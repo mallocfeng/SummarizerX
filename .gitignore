@@ -1,5 +1,37 @@
 # macOS 自动生成文件
 .DS_Store
 
-# 压缩包归档
+# Node.js 依赖
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 构建/打包产物
+dist/
+build/
 *.zip
+*.tar.gz
+
+# VSCode / JetBrains 编辑器配置
+.vscode/
+.idea/
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+
+# 本地环境配置（避免提交敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+*.log
+*.bak
+*.tmp
+*.swp
+
+# Chrome 插件打包文件
+*.crx
+*.pem
