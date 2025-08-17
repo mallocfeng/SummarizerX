@@ -28,6 +28,9 @@ It supports both **Local Fast Mode** and **AI Cleaning Mode** for better readabi
 3. Enable **Developer Mode**
 4. Click **Load unpacked** → select the project folder
 
+Or download the packaged ZIP from [Releases](https://github.com/mallocfeng/SummarizerX/releases),  
+enable **Developer Mode** in `chrome://extensions/`, then drag & drop the ZIP file into the page.
+
 ### ⌨️ Shortcuts
 You can set custom shortcuts at:  
 `chrome://extensions/shortcuts`
@@ -60,6 +63,9 @@ You can set custom shortcuts at:
 2. 打开 **Chrome 扩展管理页面**：`chrome://extensions/`
 3. 开启 **开发者模式**
 4. 点击 **加载已解压的扩展程序** → 选择本项目文件夹
+
+或者直接在 [Releases](https://github.com/mallocfeng/SummarizerX/releases) 下载打包好的 ZIP 文件，  
+打开 `chrome://extensions/` 页面，启用 **开发者模式**，再将 ZIP 文件拖拽进去即可。
 
 ### ⌨️ 快捷键
 你可以在以下页面设置自定义快捷键：  
