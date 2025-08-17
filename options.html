@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 摘要阅读器 - 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <!-- 顶部抬头区 -->
+  <header class="hero">
+    <div class="wrap">
+      <h1 class="hero-title">
+        麦乐可 AI 摘要阅读器 · 设置
+        <span class="badge">v1.4.2</span>
+      </h1>
+      <p class="hero-sub">配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的“保存全部设置”。</p>
+    </div>
+  </header>
+
+  <main class="wrap main-with-dock">
+    <!-- 基础配置 -->
+    <section class="section card">
+      <h2 class="section-title"><span class="dot"></span> 基础配置</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label class="label">OpenAI API Key</label>
+          <div class="eye-wrap">
+            <input id="apiKey" class="ctrl" type="password" placeholder="sk-..." />
+            <button id="toggleKey" class="eye-btn" type="button" aria-label="显示/隐藏">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Base URL</label>
+          <input id="baseURL" class="ctrl" placeholder="https://api.openai.com/v1" />
+        </div>
+
+        <div class="field">
+          <label class="label">清洗模型（extract）</label>
+          <input id="model_extract" class="ctrl" placeholder="gpt-4o-mini" />
+        </div>
+
+        <div class="field">
+          <label class="label">摘要/翻译模型（summarize）</label>
+          <input id="model_summarize" class="ctrl" placeholder="gpt-4o-mini" />
+        </div>
+
+        <div class="field">
+          <label class="label">输出语言（Output Language）</label>
+          <select id="output_lang" class="ctrl">
+            <option value="">自动（Auto）</option>
+            <option value="zh">中文（Chinese）</option>
+            <option value="en">English（英文）</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label">正文提取方式（Extract Mode）</label>
+          <select id="extract_mode" class="ctrl">
+            <option value="fast">本地快速（推荐）</option>
+            <option value="ai">AI 清洗</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- System Prompt -->
+    <section class="section card note">
+      <h2 class="section-title"><span class="dot"></span> System Prompt（系统提示词）</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label class="label">选择预设（Presets）</label>
+          <select id="system_prompt_preset" class="ctrl">
+            <option value="general_summary">General summarization</option>
+            <option value="faithful_translation">Faithful translation</option>
+            <option value="tech_article_translation">Tech article translation</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="help">
+            说明：可选预设为英文描述；你也可以在下面输入自定义提示词。<br/>
+            无论选择哪种提示词，系统都会强制追加一句“请将结果输出为目标语言”（根据“输出语言”或自动识别）。
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">自定义系统提示词（可留空）</label>
+        <textarea id="system_prompt_custom" class="ctrl mono" placeholder="例如：Be concise and faithful. Keep structure and factual accuracy."></textarea>
+      </div>
+    </section>
+
+    <!-- 快捷键设置（内容最后一栏） -->
+    <section class="section card shortcut">
+      <h2 class="section-title"><span class="dot"></span> 快捷键设置</h2>
+      <p class="shortcut-desc">你可以在 Chrome 的扩展快捷键页面里绑定快捷键，用于快速打开侧边栏。</p>
+      <div class="row btns">
+        <button id="open-shortcut" class="btn">去设置快捷键</button>
+        <span class="hint">前往 <code>chrome://extensions/shortcuts</code>，搜索“麦乐可AI摘要阅读器”，给命令 <code>打开/切换侧边栏</code> 绑定组合键。</span>
+      </div>
+    </section>
+  </main>
+
+  <!-- 固定底栏：全局统一保存 -->
+  <aside class="save-dock">
+    <div class="dock-inner wrap">
+      <div class="dock-left">
+        <div class="status-line">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status" class="status-text">就绪</span>
+        </div>
+        <div id="meta" class="meta"></div>
+      </div>
+      <div class="dock-right">
+        <button id="btn-test" class="btn">测试 API Key</button>
+        <button id="btn-save" class="btn primary">保存全部设置</button>
+      </div>
+    </div>
+  </aside>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
