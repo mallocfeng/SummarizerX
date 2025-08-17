@@ -18,6 +18,9 @@ It supports both **Local Fast Mode** and **AI Cleaning Mode** for better readabi
 - ⚙️ **Custom Settings** — system prompt, default mode, shortcuts, etc.  
 - 📑 **Side Panel UI** — read summaries without leaving your page  
 
+![SummarizerX Screenshot](images/screenshot.png)
+![SummarizerX Screenshot](images/screenshot2.png)
+
 ### 🚀 Installation
 1. Clone this repo:  
    `git clone https://github.com/mallocfeng/SummarizerX.git`
@@ -47,6 +50,9 @@ You can set custom shortcuts at:
 - 📝 **摘要与翻译** —— 快速了解文章核心，支持翻译  
 - ⚙️ **个性化设置** —— 支持 System Prompt、默认模式、快捷键等  
 - 📑 **侧边栏阅读** —— 无需跳转，直接查看摘要  
+
+![软件截图](images/screenshot.png)
+![软件截图](images/screenshot2.png)
 
 ### 🚀 安装方法
 1. 克隆仓库：  
