@@ -167,6 +167,37 @@
         margin-left: 0;
         list-style-position: inside;
       }
+
+
+      /* 图标按钮：用于右上角 × */
+        .btn.icon{
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        line-height: 1;
+        font-size: 18px;   /* × 的大小 */
+        border-radius: 10px;
+        border: 1px solid #d1d5db; /* 更明显的灰色边框 */
+        background: linear-gradient(180deg, #f9f9f9, #e5e7eb);
+        color: #333;
+        cursor: pointer;
+        transition: background .2s, box-shadow .2s, transform .05s;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08); /* 轻微投影 */
+        }
+
+        .btn.icon:hover{
+        background: linear-gradient(180deg, #ffffff, #d1d5db);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15); /* hover 阴影更明显 */
+        border-color: #cbd5e1;
+        }
+
+        .btn.icon:active{
+        transform: translateY(1px);
+        background: linear-gradient(180deg, #e5e7eb, #cbd5e1);
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); /* 按下时内凹效果 */
+        #sx-close{ font-size: 18px; }
     `;
     const root = document.createElement("div");
     root.innerHTML = `
@@ -177,7 +208,14 @@
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
-            <button id="sx-close" class="btn" title="关闭">关闭</button>
+            <button id="sx-close" class="btn icon" title="关闭" aria-label="关闭">
+            <svg xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                width="16" height="16" 
+                fill="#1e3a8a"> <!-- 深蓝色 -->
+                <path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7a1 1 0 0 0-1.41 1.42L10.59 12l-4.89 4.89a1 1 0 0 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/>
+            </svg>
+            </button>
           </div>
         </div>
         <div id="sx-progress" class="progress hidden"><div class="bar"></div></div>
