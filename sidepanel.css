@@ -19,11 +19,7 @@
   --ring: 0 0 0 3px rgba(37,99,235,0.15);
 
   /* 系统字体栈（中英文兼容） */
-  --font-stack: "PingFang SC", -apple-system, BlinkMacSystemFont,
-              "Microsoft YaHei", "Microsoft YaHei UI",
-              "Segoe UI", Roboto, "Helvetica Neue", Arial,
-              "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC", "WenQuanYi Micro Hei",
-              sans-serif;
+  --font-stack: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif;
 }
 
 /* 基础 */
@@ -31,7 +27,7 @@
 html, body {
   height: 100%;
   margin: 0;
-  font-family: var(--font-stack);
+  font-family: var(--font-stack, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif);
 }
 
 body {
@@ -40,7 +36,11 @@ body {
 }
 
 /* 常见容器/组件强制继承字体，避免被局部样式覆盖 */
-:where(#app, .container, .card, .markdown, .btn, .input, .label, .menu, .toolbar, .alert, .empty, .skl, .progress, table, th, td, code, pre) {
+/* :where(#app, .container, .card, .markdown, .btn, .input, .label, .menu, .toolbar, .alert, .empty, .skl, .progress, table, th, td, code, pre) {
+  font-family: inherit;
+} */
+
+:where(*, *::before, *::after){
   font-family: inherit;
 }
 

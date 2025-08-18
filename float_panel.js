@@ -84,7 +84,7 @@
 
     host = document.createElement("div");
     host.id = PANEL_ID;
-    host.style.all = "initial";
+    // ⚠️ 删除会导致默认 serif 的 reset：host.style.all = "initial";
     host.style.position = "fixed";
     host.style.top = "0";
     host.style.right = "0";
@@ -92,31 +92,32 @@
     host.style.height = "100vh";
     host.style.zIndex = "2147483647";
     host.style.pointerEvents = "auto";
+    host.setAttribute("lang", "zh-CN");   // 提示中文环境，避免 fallback 到宋体等衬线
 
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
-      :host{ all:initial; }
-      /* ✅ 字体：默认苹方，Windows 回退雅黑 */
+      /* === 字体与隔离：Shadow DOM 内确保与 options 一致 === */
       :host{
-        --font-stack: "PingFang SC", -apple-system, BlinkMacSystemFont,
-                      "Microsoft YaHei", "Microsoft YaHei UI",
-                      "Segoe UI", Roboto, "Helvetica Neue", Arial,
-                      "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC", "WenQuanYi Micro Hei",
-                      sans-serif;
-        font-family: var(--font-stack);
-      }
-      *{ box-sizing: border-box; }
-      html, body{ height:100%; }
-      body{
-        margin:0;
-        font-family: var(--font-stack);
-      }
-      /* 避免子节点覆盖字体（Shadow 内通用组件） */
-      :where(.wrap, .appbar, .brand, .title, .actions, .btn, .progress, .container, .section, .section-title, .card, .alert, .empty, .skl, .footer, table, th, td, code, pre){
-        font-family: inherit;
+        /* 与 options 同步的无衬线栈；加入 Win 与 Mac 常用中文无衬线 */
+        --font-stack: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+                      "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+
+        /* 关键：直接应用到 :host，并加 fallback 与 !important 避免任何覆盖 */
+        font-family: var(--font-stack, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+                         "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif) !important;
       }
 
+      /* 让所有子元素继承 :host 的字体，抵御宿主站点样式 */
+      :host, :host * {
+        font-family: inherit !important;
+        box-sizing: border-box; /* 全局统一盒模型 */
+      }
+
+      /* 表单控件默认字体不一致，这里强制继承，防止“看起来像换了字体” */
+      button, input, select, textarea { font-family: inherit !important; }
+
+      /* —— 下面是你原有的视觉与布局样式 —— */
       .wrap{ height:100vh; display:flex; flex-direction:column; background:#f6f8ff; border-left:1px solid #e6e8f0; box-shadow:-6px 0 16px rgba(17,24,39,.06); }
       .appbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(180deg,#fff,#f4f7ff); border-bottom:1px solid #e6e8f0; }
       .brand{ display:flex; align-items:center; gap:10px; }
@@ -239,7 +240,6 @@
     shadow.getElementById("sx-run").disabled = !!loading;
     shadow.getElementById("sx-progress").classList.toggle("hidden", !loading);
   }
-  //   原始 renderToDom 已注释
 
   function renderToDom(shadow, summary, cleaned) {
     const $s = shadow.getElementById("sx-summary");
