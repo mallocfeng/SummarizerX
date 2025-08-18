@@ -22,19 +22,22 @@
   </header>
 
   <main class="container">
-    <!-- 摘要区：去掉外层标题，仅保留卡片标题栏 -->
+    <!-- 摘要区：保留“Windows 风格标题栏”，内容写入 card-body(#summary) -->
     <section class="section section-summary">
-      <div id="summary"
-           class="card card-summary"
+      <div class="card card-summary"
            data-title="摘要"
            role="region"
-           aria-label="摘要"></div>
+           aria-label="摘要">
+        <div id="summary" class="card-body"></div>
+      </div>
     </section>
 
-    <!-- 正文区：保留分区标题，结构更清晰 -->
+    <!-- 正文区：保留分区标题，内容写入 card-body(#cleaned) -->
     <section class="section">
       <h2 class="section-title"><span class="dot green"></span> 可读正文</h2>
-      <div id="cleaned" class="card card-clean"></div>
+      <div class="card card-clean">
+        <div id="cleaned" class="card-body"></div>
+      </div>
     </section>
   </main>
 
