@@ -1,4 +1,5 @@
 // sidepanel.js —— 支持 "partial"：摘要先显示、正文后到再补
+// ✅ 修复：无权限/未注入时会尝试本页注入；仅在确实缺权限时提示“点击扩展图标重新授权”
 
 const $ = (id) => document.getElementById(id);
 const onReady = new Promise((r) =>
@@ -24,6 +25,12 @@ async function getActiveTabId() {
 }
 let LAST_RUN_TAB_ID = null;
 
+/* 工具：获取当前活动页的 host */
+async function getActiveHost() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  try { return tab?.url ? (new URL(tab.url)).host : ""; } catch { return ""; }
+}
+
 /* =========================
  * Markdown 渲染（含 :::notice）
  * ========================= */
@@ -39,8 +46,7 @@ function renderNoticeMarkdown(md = "") {
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escapeHtml(code)}</code></pre>`);
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
              .replace(/\*(.+?)\*/g, "<em>$1</em>")
-             .replace(/`([^`]+?)`/g, "<code>$1</code>")
-             .replace(/$begin:math:display$([^$end:math:display$]+)\]$begin:math:text$([^)]+)$end:math:text$/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+             .replace(/`([^`]+?)`/g, "<code>$1</code>");
   html = html.replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm, (block) => {
     const items = block.split(/\n/).map(l => l.replace(/^(?:- |\* )/, "").trim()).filter(Boolean);
     return `<ul>${items.map(i => `<li>${i}</li>`).join("")}</ul>`;
@@ -67,7 +73,7 @@ function renderMarkdown(md = "") {
   let html = escapeHtml(md);
 
   // 代码块
-  html = html.replace(/```([\\s\S]*?)```/g, (_, code) =>
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) =>
     `<pre><code>${escapeHtml(code)}</code></pre>`
   );
 
@@ -129,7 +135,6 @@ function setButtonLoading(loading=true){
 }
 function showProgress(show=true){ $("progress")?.classList.toggle("hidden", !show); }
 function skeleton(){
-  // 摘要给骨架，正文给更长骨架
   $("summary").innerHTML=`<div class="skl" style="width:90%"></div><div class="skl" style="width:72%"></div><div class="skl" style="width:84%"></div>`;
   $("cleaned").innerHTML=`<div class="skl" style="width:96%"></div><div class="skl" style="width:64%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
 }
@@ -150,6 +155,70 @@ function renderToDom(summary, cleaned){
   $("cleaned").innerHTML = cleaned ? renderMarkdown(cleaned) : empty("cleaned");
 }
 
+/* ========= 友好的“重新授权”提示 ========= */
+function showReauthBanner(host){
+  const msgZh = `需要访问 <code>${escapeHtml(host)}</code> 的权限。请单击浏览器工具栏中的扩展图标（蓝色按钮）以重新授权本标签页，然后再点击“提取并摘要”。`;
+  const html =
+    `<div class="alert" data-alert id="reauth-banner" style="margin-top:10px">
+      <button class="alert-close" type="button" aria-label="关闭" title="关闭" data-alert-close>&times;</button>
+      <div class="alert-content"><p>${msgZh}</p></div>
+    </div>`;
+  const box = $("summary");
+  if (!box) return;
+  const old = document.getElementById("reauth-banner");
+  if (old) old.remove();
+  box.insertAdjacentHTML("afterbegin", html);
+}
+function removeReauthBanner(){
+  const old = document.getElementById("reauth-banner");
+  if (old) old.remove();
+}
+
+/* =======================================================
+ * 权限/注入探测与自我注入（不新增 host 权限）
+ * ======================================================= */
+async function tryInjectIntoActiveTab(tabId) {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    return true;
+  } catch (e) {
+    return { ok:false, error: e?.message || String(e) };
+  }
+}
+
+async function canAccessAndEnsureInjected() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab?.url) return { ok:false, reason:"no-tab" };
+
+  // 仅支持 http/https/file/ftp
+  if (!/^https?:|^file:|^ftp:/i.test(tab.url)) return { ok:false, reason:"scheme" };
+
+  // 1) 先 PING
+  try {
+    const ping = await chrome.tabs.sendMessage(tab.id, { type: "PING_EXTRACTOR" });
+    if (ping?.ok) return { ok:true, injected:true, tabId:tab.id };
+  } catch {}
+
+  // 2) 未注入则尝试注入（依赖 activeTab 临时授权）
+  const inj = await tryInjectIntoActiveTab(tab.id);
+  if (inj === true) {
+    // 注入成功再 PING 一次确认
+    try {
+      const ping2 = await chrome.tabs.sendMessage(tab.id, { type: "PING_EXTRACTOR" });
+      if (ping2?.ok) return { ok:true, injected:true, tabId:tab.id };
+    } catch {}
+    return { ok:false, reason:"inject-unknown", tabId:tab.id };
+  }
+
+  // 3) 注入报错，判断是否明确的权限问题
+  const msg = (inj && inj.error) ? inj.error : "";
+  if (/must request permission to access this host|Cannot access contents|Extensions settings|prohibited/i.test(msg)) {
+    return { ok:false, reason:"no-permission", error: msg, tabId:tab.id };
+  }
+  return { ok:false, reason:"inject-failed", error: msg, tabId:tab.id };
+}
+
 /* ====================
  * 与后台通信（按 tabId）
  * ==================== */
@@ -161,7 +230,7 @@ async function getStateFromBG(tabId){
 async function runForTab(tabId){
   const resp = await chrome.runtime.sendMessage({ type: "PANEL_RUN_FOR_TAB", tabId });
   if (!resp?.ok) throw new Error(resp?.error || "运行失败");
-  return true; // 后台改为立即返回 ok，实际数据走广播
+  return true; // 后台立即返回 ok，实际数据走广播
 }
 
 /* ==========================
@@ -196,14 +265,32 @@ async function restoreOnce(){
 }
 
 /* ============================
- * 点击运行：重新获取当前活动 tabId，
- * 绑定到 LAST_RUN_TAB_ID，并兜底重试（摘要先来，正文随后补）
+ * 点击运行：先自检注入→不足才提示重新授权
  * ============================ */
 async function onRun(){
   let tabId = await getActiveTabId();
   if (!tabId) { alert("没有找到可用的活动标签页"); return; }
 
   LAST_RUN_TAB_ID = tabId;
+
+  // 运行前：确保可访问 & 已注入
+  const access = await canAccessAndEnsureInjected();
+  if (!access.ok) {
+    const host = await getActiveHost();
+    if (access.reason === "scheme") {
+      $("summary").innerHTML = `<div class="alert" data-alert><div class="alert-content"><p>🚫 此页面协议不支持抓取（如 chrome://、扩展页、PDF 查看器等）。</p></div></div>`;
+    } else if (access.reason === "no-permission") {
+      showReauthBanner(host || "当前站点");
+    } else {
+      // 注入失败等其他未知情况
+      showReauthBanner(host || "当前站点");
+    }
+    setButtonLoading(false); showProgress(false);
+    return;
+  }
+
+  // 能访问 & 已注入 —— 清掉提示，进入骨架并启动
+  removeReauthBanner();
   setButtonLoading(true); showProgress(true); skeleton();
 
   try{
@@ -212,7 +299,6 @@ async function onRun(){
     const st = await getStateFromBG(tabId);
     if (st.status === "partial"){
       $("summary").innerHTML = st.summary ? renderMarkdown(st.summary) : empty("summary");
-      // 正文继续加载，保持骨架
     } else if (st.status === "done"){
       renderToDom(st.summary, st.cleaned);
       setButtonLoading(false); showProgress(false);
@@ -221,20 +307,15 @@ async function onRun(){
     }
   } catch(e){
     const msg = e?.message || String(e);
-    if (/No tab with id/i.test(msg)) {
-      try {
-        tabId = await getActiveTabId();
-        if (!tabId) throw new Error(msg);
-        LAST_RUN_TAB_ID = tabId;
-        await runForTab(tabId);
-      } catch(e2){
-        console.error(e2); renderEmptyBoth(); alert("运行失败：\n" + (e2?.message || String(e2)));
-        setButtonLoading(false); showProgress(false);
-      }
-    } else {
-      console.error(e); renderEmptyBoth(); alert("运行失败：\n" + msg);
+    // 若后台仍报权限错误，再给提示
+    if (/Cannot access contents of url|must request permission to access this host|Receiving end does not exist/i.test(msg)) {
+      const host = await getActiveHost();
+      showReauthBanner(host || "当前站点");
       setButtonLoading(false); showProgress(false);
+      return;
     }
+    console.error(e); renderEmptyBoth(); alert("运行失败：\n" + msg);
+    setButtonLoading(false); showProgress(false);
   }
 }
 
@@ -262,6 +343,101 @@ chrome.runtime.onMessage.addListener(async (msg) => {
       setButtonLoading(false); showProgress(false); renderEmptyBoth();
     }
   } catch(e){ console.warn(e); }
+});
+
+/* =======================================================
+ * 静默检测是否具备访问/注入能力：
+ * - 仅在明确“无权限”时才提示
+ * - 有权限或只是暂时未就绪则不打扰
+ * - 对 onUpdated/onActivated 做去抖处理，避免频繁触发
+ * ======================================================= */
+const pendingTimers = new Map();
+
+function debouncePerTab(tabId, fn, wait = 250) {
+  if (pendingTimers.has(tabId)) clearTimeout(pendingTimers.get(tabId));
+  const t = setTimeout(() => { pendingTimers.delete(tabId); fn(); }, wait);
+  pendingTimers.set(tabId, t);
+}
+
+async function silentCheckAndMaybePrompt(tabId, urlFromChangeInfo) {
+  try {
+    // 只处理当前活动标签页
+    const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!active || active.id !== tabId) return;
+
+    const url = urlFromChangeInfo || active.url || "";
+
+    // 不支持的协议：直接收起提示，不打扰
+    if (!/^https?:|^file:|^ftp:/i.test(url)) { removeReauthBanner(); return; }
+
+    // --- ① 先问后台：这个 tab 是否已经被“点过图标”授权过？（同一 tab 内换站点也视为已授权）
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "CHECK_GRANTED", tabId });
+      if (resp && resp.ok === true) {
+        removeReauthBanner();   // 已授权 → 不提示
+        return;
+      }
+    } catch (_) {
+      // 后台没有实现 CHECK_GRANTED 时忽略，继续后面的静默检测
+    }
+
+    // --- ② 尝试 ping 已注入的内容脚本（已注入即视为可用）
+    try {
+      const ping = await chrome.tabs.sendMessage(tabId, { type: "PING_EXTRACTOR" });
+      if (ping?.ok) { removeReauthBanner(); return; }
+    } catch (_) {
+      // ignore，进入下一步
+    }
+
+    // --- ③ 静默试探注入：只用来区分“真无权限”与“暂时未就绪”，不在这里抛 UI 错
+    let injErr = "";
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] });
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+      // 注入成功后再 ping 一次确认
+      try {
+        const ping2 = await chrome.tabs.sendMessage(tabId, { type: "PING_EXTRACTOR" });
+        if (ping2?.ok) { removeReauthBanner(); return; }
+      } catch (_) { /* 继续判定 */ }
+    } catch (e) {
+      injErr = e?.message || String(e);
+    }
+
+    // --- ④ 只有能“明确识别为权限问题”才提示；否则静默
+    const isPermError = /must request permission to access this host|Cannot access contents|prohibited|Extensions settings|Extension manifest must request permission/i.test(injErr);
+
+    if (isPermError) {
+      // 轻量防抖：1500ms 内不重复弹提示
+      if (!window.__SX_LAST_REAUTH_TS) window.__SX_LAST_REAUTH_TS = 0;
+      const now = Date.now();
+      if (now - window.__SX_LAST_REAUTH_TS < 1500) return;
+      window.__SX_LAST_REAUTH_TS = now;
+
+      const host = (() => { try { return new URL(url).host; } catch { return "当前站点"; } })();
+      showReauthBanner(host);
+    } else {
+      removeReauthBanner();
+    }
+  } catch {
+    // 任意异常都不提示，避免打扰
+  }
+}
+
+/* ============================
+ * 标签页 URL 变化/加载完成：静默检测
+ * ============================ */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // 仅在 active 标签页上处理，且在 URL 变化或加载完成时触发
+  if (!tab?.active) return;
+  if (!changeInfo.url && changeInfo.status !== "complete") return;
+  debouncePerTab(tabId, () => silentCheckAndMaybePrompt(tabId, changeInfo.url));
+});
+
+/* ============================
+ * 标签页切换：静默检测当前活动页
+ * ============================ */
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  debouncePerTab(tabId, () => silentCheckAndMaybePrompt(tabId));
 });
 
 /* =========

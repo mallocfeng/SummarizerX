@@ -1,6 +1,13 @@
 // background.js —— 两阶段：先出“摘要”(status: partial)，后出“可读正文”(status: done)
 // 同时修复 sidePanel 打开顺序 & 去除重复 onClicked 监听；保留最小权限（activeTab 动态注入）
 
+
+// 记录用户点击图标后“已授权”的 tab
+//const grantedTabs = new Set();
+
+// 记录每个 tab 最近一次已知 URL（用于判断是否导航）
+const lastUrlByTab = new Map();
+
 const DEFAULT_CONFIG = {
   baseURL: "https://api.openai.com/v1",
   model_extract: "gpt-4o-mini",
@@ -316,10 +323,10 @@ async function openSidePanelForTab(tabId) {
 }
 
 // 扩展图标点击：只保留这一处监听（去重）
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab?.id) return;
-  await openSidePanelForTab(tab.id);
-});
+// chrome.action.onClicked.addListener(async (tab) => {
+//   if (!tab?.id) return;
+//   await openSidePanelForTab(tab.id);
+// });
 
 // 快捷键（commands）：打开当前活动页的侧栏
 // chrome.commands.onCommand.addListener(async (command) => {
@@ -327,3 +334,95 @@ chrome.action.onClicked.addListener(async (tab) => {
 //   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
 //   if (active?.id) await openSidePanelForTab(active.id);
 // });
+
+
+// background.js
+const grantedTabs = new Set();
+
+// 当用户点击图标时，标记这个 tab 已授权
+// chrome.action.onClicked.addListener((tab) => {
+//   if (tab.id) {
+//     grantedTabs.add(tab.id);
+//     // 原有逻辑：执行 content.js 注入
+//     chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["utils_extract.js"] });
+//     chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+//   }
+// });
+
+chrome.action.onClicked.addListener((tab) => {
+  if (tab?.id) {
+    grantedTabs.add(tab.id);
+    // 可选：此处保持你现有的“尝试注入”，不强制
+    // chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["utils_extract.js"] });
+    // chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+
+    // 打开 sidepanel（如果你已有 openSidePanelForTab，则复用）
+    chrome.sidePanel?.setOptions?.({ tabId: tab.id, path: "sidepanel.html", enabled: true }).catch(()=>{});
+    chrome.sidePanel?.open?.({ tabId: tab.id }).catch(()=>{});
+  }
+});
+
+
+
+// 小防抖：避免多次事件频繁触发导致闪烁
+const closeDebounce = new Map();
+function debounceClose(tabId, fn, wait = 200) {
+  if (closeDebounce.has(tabId)) clearTimeout(closeDebounce.get(tabId));
+  const t = setTimeout(() => { closeDebounce.delete(tabId); fn(); }, wait);
+  closeDebounce.set(tabId, t);
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // 只处理当前窗口的活动标签页
+  if (!tab?.active) return;
+
+  const urlChanged = typeof changeInfo.url === "string";
+  const startedLoading = changeInfo.status === "loading";
+
+  // 仅当发生导航或开始加载时触发关闭
+  if (!urlChanged && !startedLoading) return;
+
+  debounceClose(tabId, async () => {
+    // 记录 URL 变化（可用于后续判断）
+    if (urlChanged) {
+      lastUrlByTab.set(tabId, changeInfo.url);
+    }
+
+    // 收起面板 + 清理授权，让用户必须重新点击
+    grantedTabs.delete(tabId);
+    await closeSidePanelForTab(tabId);
+  });
+});
+
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  grantedTabs.delete(tabId);
+  lastUrlByTab.delete(tabId);
+  if (closeDebounce.has(tabId)) clearTimeout(closeDebounce.get(tabId));
+  closeDebounce.delete(tabId);
+});
+
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  grantedTabs.delete(removedTabId);
+  lastUrlByTab.delete(removedTabId);
+});
+
+
+
+async function closeSidePanelForTab(tabId) {
+  try {
+    // 设置 enabled:false 会收起 sidepanel
+    await chrome.sidePanel.setOptions({ tabId, enabled: false });
+  } catch (e) {
+    // 少数旧版不支持 enabled:false，可忽略
+  }
+}
+
+// 侧边栏或其他逻辑需要知道是否已授权
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "CHECK_GRANTED") {
+    sendResponse({ ok: grantedTabs.has(msg.tabId) });
+    return true;
+  }
+});
+
