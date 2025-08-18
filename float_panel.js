@@ -97,12 +97,26 @@
     const style = document.createElement("style");
     style.textContent = `
       :host{ all:initial; }
+      /* ✅ 字体：默认苹方，Windows 回退雅黑 */
+      :host{
+        --font-stack: "PingFang SC", -apple-system, BlinkMacSystemFont,
+                      "Microsoft YaHei", "Microsoft YaHei UI",
+                      "Segoe UI", Roboto, "Helvetica Neue", Arial,
+                      "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC", "WenQuanYi Micro Hei",
+                      sans-serif;
+        font-family: var(--font-stack);
+      }
       *{ box-sizing: border-box; }
       html, body{ height:100%; }
       body{
         margin:0;
-        font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Source Han Sans SC",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+        font-family: var(--font-stack);
       }
+      /* 避免子节点覆盖字体（Shadow 内通用组件） */
+      :where(.wrap, .appbar, .brand, .title, .actions, .btn, .progress, .container, .section, .section-title, .card, .alert, .empty, .skl, .footer, table, th, td, code, pre){
+        font-family: inherit;
+      }
+
       .wrap{ height:100vh; display:flex; flex-direction:column; background:#f6f8ff; border-left:1px solid #e6e8f0; box-shadow:-6px 0 16px rgba(17,24,39,.06); }
       .appbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(180deg,#fff,#f4f7ff); border-bottom:1px solid #e6e8f0; }
       .brand{ display:flex; align-items:center; gap:10px; }
@@ -225,11 +239,31 @@
     shadow.getElementById("sx-run").disabled = !!loading;
     shadow.getElementById("sx-progress").classList.toggle("hidden", !loading);
   }
+  //   原始 renderToDom 已注释
+
   function renderToDom(shadow, summary, cleaned) {
     const $s = shadow.getElementById("sx-summary");
     const $c = shadow.getElementById("sx-cleaned");
-    $s.innerHTML = summary ? renderMarkdown(summary) : `<div class="empty"><div class="icon">📝</div><div class="title">暂无摘要</div></div>`;
-    $c.innerHTML = cleaned ? renderMarkdown(cleaned) : `<div class="empty"><div class="icon">📄</div><div class="title">暂无可读正文</div></div>`;
+
+    // 摘要：正常渲染或初始空态
+    $s.innerHTML = summary
+      ? renderMarkdown(summary)
+      : `<div class="empty"><div class="icon">📝</div><div class="title">暂无摘要</div></div>`;
+
+    // 可读正文：区分三态
+    // 1) cleaned === null  -> partial 阶段：保持“加载动效/骨架屏”
+    // 2) cleaned 为字符串 -> 最终结果
+    // 3) 其他（undefined/空串）-> 初始空态
+    if (cleaned === null) {
+      $c.innerHTML =
+        `<div class="skl" style="width:96%"></div>` +
+        `<div class="skl" style="width:88%"></div>` +
+        `<div class="skl" style="width:76%"></div>`;
+    } else {
+      $c.innerHTML = cleaned
+        ? renderMarkdown(cleaned)
+        : `<div class="empty"><div class="icon">📄</div><div class="title">暂无可读正文</div></div>`;
+    }
   }
 
   // ===== 打开/绑定 =====
@@ -317,9 +351,9 @@
         if (st.status === "partial") {
           renderToDom(shadow, st.summary, null);
         } else if (st.status === "done") {
-          renderToDom(shadow, st.summary, st.cleaned);
-          setLoading(shadow, false);
-          return;
+          // ✅ 不再早退：此时很可能是上一次的 done，新一轮马上会把状态切到 running/partial
+          setLoading(shadow, true);
+          setSkeleton(shadow);
         }
       } catch {}
       // 无论如何开始轮询，直到 done

@@ -296,15 +296,31 @@ async function onRun(){
   try{
     await runForTab(tabId);
     // 立刻拉一次状态（可能已经 partial）
+    // const st = await getStateFromBG(tabId);
+    // if (st.status === "partial"){
+    //   $("summary").innerHTML = st.summary ? renderMarkdown(st.summary) : empty("summary");
+    // } else if (st.status === "done"){
+    //   renderToDom(st.summary, st.cleaned);
+    //   setButtonLoading(false); showProgress(false);
+    // } else if (st.status === "error"){
+    //   renderEmptyBoth(); setButtonLoading(false); showProgress(false);
+    // }
+
     const st = await getStateFromBG(tabId);
     if (st.status === "partial"){
       $("summary").innerHTML = st.summary ? renderMarkdown(st.summary) : empty("summary");
+    // 不再把“done”当成终止；这里很可能是旧状态，保持加载并交给轮询
     } else if (st.status === "done"){
-      renderToDom(st.summary, st.cleaned);
-      setButtonLoading(false); showProgress(false);
+      // 不要 setButtonLoading(false) / 不要 return
+      // 可以什么都不做，或仅保持骨架屏：
+      // skeleton();
     } else if (st.status === "error"){
       renderEmptyBoth(); setButtonLoading(false); showProgress(false);
     }
+    // 关键：无论上面拉到什么状态，都开始轮询直到真正的 done
+    pollUntilDone(tabId);
+
+
   } catch(e){
     const msg = e?.message || String(e);
     // 若后台仍报权限错误，再给提示

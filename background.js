@@ -221,6 +221,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
       // 🚀 关键改动：**立刻**回复 ok，然后“后台异步”跑两阶段任务
+      await setState(msg.tabId, { status: "running" }); // 抢先置 running
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
@@ -286,10 +287,22 @@ async function closeAllFloatPanels() {
   } catch {}
 }
 
+// chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+//   if (!changeInfo.url && changeInfo.status !== "loading") return;
+//   closeAllFloatPanels();
+// });
+
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // 只要开始加载或 URL 变化，就清掉该 tab 的缓存状态
+  if (changeInfo.status === "loading" || changeInfo.url) {
+    chrome.storage.session.remove(STATE_KEY(tabId));
+  }
+
   if (!changeInfo.url && changeInfo.status !== "loading") return;
   closeAllFloatPanels();
 });
+
 chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
 
 chrome.tabs.onRemoved.addListener((tabId) => { grantedTabs.delete(tabId); lastUrlByTab.delete(tabId); });
