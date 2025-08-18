@@ -73,7 +73,7 @@ async function loadSettings() {
 async function saveSettings() {
   const payload = {
     apiKey: $("apiKey").value.trim(),
-    baseURL: $("baseURL").value.trim(),
+    baseURL: ($("baseURL").value.trim() || DEFAULTS.baseURL).replace(/\/+$/,""),
     model_extract: $("model_extract").value.trim(),
     model_summarize: $("model_summarize").value.trim(),
     output_lang: $("output_lang").value,
@@ -87,16 +87,56 @@ async function saveSettings() {
 }
 
 async function testApiKey() {
+  const cleanupSlash = (s="") => s.replace(/\/+$/,"");
   try {
     const key = $("apiKey").value.trim();
+    const base = cleanupSlash($("baseURL").value.trim() || DEFAULTS.baseURL);
+    const model = $("model_summarize").value.trim() || DEFAULTS.model_summarize;
     if (!key) throw new Error("请先输入 API Key");
-    setStatus("⏳ 正在测试 API Key...");
-    const res = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${key}` }});
-    if (!res.ok) throw new Error(`无效: ${res.status} ${await res.text()}`);
-    setStatus("✅ API Key 有效");
+    setStatus("⏳ 正在测试 API Key 与 Base URL…");
+
+    // --- 尝试 1：/v1/models（多数 OpenAI 兼容端可用）
+    const resp1 = await fetch(`${base}/models`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${key}` }
+    });
+
+    if (resp1.ok) {
+      setStatus("✅ 测试通过：/models 可访问，Key 有效");
+      return;
+    }
+
+    // --- 尝试 2：/v1/chat/completions（有些兼容端不实现 /models）
+    const payload = {
+      model,
+      messages: [{ role: "user", content: "ping" }],
+      temperature: 0
+    };
+    const resp2 = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (resp2.ok) {
+      setStatus("✅ 测试通过：/chat/completions 可访问，Key 有效");
+      return;
+    }
+
+    const t1 = await safeReadText(resp1);
+    const t2 = await safeReadText(resp2);
+    throw new Error(`两种探测均失败。\n/models => ${resp1.status} ${t1}\n/chat/completions => ${resp2.status} ${t2}`);
   } catch (e) {
     setStatus("❌ 测试失败：" + (e?.message || String(e)));
   }
+}
+
+// 辅助：安全读取响应文本
+async function safeReadText(res) {
+  try { return await res.text(); } catch { return "(no body)"; }
 }
 
 function toggleApiKeyVisibility() {
@@ -130,9 +170,12 @@ function onOutputLangChange() {
   }
 }
 
-document.getElementById("open-shortcut").addEventListener("click", () => {
-  chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
-});
+const $openShortcut = document.getElementById("open-shortcut");
+if ($openShortcut) {
+  $openShortcut.addEventListener("click", () => {
+    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+  });
+}
 
 $("btn-save").addEventListener("click", saveSettings);
 $("btn-test").addEventListener("click", testApiKey);
