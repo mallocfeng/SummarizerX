@@ -22,6 +22,17 @@ function setMeta(meta) {
   $("meta").textContent = `当前配置：extract=${meta.model_extract}，summary=${meta.model_summarize}，base=${meta.baseURL}，lang=${meta.output_lang || "auto"}，mode=${meta.extract_mode}`;
 }
 
+// options.js
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('app-version');
+  if (!el) return;
+
+  const { version, version_name } = chrome.runtime.getManifest();
+  // 显示短版本，鼠标悬停显示更详细信息（可选）
+  el.textContent = `v${version}`;
+  el.title = version_name || version;
+});
+
 // —— 根据输出语言，生成强制语言尾注
 function langSuffix() {
   const lang = ($("output_lang").value || "").toLowerCase();

@@ -264,6 +264,17 @@ async function restoreOnce(){
   }
 }
 
+
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('app-version');
+  if (!el) return;
+
+  const { version, version_name } = chrome.runtime.getManifest();
+  // 显示短版本，鼠标悬停显示更详细信息（可选）
+  el.textContent = `v${version}`;
+  el.title = version_name || version;
+});
+
 /* ============================
  * 点击运行：先自检注入→不足才提示重新授权
  * ============================ */

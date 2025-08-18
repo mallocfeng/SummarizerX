@@ -193,7 +193,7 @@ body {
 }
 .card h3{ font-size:16px; margin:12px 0 8px; font-weight:600; }
 .card p{ margin:10px 0; padding-left:5px; }  /* 段落微缩进，和列表对齐 */
-.card ul, .card ol{ padding-left:24px; margin:10px 0; }
+.card ul, .card ol{ padding-left:10px; margin:10px 0; }
 .card li{ margin:6px 0; }
 .card blockquote{
   margin:14px 0; padding:10px 12px; border-left:4px solid var(--primary);
@@ -237,7 +237,7 @@ body {
 
 /* 放大“摘要/可读正文”的基础字号，细节层次 */
 #summary, #cleaned{
-  font-size:16px; line-height:1.75; color:#222;
+  font-size:14px; line-height:1.75; color:#222;
 }
 #summary h1, #cleaned h1{ font-size:20px; line-height:1.4; }
 #summary h2, #cleaned h2{ font-size:18px; line-height:1.4; }

@@ -150,6 +150,23 @@
       .alert-close{ position:absolute; top:4px; right:4px; border:none; background:transparent; font-size:16px; cursor:pointer; line-height:1; }
       .footer{ flex:0 0 auto; font-size:12px; color:#6b7280; border-top:1px solid #e6e8f0; padding:8px 12px; }
       .dragbar{ position:absolute; left:-6px; top:0; width:6px; height:100%; cursor:ew-resize; background:transparent; }
+
+      /* === 摘要(#sx-summary) 列表缩进调小 === */
+      #sx-summary ul,
+      #sx-summary ol{
+        padding-left: 14px;   /* 从默认/旧值收紧 */
+        margin-left: 0;       /* 去掉 UA 默认外边距，避免双重缩进 */
+        list-style-position: outside; /* 圆点在外；想更紧凑可改 inside */
+      }
+      #sx-summary li{ margin: 4px 0; } /* 项间距略收 */
+
+      /* 更紧凑方案：给容器加 class="compact" 即可启用 */
+      #sx-summary.compact ul,
+      #sx-summary.compact ol{
+        padding-left: 0;
+        margin-left: 0;
+        list-style-position: inside;
+      }
     `;
     const root = document.createElement("div");
     root.innerHTML = `
