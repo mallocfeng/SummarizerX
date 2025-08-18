@@ -8,7 +8,8 @@ const DEFAULTS = {
   output_lang: "",
   extract_mode: "fast",
   system_prompt_preset: "general_summary",
-  system_prompt_custom: ""
+  system_prompt_custom: "",
+  aiProvider: "openai",
 };
 
 const PRESETS = {
@@ -17,18 +18,36 @@ const PRESETS = {
   tech_article_translation: "You are a technical translator for software articles. Keep code, commands and technical terms unchanged. Clarify ambiguous references."
 };
 
+// —— 各平台预设
+const PROVIDER_PRESETS = {
+  openai: {
+    baseURL: "https://api.openai.com/v1",
+    model_extract: "gpt-4o-mini",
+    model_summarize: "gpt-4o-mini",
+    apiKeyKey: "apiKey_openai",
+  },
+  deepseek: {
+    baseURL: "https://api.deepseek.com/v1",
+    model_extract: "deepseek-chat",
+    model_summarize: "deepseek-chat",
+    apiKeyKey: "apiKey_deepseek",
+  },
+  custom: {
+    // 自定义不套默认，保持用户可自由输入
+    apiKeyKey: "apiKey_custom",
+  }
+};
+
 function setStatus(text) { $("status").textContent = text; }
 function setMeta(meta) {
-  $("meta").textContent = `当前配置：extract=${meta.model_extract}，summary=${meta.model_summarize}，base=${meta.baseURL}，lang=${meta.output_lang || "auto"}，mode=${meta.extract_mode}`;
+  $("meta").textContent = `当前配置：provider=${meta.aiProvider}，extract=${meta.model_extract}，summary=${meta.model_summarize}，base=${meta.baseURL}，lang=${meta.output_lang || "auto"}，mode=${meta.extract_mode}`;
 }
 
-// options.js
+// 版本号
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-version');
   if (!el) return;
-
   const { version, version_name } = chrome.runtime.getManifest();
-  // 显示短版本，鼠标悬停显示更详细信息（可选）
   el.textContent = `v${version}`;
   el.title = version_name || version;
 });
@@ -47,21 +66,43 @@ function applyPresetToTextarea(force = false) {
   const presetKey = $("system_prompt_preset").value || "general_summary";
   const base = PRESETS[presetKey] || PRESETS.general_summary;
   const newText = base + langSuffix();
-
   if (!box.value.trim() || force) {
     box.value = newText;
   }
 }
 
+/* =========================
+ * 载入/保存
+ * ========================= */
 async function loadSettings() {
   const d = await chrome.storage.sync.get([
-    "apiKey","baseURL","model_extract","model_summarize",
+    "aiProvider",
+    "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_custom",
+    "baseURL","model_extract","model_summarize",
     "output_lang","extract_mode","system_prompt_preset","system_prompt_custom"
   ]);
-  $("apiKey").value = d.apiKey || "";
-  $("baseURL").value = d.baseURL || DEFAULTS.baseURL;
-  $("model_extract").value = d.model_extract || DEFAULTS.model_extract;
-  $("model_summarize").value = d.model_summarize || DEFAULTS.model_summarize;
+
+  // 平台（默认 openai）
+  const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
+  $("aiProvider").value = aiProvider;
+
+  // API Key：展示当前平台专用 Key（若没有，则 fallback 到通用 apiKey 或留空）
+  const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
+  const providerSavedKey = (providerKeyName && d[providerKeyName]) ? d[providerKeyName] : "";
+  $("apiKey").value = providerSavedKey || d.apiKey || "";
+
+  // Base / 模型：如果 provider = openai / deepseek，优先用预设；否则用已存或默认
+  if (aiProvider === "openai" || aiProvider === "deepseek") {
+    const p = PROVIDER_PRESETS[aiProvider];
+    $("baseURL").value = p.baseURL;
+    $("model_extract").value = p.model_extract;
+    $("model_summarize").value = p.model_summarize;
+  } else {
+    $("baseURL").value = d.baseURL || DEFAULTS.baseURL;
+    $("model_extract").value = d.model_extract || DEFAULTS.model_extract;
+    $("model_summarize").value = d.model_summarize || DEFAULTS.model_summarize;
+  }
+
   $("output_lang").value = d.output_lang || DEFAULTS.output_lang;
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
   $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
@@ -73,6 +114,7 @@ async function loadSettings() {
   }
 
   setMeta({
+    aiProvider,
     baseURL: $("baseURL").value,
     model_extract: $("model_extract").value,
     model_summarize: $("model_summarize").value,
@@ -82,8 +124,10 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  const aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
   const payload = {
-    apiKey: $("apiKey").value.trim(),
+    aiProvider,
+    apiKey: $("apiKey").value.trim(), // 仍然保存一份“当前使用”的通用 Key
     baseURL: ($("baseURL").value.trim() || DEFAULTS.baseURL).replace(/\/+$/,""),
     model_extract: $("model_extract").value.trim(),
     model_summarize: $("model_summarize").value.trim(),
@@ -92,11 +136,21 @@ async function saveSettings() {
     system_prompt_preset: $("system_prompt_preset").value,
     system_prompt_custom: $("system_prompt_custom").value.trim()
   };
+
+  // 同时把当前平台的 key 单独保存（方便切换时自动带回）
+  const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
+  if (providerKeyName) {
+    payload[providerKeyName] = payload.apiKey;
+  }
+
   await chrome.storage.sync.set(payload);
   setStatus("已保存设置 ✅");
   setMeta(payload);
 }
 
+/* =========================
+ * API Key 测试
+ * ========================= */
 async function testApiKey() {
   const cleanupSlash = (s="") => s.replace(/\/+$/,"");
   try {
@@ -145,7 +199,6 @@ async function testApiKey() {
   }
 }
 
-// 辅助：安全读取响应文本
 async function safeReadText(res) {
   try { return await res.text(); } catch { return "(no body)"; }
 }
@@ -155,9 +208,58 @@ function toggleApiKeyVisibility() {
   input.type = input.type === "password" ? "text" : "password";
 }
 
-/* ========== 事件 ========== */
+/* =========================
+ * 平台切换 & 自定义检测
+ * ========================= */
+let isProgrammaticProviderChange = false; // 程序性切换时，忽略 change 回调
 
-// 预设变化：若已有内容，先确认
+async function onProviderChange() {
+  if (isProgrammaticProviderChange) return;
+
+  const provider = $("aiProvider").value || "openai";
+  const d = await chrome.storage.sync.get([
+    "apiKey","apiKey_openai","apiKey_deepseek","apiKey_custom"
+  ]);
+
+  if (provider === "openai" || provider === "deepseek") {
+    const p = PROVIDER_PRESETS[provider];
+
+    // 1) 切换 Base / 模型为预设
+    $("baseURL").value = p.baseURL;
+    $("model_extract").value = p.model_extract;
+    $("model_summarize").value = p.model_summarize;
+
+    // 2) 尝试填充该平台的已保存 Key（否则留空）
+    const keyName = p.apiKeyKey;
+    const saved = keyName ? (d[keyName] || "") : "";
+    $("apiKey").value = saved || ""; // 没保存过就留空
+  } else {
+    // custom：不动用户输入（如果需要也可从存储带回）
+    const saved = d.apiKey_custom || "";
+    if (saved) $("apiKey").value = saved;
+  }
+
+  setMeta({
+    aiProvider: provider,
+    baseURL: $("baseURL").value,
+    model_extract: $("model_extract").value,
+    model_summarize: $("model_summarize").value,
+    output_lang: $("output_lang").value,
+    extract_mode: $("extract_mode").value
+  });
+}
+
+// —— 监听“会导致自定义”的输入，但 **不包含 apiKey**
+function markCustomIfManualChange() {
+  // 用户手动改了 Base/模型 → 切到 custom
+  const sel = $("aiProvider");
+  if (sel.value !== "custom") {
+    isProgrammaticProviderChange = true;
+    sel.value = "custom";
+    isProgrammaticProviderChange = false;
+  }
+}
+
 function onPresetChange() {
   const box = $("system_prompt_custom");
   if (box.value.trim()) {
@@ -169,7 +271,6 @@ function onPresetChange() {
   }
 }
 
-// 输出语言变化：若已有内容，先确认
 function onOutputLangChange() {
   const box = $("system_prompt_custom");
   if (box.value.trim()) {
@@ -181,6 +282,40 @@ function onOutputLangChange() {
   }
 }
 
+// === 动态为内容区与占位块设置正确的底部留白 ===
+function fitDockPadding() {
+  const dock = document.querySelector('.save-dock');
+  const main = document.querySelector('.main-with-dock');
+  const spacer = document.getElementById('dock-spacer');
+  if (!dock || !main) return;
+
+  const h = dock.getBoundingClientRect().height || 0;
+  // 主内容底部留白 = 保存栏高度 + 16px 视觉间距
+  main.style.paddingBottom = `${h + 16}px`;
+  if (spacer) spacer.style.height = `${h}px`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 你原有的初始化逻辑……
+  // （保持不动）
+
+  // 初始化底部留白
+  fitDockPadding();
+
+  // 窗口尺寸变化时更新
+  window.addEventListener('resize', fitDockPadding);
+
+  // 监听保存栏高度变化（换行/文案变化等）
+  const dock = document.querySelector('.save-dock');
+  if (window.ResizeObserver && dock) {
+    const ro = new ResizeObserver(() => fitDockPadding());
+    ro.observe(dock);
+  }
+});
+
+/* =========================
+ * 事件绑定
+ * ========================= */
 const $openShortcut = document.getElementById("open-shortcut");
 if ($openShortcut) {
   $openShortcut.addEventListener("click", () => {
@@ -191,7 +326,17 @@ if ($openShortcut) {
 $("btn-save").addEventListener("click", saveSettings);
 $("btn-test").addEventListener("click", testApiKey);
 $("toggleKey").addEventListener("click", toggleApiKeyVisibility);
+
 $("system_prompt_preset").addEventListener("change", onPresetChange);
 $("output_lang").addEventListener("change", onOutputLangChange);
 
+// 平台切换
+$("aiProvider").addEventListener("change", onProviderChange);
+
+// 手动改 Base / 模型 → 切自定义（不监听 apiKey）
+$("baseURL").addEventListener("input", markCustomIfManualChange);
+$("model_extract").addEventListener("input", markCustomIfManualChange);
+$("model_summarize").addEventListener("input", markCustomIfManualChange);
+
+// 初始加载
 loadSettings();
