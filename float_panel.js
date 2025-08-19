@@ -16,7 +16,10 @@
     if (typeof md !== "string") md = String(md ?? "");
     let html = escapeHtml(md);
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escapeHtml(code)}</code></pre>`);
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`]+?)`/g, "<code>$1</code>");
+    html = html
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+?)`/g, "<code>$1</code>");
     html = html.replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm, (block) => {
       const items = block.split(/\n/).map((l) => l.replace(/^(?:- |\* )/, "").trim()).filter(Boolean);
       return `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
@@ -29,8 +32,11 @@
     return `<p>${html}</p>`;
   }
 
+  // 轻量 Markdown 渲染（避免整块 <p> 包裹导致显示不全）
   function renderMarkdown(md = "") {
     if (typeof md !== "string") md = String(md ?? "");
+
+    // 先提取 :::notice … :::，占位
     const notices = [];
     md = md.replace(/:::notice\s*([\s\S]*?)\s*:::/g, (_, inner) => {
       notices.push((inner || "").trim());
@@ -38,11 +44,17 @@
     });
 
     let html = escapeHtml(md);
+
+    // 代码块
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escapeHtml(code)}</code></pre>`);
+
+    // 引用
     html = html.replace(/(^|\n)((?:&gt;\s?.*(?:\n|$))+)/g, (_, pfx, block) => {
       const inner = block.split("\n").filter(Boolean).map((line) => line.replace(/^&gt;\s?/, "").trim()).join("<br>");
       return `${pfx}<blockquote>${inner}</blockquote>`;
     });
+
+    // 标题
     html = html
       .replace(/^######\s?(.*)$/gm, "<h6>$1</h6>")
       .replace(/^#####\s?(.*)$/gm, "<h5>$1</h5>")
@@ -50,6 +62,8 @@
       .replace(/^###\s?(.*)$/gm, "<h3>$1</h3>")
       .replace(/^##\s?(.*)$/gm, "<h2>$1</h2>")
       .replace(/^#\s?(.*)$/gm, "<h1>$1</h1>");
+
+    // 列表
     html = html.replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm, (block) => {
       const items = block.split(/\n/).map((l) => l.replace(/^(?:- |\* )/, "").trim()).filter(Boolean);
       return `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
@@ -58,14 +72,19 @@
       const items = block.split(/\n/).map((l) => l.replace(/^\d+\. /, "").trim()).filter(Boolean);
       return `<ol>${items.map((i) => `<li>${i}</li>`).join("")}</ol>`;
     });
+
+    // 强调/链接/代码
     html = html
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
       .replace(/`([^`]+?)`/g, "<code>$1</code>")
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    html = html.replace(/\n{2,}/g, "</p><p>");
-    html = `<p>${html}</p>`;
 
+    // ⚠️ 不用整块 <p> 包裹：仅把“空行”转换成 <br><br>
+    html = html.replace(/\n{2,}/g, "<br><br>");
+    html = `<div class="md">${html}</div>`;
+
+    // 还原 notice
     notices.forEach((txt, i) => {
       const alertHtml =
         `<div class="alert" data-alert>
@@ -74,6 +93,29 @@
         </div>`;
       html = html.replace(`__ALERT_TOKEN_${i}__`, alertHtml);
     });
+
+    return html;
+  }
+
+  // 清理内联颜色/背景/nowrap（避免白字白底/文字挤没）
+  function stripInlineColor(html = "") {
+    const dropProps = /\b(?:color|background-color|white-space)\s*:[^;"'}]+;?/gi;
+
+    // style="...":
+    html = html.replace(/style\s*=\s*"([^"]*)"/gi, (m, css) => {
+      const cleaned = css.replace(dropProps, "");
+      return cleaned.trim() ? `style="${cleaned.trim()}"` : "";
+    });
+
+    // style='...':
+    html = html.replace(/style\s*=\s*'([^']*)'/gi, (m, css) => {
+      const cleaned = css.replace(dropProps, "");
+      return cleaned.trim() ? `style='${cleaned.trim()}'` : "";
+    });
+
+    // 老式 <font color="">
+    html = html.replace(/<font\b([^>]*?)\scolor=(["']).*?\2([^>]*)>/gi, "<font$1$3>");
+
     return html;
   }
 
@@ -84,7 +126,6 @@
 
     host = document.createElement("div");
     host.id = PANEL_ID;
-    // ⚠️ 删除会导致默认 serif 的 reset：host.style.all = "initial";
     host.style.position = "fixed";
     host.style.top = "0";
     host.style.right = "0";
@@ -92,37 +133,40 @@
     host.style.height = "100vh";
     host.style.zIndex = "2147483647";
     host.style.pointerEvents = "auto";
-    host.setAttribute("lang", "zh-CN");   // 提示中文环境，避免 fallback 到宋体等衬线
+    host.setAttribute("lang", "zh-CN");
 
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
       /* === 字体与隔离：Shadow DOM 内确保与 options 一致 === */
       :host{
-        /* 与 options 同步的无衬线栈；加入 Win 与 Mac 常用中文无衬线 */
         --font-stack: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
                       "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-
-        /* 关键：直接应用到 :host，并加 fallback 与 !important 避免任何覆盖 */
         font-family: var(--font-stack, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
                          "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif) !important;
-      }
 
-      /* 让所有子元素继承 :host 的字体，抵御宿主站点样式 */
+        /* 固定浅色配色，避免外站暗色策略影响 */
+        color-scheme: light;
+        color:#111827 !important;  /* 钉住根文字色，避免继承白色 */
+      }
       :host, :host * {
         font-family: inherit !important;
-        box-sizing: border-box; /* 全局统一盒模型 */
+        box-sizing: border-box;
       }
-
-      /* 表单控件默认字体不一致，这里强制继承，防止“看起来像换了字体” */
       button, input, select, textarea { font-family: inherit !important; }
 
-      /* —— 下面是你原有的视觉与布局样式 —— */
-      .wrap{ height:100vh; display:flex; flex-direction:column; background:#f6f8ff; border-left:1px solid #e6e8f0; box-shadow:-6px 0 16px rgba(17,24,39,.06); }
+      /* —— 原有样式 —— */
+      .wrap{
+        height:100vh; display:flex; flex-direction:column;
+        /* ⬇︎ 加深背景：由纯色改为更深一点的柔和渐变 */
+        background: linear-gradient(180deg,#f1f4ff,#e7ecff);
+        border-left:1px solid #e6e8f0; box-shadow:-6px 0 16px rgba(17,24,39,.06);
+        color:#111827; /* 钉住默认文字色 */
+      }
       .appbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(180deg,#fff,#f4f7ff); border-bottom:1px solid #e6e8f0; }
       .brand{ display:flex; align-items:center; gap:10px; }
       .logo{ width:10px; height:10px; border-radius:50%; background:#2563eb; box-shadow:0 0 0 4px rgba(37,99,235,.12); }
-      .title{ font-size:14px; font-weight:800; }
+      .title{ font-size:14px; font-weight:800; color:#111827; } /* 避免白色标题 */
       .actions{ display:flex; gap:8px; }
       .btn{ padding:8px 12px; border:1px solid #e6e8f0; border-radius:10px; cursor:pointer; background:#fff; color:#111827; font-weight:600; }
       .btn.primary{ background:linear-gradient(180deg,#2563eb,#1f5fe0); color:#fff; border-color:#1d4ed8; box-shadow:0 6px 16px rgba(37,99,235,.18), inset 0 -1px 0 rgba(255,255,255,.15); }
@@ -136,7 +180,7 @@
       .section-title{ margin:0 0 10px; font-size:14px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
       .dot{ width:8px; height:8px; border-radius:50%; background:#2563eb; box-shadow:0 0 0 4px rgba(37,99,235,.12); }
       .dot.green{ background:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.12); }
-      .card{ background:#fff; border:1px solid #e6e8f0; border-radius:12px; padding:18px 20px; line-height:1.7; font-size:16px; box-shadow:0 2px 8px rgba(17,24,39,0.03); }
+      .card{ background:#fff; border:1px solid #e6e8f0; border-radius:12px; padding:18px 20px; line-height:1.7; font-size:16px; box-shadow: 0 2px 8px rgba(17,24,39,0.03); }
       .card-summary{ padding-top:54px; border-color:#cfe0ff; background:#fff; box-shadow: 0 2px 10px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.6); position:relative; }
       .card-summary::before{ content:""; position:absolute; left:0; right:0; top:0; height:42px; background:linear-gradient(180deg,#dbe8ff 0%,#cfe0ff 100%); border-radius:12px 12px 0 0; border-bottom:1px solid #bdd1ff; }
       .card-summary::after{ content:"摘要"; position:absolute; left:14px; top:10px; font-weight:700; font-size:14px; color:#123a8f; }
@@ -151,53 +195,44 @@
       .footer{ flex:0 0 auto; font-size:12px; color:#6b7280; border-top:1px solid #e6e8f0; padding:8px 12px; }
       .dragbar{ position:absolute; left:-6px; top:0; width:6px; height:100%; cursor:ew-resize; background:transparent; }
 
-      /* === 摘要(#sx-summary) 列表缩进调小 === */
-      #sx-summary ul,
-      #sx-summary ol{
-        padding-left: 14px;   /* 从默认/旧值收紧 */
-        margin-left: 0;       /* 去掉 UA 默认外边距，避免双重缩进 */
-        list-style-position: outside; /* 圆点在外；想更紧凑可改 inside */
+      /* 摘要(#sx-summary) 列表缩进调小 */
+      #sx-summary ul, #sx-summary ol{ padding-left:14px; margin-left:0; list-style-position:outside; }
+      #sx-summary li{ margin:4px 0; }
+      #sx-summary.compact ul, #sx-summary.compact ol{ padding-left:0; margin-left:0; list-style-position:inside; }
+
+      /* 图标按钮（右上角关闭） */
+      .btn.icon{
+        width:36px; height:36px; padding:0; display:grid; place-items:center; line-height:1;
+        font-size:18px; border-radius:10px; border:1px solid #d1d5db;
+        background: linear-gradient(180deg, #f9f9f9, #e5e7eb); color:#333; cursor:pointer;
+        transition: background .2s, box-shadow .2s, transform .05s; box-shadow:0 1px 2px rgba(0,0,0,0.08);
       }
-      #sx-summary li{ margin: 4px 0; } /* 项间距略收 */
-
-      /* 更紧凑方案：给容器加 class="compact" 即可启用 */
-      #sx-summary.compact ul,
-      #sx-summary.compact ol{
-        padding-left: 0;
-        margin-left: 0;
-        list-style-position: inside;
-      }
-
-
-      /* 图标按钮：用于右上角 × */
-        .btn.icon{
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        display: grid;
-        place-items: center;
-        line-height: 1;
-        font-size: 18px;   /* × 的大小 */
-        border-radius: 10px;
-        border: 1px solid #d1d5db; /* 更明显的灰色边框 */
-        background: linear-gradient(180deg, #f9f9f9, #e5e7eb);
-        color: #333;
-        cursor: pointer;
-        transition: background .2s, box-shadow .2s, transform .05s;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.08); /* 轻微投影 */
-        }
-
-        .btn.icon:hover{
+      .btn.icon:hover{
         background: linear-gradient(180deg, #ffffff, #d1d5db);
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15); /* hover 阴影更明显 */
-        border-color: #cbd5e1;
-        }
-
-        .btn.icon:active{
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15); border-color:#cbd5e1;
+      }
+      .btn.icon:active{
         transform: translateY(1px);
         background: linear-gradient(180deg, #e5e7eb, #cbd5e1);
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); /* 按下时内凹效果 */
-        #sx-close{ font-size: 18px; }
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+      }
+
+      /* === 强制摘要/正文区域可读：只作用于常见“文本元素”，保留 .alert 背景 === */
+      #sx-summary, #sx-cleaned { color:#111827 !important; }
+      #sx-summary .md :where(h1,h2,h3,h4,h5,h6,p,li,span,a,strong,em,code,pre,blockquote),
+      #sx-cleaned .md :where(h1,h2,h3,h4,h5,h6,p,li,span,a,strong,em,code,pre,blockquote){
+        color:#111827 !important;
+        background-color: transparent !important; /* 不清除 .alert 容器背景 */
+        white-space: normal !important;
+      }
+      #sx-summary a, #sx-cleaned a { color:#1f2937 !important; text-decoration: underline; }
+      #sx-summary code, #sx-cleaned code,
+      #sx-summary pre,  #sx-cleaned pre { color:#111 !important; }
+
+      /* 图片/表格/代码框适配容器宽度 */
+      #sx-summary img, #sx-cleaned img { max-width:100%; height:auto; }
+      #sx-summary table, #sx-cleaned table { max-width:100%; display:block; overflow:auto; border-collapse:collapse; }
+      #sx-summary pre, #sx-cleaned pre { max-width:100%; overflow:auto; }
     `;
     const root = document.createElement("div");
     root.innerHTML = `
@@ -209,12 +244,10 @@
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
             <button id="sx-close" class="btn icon" title="关闭" aria-label="关闭">
-            <svg xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                width="16" height="16" 
-                fill="#1e3a8a"> <!-- 深蓝色 -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                   width="16" height="16" fill="#1e3a8a" aria-hidden="true">
                 <path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7a1 1 0 0 0-1.41 1.42L10.59 12l-4.89 4.89a1 1 0 0 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/>
-            </svg>
+              </svg>
             </button>
           </div>
         </div>
@@ -300,15 +333,12 @@
     const $s = shadow.getElementById("sx-summary");
     const $c = shadow.getElementById("sx-cleaned");
 
-    // 摘要：正常渲染或初始空态
+    // 摘要
     $s.innerHTML = summary
-      ? renderMarkdown(summary)
+      ? stripInlineColor(renderMarkdown(summary))
       : `<div class="empty"><div class="icon">📝</div><div class="title">暂无摘要</div></div>`;
 
-    // 可读正文：区分三态
-    // 1) cleaned === null  -> partial 阶段：保持“加载动效/骨架屏”
-    // 2) cleaned 为字符串 -> 最终结果
-    // 3) 其他（undefined/空串）-> 初始空态
+    // 可读正文
     if (cleaned === null) {
       $c.innerHTML =
         `<div class="skl" style="width:96%"></div>` +
@@ -316,7 +346,7 @@
         `<div class="skl" style="width:76%"></div>`;
     } else {
       $c.innerHTML = cleaned
-        ? renderMarkdown(cleaned)
+        ? stripInlineColor(renderMarkdown(cleaned))
         : `<div class="empty"><div class="icon">📄</div><div class="title">暂无可读正文</div></div>`;
     }
   }
@@ -406,7 +436,7 @@
         if (st.status === "partial") {
           renderToDom(shadow, st.summary, null);
         } else if (st.status === "done") {
-          // ✅ 不再早退：此时很可能是上一次的 done，新一轮马上会把状态切到 running/partial
+          // 不早退：很可能是上一次的 done，新一轮很快会变成 running/partial
           setLoading(shadow, true);
           setSkeleton(shadow);
         }
