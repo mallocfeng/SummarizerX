@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "麦乐可 AI 摘要阅读器",
-  "version": "1.6.3",
+  "name": "SummarizerX 麦乐可 AI 摘要阅读器",
+  "version": "1.6.4",
   "description": "提取当前网页主要内容，支持本地快速/AI 清洗两种模式，并生成摘要或翻译。包含独立设置页（System Prompt 等）。",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage", "tabs"],
   "background": { "service_worker": "background.js", "type": "module" },
