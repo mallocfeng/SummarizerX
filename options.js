@@ -1,6 +1,10 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
 const $ = (id) => document.getElementById(id);
 
+const GUIDE_URL = chrome.runtime.getURL('help_buy_api.html');
+const GUIDE_OPENAI  = `${GUIDE_URL}#openai`;
+const GUIDE_DEEPSEEK = `${GUIDE_URL}#deepseek`;
+
 const DEFAULTS = {
   baseURL: "https://api.openai.com/v1",
   model_extract: "gpt-4o-mini",
@@ -50,6 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const { version, version_name } = chrome.runtime.getManifest();
   el.textContent = `v${version}`;
   el.title = version_name || version;
+  const $openaiGuide = document.getElementById('link-buy-openai');
+  const $deepseekGuide = document.getElementById('link-buy-deepseek');
+  if ($openaiGuide)  $openaiGuide.href  = GUIDE_OPENAI;
+  if ($deepseekGuide) $deepseekGuide.href = GUIDE_DEEPSEEK;
 });
 
 // —— 根据输出语言，生成强制语言尾注
@@ -58,6 +66,16 @@ function langSuffix() {
   if (lang === "zh") return "\n\n请仅用中文输出结果。";
   if (lang === "en") return "\n\nRespond only in English.";
   return "\n\nEnsure the output strictly matches the target language.";
+}
+
+function reflectGuideLink(){
+  const p = $("aiProvider").value;
+  const o = document.getElementById('link-buy-openai');
+  const d = document.getElementById('link-buy-deepseek');
+  if (!o || !d) return;
+  if (p === "openai") { o.style.display = "inline"; d.style.display = "none"; }
+  else if (p === "deepseek") { o.style.display = "none"; d.style.display = "inline"; }
+  else { o.style.display = "inline"; d.style.display = "inline"; }
 }
 
 // —— 只用 Markdown 的硬约束尾注（禁止 HTML 和内联样式）
@@ -141,6 +159,8 @@ async function loadSettings() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value
   });
+  reflectGuideLink(); // 更新购买指南链接显示
+  updateBuyHelp($("aiProvider").value || "openai");
 }
 
 async function saveSettings() {
@@ -267,6 +287,8 @@ async function onProviderChange() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value
   });
+  reflectGuideLink(); // 更新购买指南链接显示
+  updateBuyHelp(provider);
 }
 
 // —— 监听“会导致自定义”的输入，但 **不包含 apiKey**
@@ -314,6 +336,45 @@ function fitDockPadding() {
   main.style.paddingBottom = `${h + 16}px`;
   if (spacer) spacer.style.height = `${h}px`;
 }
+
+
+function updateBuyHelp(provider) {
+  const open = document.getElementById('link-buy-openai');
+  const deep = document.getElementById('link-buy-deepseek');
+  const sep  = document.getElementById('buy-help-sep');
+
+  if (!open || !deep || !sep) return;
+
+  // 可选：在这里统一设置 href（更稳，不怕文件名变化）
+  try {
+    const guideUrl = GUIDE_URL;
+    open.href = GUIDE_OPENAI
+    deep.href = GUIDE_DEEPSEEK;
+  } catch (e) {
+    // 如果不是扩展环境或无权限，忽略即可
+  }
+
+  // 逻辑：custom 显示两个链接；openai 只显示 OpenAI；deepseek 只显示 DeepSeek
+  if (provider === 'custom') {
+    open.style.display = 'inline';
+    deep.style.display = 'inline';
+    sep.style.display  = 'inline';
+  } else if (provider === 'openai') {
+    open.style.display = 'inline';
+    deep.style.display = 'none';
+    sep.style.display  = 'none'; // 只剩一个链接 → 不显示分隔点
+  } else if (provider === 'deepseek') {
+    open.style.display = 'none';
+    deep.style.display = 'inline';
+    sep.style.display  = 'none'; // 只剩一个链接 → 不显示分隔点
+  } else {
+    // 兜底：显示两个
+    open.style.display = 'inline';
+    deep.style.display = 'inline';
+    sep.style.display  = 'inline';
+  }
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
   // 你原有的初始化逻辑……

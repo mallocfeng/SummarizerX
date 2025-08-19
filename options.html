@@ -54,6 +54,13 @@
           <option value="deepseek">DeepSeek</option>
           <option value="custom">自定义</option>
         </select>
+        <!-- 新增：购买指南（紧跟在下拉框后，右侧留白展示） -->
+        <span class="buy-help-inline">
+          不会买？查看：
+          <a id="link-buy-openai" href="#" target="_blank" rel="noopener">OpenAI 指南</a>
+          <span id="buy-help-sep"> · </span>
+          <a id="link-buy-deepseek" href="#" target="_blank" rel="noopener">DeepSeek 指南</a>
+        </span>
         <p class="hint">切换平台将自动填写 Base URL 和模型；若手动修改任意字段，将自动切到「自定义」。</p>
       </div>
 

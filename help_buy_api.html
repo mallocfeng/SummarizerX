@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>如何购买与获取 API：OpenAI & DeepSeek（超详细小白指南）</title>
+<style>
+  :root{
+    --bg:#f6f8ff; --card:#ffffff; --text:#0f172a; --sub:#475569;
+    --pri:#2563eb; --pri-weak:#dbe8ff; --ok:#10b981; --warn:#f59e0b; --line:#e6e8f0;
+    --radius:14px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; font:14px/1.7 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background:linear-gradient(180deg,#f1f4ff,#e7ecff); color:var(--text);
+  }
+  a{ color:#1f2937; text-decoration:underline; text-underline-offset:2px; }
+  .wrap{ max-width:980px; margin:24px auto 60px; padding:0 16px; }
+  .hero{
+    background:linear-gradient(180deg,#fff,#f4f7ff);
+    border:1px solid var(--line); border-radius:18px; padding:20px 20px 16px;
+    box-shadow:0 6px 16px rgba(37,99,235,.08);
+  }
+  .hero h1{ margin:0 0 6px; font-size:22px; line-height:1.3 }
+  .hero p{ margin:4px 0 0; color:var(--sub) }
+  .grid{ display:grid; grid-template-columns: 1fr; gap:14px; margin-top:16px; }
+  @media (min-width:900px){ .grid{ grid-template-columns: 1fr 1fr; } }
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px 16px 14px;
+    box-shadow:0 2px 8px rgba(17,24,39,.05);
+    scroll-margin-top: 12px; /* 锚点滚动时留白 */
+  }
+  .card h2{ margin:0 0 8px; font-size:18px }
+  .card p.lead{ margin:0 0 10px; color:var(--sub) }
+
+  /* ✅ 默认给两块区域轻微底色区分 */
+  #openai{ background:#f7fbff; border-color:#dbe8ff; }
+  #deepseek{ background:#fffaf5; border-color:#ffe5c7; }
+
+  /* ✅ 命中锚点时高亮（点击顶部标签后更醒目） */
+  .card:target{
+    outline:2px solid var(--pri);
+    box-shadow:0 0 0 4px var(--pri-weak), 0 2px 8px rgba(17,24,39,.06);
+  }
+  #openai:target{ background:#eef6ff; border-color:#cfe0ff; }
+  #deepseek:target{ background:#fff4ec; border-color:#ffd7ba; }
+
+  .steps{ margin:8px 0 0; padding:0; list-style:none; counter-reset: s; }
+  .steps li{
+    position:relative; padding:12px 12px 12px 44px; margin:10px 0; background:#fbfcff; border:1px solid var(--line);
+    border-radius:12px;
+  }
+  .steps li::before{
+    content:counter(s); counter-increment:s;
+    position:absolute; left:10px; top:10px; width:24px; height:24px; display:grid; place-items:center;
+    border-radius:50%; background:var(--pri); color:#fff; font-weight:700; font-size:12px;
+    box-shadow:0 0 0 4px var(--pri-weak);
+  }
+  .note{ background:#fff8dc; border:1px solid #f1e2a8; border-radius:12px; padding:10px 12px; margin:10px 0; }
+  .ok{ color:#065f46; background:#ecfdf5; border:1px solid #bbf7d0; }
+  .warn{ color:#7c2d12; background:#fffbeb; border:1px solid #fde68a; }
+  .bad{ color:#7f1d1d; background:#fef2f2; border:1px solid #fecaca; }
+  .qna details{ border:1px solid var(--line); border-radius:12px; background:#fff; padding:10px 12px; margin:10px 0; }
+  .qna summary{ cursor:pointer; font-weight:700; }
+  code, .kbd{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    background:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:.15em .45em; font-size:.92em;
+  }
+  pre{
+    margin:10px 0; padding:12px; background:#f7f9ff; border:1px solid var(--line); border-radius:12px; overflow:auto;
+  }
+  .two-col{ display:grid; grid-template-columns:1fr; gap:10px; }
+  @media (min-width:680px){ .two-col{ grid-template-columns:1fr 1fr; } }
+
+  .inline-list{ display:flex; flex-wrap:wrap; gap:10px; margin:8px 0 0; padding:0; list-style:none; }
+  .tag{ padding:6px 10px; border:1px dashed var(--line); border-radius:999px; background:#fff }
+  .mini{ font-size:12px; color:var(--sub); }
+
+  /* 让 “标签按钮”里的链接像按钮一样显示 */
+  .tag a{ color:inherit; text-decoration:none; display:block; }
+  .tag a:hover{ text-decoration:underline; }
+
+  .footer{
+    margin-top:16px; padding:10px 12px; text-align:center; color:var(--sub);
+  }
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:10px; border:1px solid var(--line);
+    background:#fff; cursor:pointer; font-weight:600;
+  }
+  .btn.primary{ background:linear-gradient(180deg,#2563eb,#1f5fe0); color:#fff; border-color:#1d4ed8; }
+  .tip-list{ margin:6px 0 0; }
+  .tip-list li{ margin:6px 0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero" id="top">
+      <h1>如何购买/开通 API（OpenAI & DeepSeek）</h1>
+      <p>完全小白也能看懂：准备什么 → 去哪里 → 按什么顺序点 → 拿到 API Key → 放到 SummarizerX / 麦乐可 AI 摘要阅读器 里使用。</p>
+      <ul class="inline-list">
+        <li class="tag">🧾 按步骤做即可</li>
+        <li class="tag">🔐 API Key 就像密码</li>
+        <li class="tag">💳 支付方式：国际信用/借记卡等</li>
+        <!-- ✅ 新增两个跳转标签 -->
+        <li class="tag"><a href="#openai">📘 我想买 OpenAI</a></li>
+        <li class="tag"><a href="#deepseek">🟠 我想买 DeepSeek</a></li>
+      </ul>
+    </section>
+
+    <div class="grid">
+      <!-- OpenAI：把 id 放到 section 上，便于 :target 高亮 -->
+      <section class="card" id="openai">
+        <h2>一、OpenAI（ChatGPT API 等）</h2>
+        <p class="lead">目标：开通计费 & 生成 <code>API Key</code></p>
+        <ol class="steps">
+          <li>
+            访问 <a href="https://platform.openai.com/" target="_blank" rel="noopener noreferrer">OpenAI 平台</a>，注册/登录账号（需要邮箱，可能需要手机号验证）。
+            <div class="note warn mini">注意：部分地区/号码可能无法验证，需更换网络或使用可接收短信的手机号。</div>
+          </li>
+          <li>
+            开通计费（Billing）：进入 <a href="https://platform.openai.com/account/billing" target="_blank" rel="noopener noreferrer">Billing</a>，
+            添加信用卡/借记卡等支付方式，完成开通。
+            <ul class="tip-list mini">
+              <li>OpenAI 采用按量计费，先绑定支付方式，按实际使用计费。</li>
+              <li>若显示 <em>insufficient_quota / billing_not_active</em>，通常是未完成计费开通或额度不足。</li>
+            </ul>
+          </li>
+          <li>
+            生成密钥：打开 <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">API Keys</a> 页面 → 点击 <span class="kbd">Create new secret key</span> → 起个名字 → 复制保存。
+            <div class="note ok mini">小贴士：只会显示一次，务必复制保存到安全位置（如密码管理器）。</div>
+          </li>
+          <li>
+            在扩展设置中粘贴：打开 SummarizerX 设置页 → 选择 <span class="kbd">OpenAI</span> → 粘贴刚复制的 Key → 保存。
+          </li>
+        </ol>
+        <details class="note" style="margin-top:10px;">
+          <summary><strong>可选：10 秒自测（命令行）</strong></summary>
+          <p class="mini">在终端运行下列命令（替换 <code>YOUR_KEY</code>）。若返回 200，说明 Key 可用：</p>
+<pre><code>curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer YOUR_KEY"</code></pre>
+        </details>
+        <p class="mini"><a href="#top">↑ 返回顶部</a></p>
+      </section>
+
+      <!-- DeepSeek：同理把 id 放到 section 上 -->
+      <section class="card" id="deepseek">
+        <h2>二、DeepSeek</h2>
+        <p class="lead">目标：在控制台创建 <code>API Key</code> 并开通用量/余额</p>
+        <ol class="steps">
+          <li>
+            访问 <a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">DeepSeek 控制台</a>（或从
+            <a href="https://api-docs.deepseek.com/" target="_blank" rel="noopener noreferrer">开发者文档</a> 进入），注册/登录账号。
+          </li>
+          <li>
+            开通计费或充值：在控制台的 <span class="kbd">Billing/充值</span> 或 <span class="kbd">Usage</span> 区域，绑定支付方式或充值余额。
+            <div class="note mini">不同地区/账号可能显示为“按量付费”或“余额充值”，按页面提示完成即可。</div>
+          </li>
+          <li>
+            创建密钥：进入 <span class="kbd">API Keys</span> 或 <span class="kbd">密钥管理</span> → 点击 <span class="kbd">Create</span> → 复制保存。
+          </li>
+          <li>
+            在扩展设置中粘贴：打开 SummarizerX 设置页 → 选择 <span class="kbd">DeepSeek</span> → 粘贴 Key → 保存。
+          </li>
+        </ol>
+        <details class="note" style="margin-top:10px;">
+          <summary><strong>可选：10 秒自测（命令行）</strong></summary>
+          <p class="mini">DeepSeek 兼容 OpenAI 风格 API。将 <code>YOUR_KEY</code> 替换为你的密钥：</p>
+<pre><code>curl https://api.deepseek.com/v1/models \
+  -H "Authorization: Bearer YOUR_KEY"</code></pre>
+        </details>
+        <p class="mini"><a href="#top">↑ 返回顶部</a></p>
+      </section>
+    </div>
+
+    <!-- 放到扩展里的说明 -->
+    <section class="card" style="margin-top:14px;">
+      <h2 id="summarizerx">三、把 Key 放进「SummarizerX / 麦乐可 AI 摘要阅读器」</h2>
+      <ol class="steps">
+        <li>打开扩展设置 → 「AI 服务提供商」选择 OpenAI 或 DeepSeek（两者都可以保存，随时切换）。</li>
+        <li>将对应的 Key 粘贴到输入框 → 保存。</li>
+        <li>首次请求会很快返回「摘要」，稍后自动补全「可读正文」。若响应慢，多半是 Key 配额或网络的问题。</li>
+      </ol>
+      <div class="note ok mini">提示：扩展支持同时保存两个 Key，后续切换无需重复输入。</div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section class="card qna" style="margin-top:14px;">
+      <h2 id="faq">四、常见问题（FAQ）</h2>
+
+      <details open>
+        <summary>Key 是什么？丢了怎么办？</summary>
+        <p>Key 就像账号的“通行证”。一旦泄露，别人可能用你的额度。若怀疑泄露，请立刻在控制台<strong>撤销/删除</strong>旧 Key 并<strong>重新创建</strong>新 Key。</p>
+      </details>
+
+      <details>
+        <summary>提示 “insufficient_quota / billing_not_active” 怎么办？</summary>
+        <ul class="tip-list">
+          <li>确认已经完成计费开通（OpenAI 需绑定支付方式；DeepSeek 可能需要充余额）。</li>
+          <li>检查是否消费超限或余额不足，必要时提升额度/继续充值。</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>请求能通，但摘要迟迟不出？</summary>
+        <ul class="tip-list">
+          <li>网络质量或接口波动可能导致响应变慢，稍等即可。扩展采用“两段式加载”，先出摘要再补全文。</li>
+          <li>若长时间无响应：检查控制台用量页面是否有错误日志；或尝试切换到另一个提供商测试。</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>我可以把 Key 给同事用吗？</summary>
+        <p>不建议。更安全的做法是：为团队使用创建单独的 Key（不同备注名），并定期轮换；或使用各平台提供的组织/项目级别权限隔离。</p>
+      </details>
+
+      <details>
+        <summary>如何更省钱？</summary>
+        <ul class="tip-list">
+          <li>在扩展里优先使用“摘要后再清洗全文”的策略，减少不必要的大段调用。</li>
+          <li>合理限制最长输出字数、模型选择（性价比更高的模型）等。</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="footer mini">
+      本页仅作指引，实际界面以各平台为准。请从官方控制台完成购买/开通与 Key 管理。
+    </section>
+  </div>
+
+<script>
+  // 小增强：一键复制 code 块（可选）
+  (function(){
+    document.querySelectorAll('pre').forEach(function($pre){
+      var btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.style.float = 'right';
+      btn.style.margin = '-6px 0 6px 0';
+      btn.textContent = '复制命令';
+      btn.onclick = function(){
+        var txt = $pre.innerText;
+        navigator.clipboard.writeText(txt).then(function(){
+          btn.classList.add('primary'); btn.textContent='已复制';
+          setTimeout(function(){ btn.classList.remove('primary'); btn.textContent='复制命令'; }, 1200);
+        });
+      };
+      $pre.parentNode.insertBefore(btn, $pre);
+    });
+  })();
+</script>
+</body>
+</html>
