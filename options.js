@@ -60,12 +60,32 @@ function langSuffix() {
   return "\n\nEnsure the output strictly matches the target language.";
 }
 
+// —— 只用 Markdown 的硬约束尾注（禁止 HTML 和内联样式）
+function formatRulesSuffix() {
+  return "\n\nFormatting rules (STRICT):\n" +
+         "- Output must be **pure Markdown**. Do NOT use any HTML tags or inline CSS.\n" +
+         "- Do not output <div>, <span>, <font>, <br>, <p>, style=... etc.\n" +
+         "- Use fenced code blocks for code (```lang ... ```), and Markdown lists/headings/links only.\n" +
+         "- Do not include color names, CSS, or inline styles in the content.\n";
+}
+
 // —— 预设 + 语言尾注 → 覆盖到自定义文本框
+// function applyPresetToTextarea(force = false) {
+//   const box = $("system_prompt_custom");
+//   const presetKey = $("system_prompt_preset").value || "general_summary";
+//   const base = PRESETS[presetKey] || PRESETS.general_summary;
+//   const newText = base + langSuffix();
+//   if (!box.value.trim() || force) {
+//     box.value = newText;
+//   }
+// }
+
 function applyPresetToTextarea(force = false) {
   const box = $("system_prompt_custom");
   const presetKey = $("system_prompt_preset").value || "general_summary";
   const base = PRESETS[presetKey] || PRESETS.general_summary;
-  const newText = base + langSuffix();
+
+  const newText = base + formatRulesSuffix() + langSuffix(); // ← 加上“只用 Markdown”硬规则
   if (!box.value.trim() || force) {
     box.value = newText;
   }

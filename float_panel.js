@@ -13,6 +13,7 @@
     String(str || "").replace(/[&<>"']/g, (s) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
 
   function renderNoticeMarkdown(md = "") {
+    md = collapseBlankLines(md);  // 先压缩空行
     if (typeof md !== "string") md = String(md ?? "");
     let html = escapeHtml(md);
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escapeHtml(code)}</code></pre>`);
@@ -29,13 +30,21 @@
       return `<ol>${items.map((i) => `<li>${i}</li>`).join("")}</ol>`;
     });
     html = html.replace(/\n{2,}/g, "</p><p>");
+    html = html.replace(/(?:<\/p>\s*<p>\s*){2,}/gi, "</p><p>"); // 压缩多余空行
     return `<p>${html}</p>`;
+  }
+
+  // 把 2 行以上的空白行压到 1 行（\n\n）
+  function collapseBlankLines(txt = "") {
+    return String(txt)
+      .replace(/\r\n?/g, "\n")                              // 统一换行
+      .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n");         // 3+ 空行 => 1 个空行
   }
 
   // 轻量 Markdown 渲染（避免整块 <p> 包裹导致显示不全）
   function renderMarkdown(md = "") {
     if (typeof md !== "string") md = String(md ?? "");
-
+    md = collapseBlankLines(md);  // 压缩空行
     // 先提取 :::notice … :::，占位
     const notices = [];
     md = md.replace(/:::notice\s*([\s\S]*?)\s*:::/g, (_, inner) => {
@@ -81,7 +90,28 @@
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
     // ⚠️ 不用整块 <p> 包裹：仅把“空行”转换成 <br><br>
-    html = html.replace(/\n{2,}/g, "<br><br>");
+      // 空行→<br><br>
+      html = html.replace(/\n{2,}/g, "<br><br>");
+      // 3 个以上 <br> → 2 个
+      html = html.replace(/(?:<br\s*\/?>\s*){3,}/gi, "<br><br>");
+
+ 
+
+    // // —— 去掉块元素周围多余的 <br>，避免大间隙 ——
+    // // 1) 块元素结束后紧跟多个 <br> => 去掉
+    // html = html.replace(
+    //   /(<\/(?:h[1-6]|p|ul|ol|pre|blockquote)>)\s*(?:<br\s*\/?>\s*)+/gi,
+    //   "$1"
+    // );
+    // // 2) 多个 <br> 紧贴块元素开始前 => 去掉
+    // html = html.replace(
+    //   /(?:<br\s*\/?>\s*)+(?=\s*<(?:h[1-6]|p|ul|ol|pre|blockquote)\b)/gi,
+    //   ''
+    // );
+    // // 3) 保险：把 3 个以上 <br> 压成 2 个（最多“一个空行”的视觉）
+    // html = html.replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>');
+
+
     html = `<div class="md">${html}</div>`;
 
     // 还原 notice
@@ -137,13 +167,15 @@
 
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
+
+
     style.textContent = `
       /* === 字体与隔离：Shadow DOM 内确保与 options 一致 === */
       :host{
         --font-stack: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
                       "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
         font-family: var(--font-stack, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-                         "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif) !important;
+                        "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif) !important;
 
         /* 固定浅色配色，避免外站暗色策略影响 */
         color-scheme: light;
@@ -180,7 +212,7 @@
       .section-title{ margin:0 0 10px; font-size:14px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
       .dot{ width:8px; height:8px; border-radius:50%; background:#2563eb; box-shadow:0 0 0 4px rgba(37,99,235,.12); }
       .dot.green{ background:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.12); }
-      .card{ background:#fff; border:1px solid #e6e8f0; border-radius:12px; padding:18px 20px; line-height:1.7; font-size:16px; box-shadow: 0 2px 8px rgba(17,24,39,0.03); }
+      .card{ background:#fff; border:1px solid #e6e8f0; border-radius:12px; padding:18px 20px; line-height:1.7; font-size:15px; box-shadow: 0 2px 8px rgba(17,24,39,0.03); }
       .card-summary{ padding-top:54px; border-color:#cfe0ff; background:#fff; box-shadow: 0 2px 10px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.6); position:relative; }
       .card-summary::before{ content:""; position:absolute; left:0; right:0; top:0; height:42px; background:linear-gradient(180deg,#dbe8ff 0%,#cfe0ff 100%); border-radius:12px 12px 0 0; border-bottom:1px solid #bdd1ff; }
       .card-summary::after{ content:"摘要"; position:absolute; left:14px; top:10px; font-weight:700; font-size:14px; color:#123a8f; }
@@ -229,11 +261,123 @@
       #sx-summary code, #sx-cleaned code,
       #sx-summary pre,  #sx-cleaned pre { color:#111 !important; }
 
-      /* 图片/表格/代码框适配容器宽度 */
+      /* 图片/表格/代码框适配容器宽度（基线） */
       #sx-summary img, #sx-cleaned img { max-width:100%; height:auto; }
       #sx-summary table, #sx-cleaned table { max-width:100%; display:block; overflow:auto; border-collapse:collapse; }
       #sx-summary pre, #sx-cleaned pre { max-width:100%; overflow:auto; }
+
+      /* ===== Markdown 渲染(.md)——统一显示优化（新增） ===== */
+      .md{
+        font-size:15px;
+        line-height:1.75;
+        color:#111827;
+        word-break:break-word;
+        overflow-wrap:anywhere; /* 长链接/长英文自动断行 */
+      }
+      /* 标题更紧凑，但层级清晰 */
+      .md h1{ margin:16px 0 10px; font-size:20px; line-height:1.4; font-weight:800; }
+      .md h2{ margin:14px 0 8px;  font-size:18px; line-height:1.4; font-weight:800; }
+      .md h3{ margin:12px 0 8px;  font-size:16px; line-height:1.4; font-weight:700; }
+      .md h4{ margin:10px 0 6px;  font-size:15px; line-height:1.4; font-weight:700; }
+      .md h5{ margin:8px  0 6px;  font-size:14px; line-height:1.4; font-weight:700; }
+      .md h6{ margin:8px  0 6px;  font-size:13px; line-height:1.4; font-weight:700; color:#374151; }
+
+      /* 段落/列表间距（避免大段空白） */
+      .md p{  margin:8px 0; }
+      .md ul, .md ol{ margin:8px 0; padding-left:18px; }
+      .md li{ margin:4px 0; }
+      .md li > p{ margin:4px 0; }  /* 列表项内段落更紧凑 */
+      .md blockquote{ 
+        margin:12px 0; padding:8px 12px;
+        border-left:3px solid #cfe0ff; border-radius:8px;
+        background:#f8fbff;
+        color:#0f172a;
+      }
+
+      /* 链接与强调 */
+      .md a{ text-decoration: underline; text-underline-offset:2px; }
+      .md strong{ font-weight:700; }
+      .md em{ font-style:italic; }
+
+      /* 代码：行内与块 */
+      .md code{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size:.92em;
+        background:#f3f4f6;
+        border:1px solid #e5e7eb;
+        border-radius:4px;
+        padding:0 .25em;
+      }
+      .md pre{
+        margin:10px 0; padding:12px;
+        background:#f7f9ff;
+        border:1px solid #e6e8f0; border-radius:10px;
+        overflow:auto; line-height:1.6;
+      }
+      .md pre code{
+        background:transparent; border:none; padding:0; display:block; font-size:.92em;
+      }
+
+      /* 表格：可读的细边框样式 */
+      .md table{
+        width:100%; border-collapse:collapse; display:block; overflow:auto;
+        margin:10px 0;
+      }
+      .md thead th{
+        background:#f8fafc; color:#0f172a; font-weight:700;
+      }
+      .md th, .md td{
+        border:1px solid #e5e7eb; padding:8px 10px; text-align:left; vertical-align:top;
+      }
+
+      /* 图片与分割线 */
+      .md img{ display:block; margin:8px 0; }
+      .md hr{ border:0; border-top:1px solid #e6e8f0; margin:12px 0; }
+
+      /* 首尾去多余外边距，避免开头/结尾突兀空白 */
+      .md > :first-child{ margin-top: 0; }
+      .md > :last-child{  margin-bottom: 0; }
+      
+
+
+
+      /* 列表自身的间距：保留该有的空行，但不过分 */
+      .md ul, .md ol { margin: 8px 0; }
+      .md li { margin: 4px 0; }
+      .md li > p { margin: 4px 0; }      /* 列表项里段落更紧凑，空行仍可见 */
+
+      /* “列表 → 标题/段落/引用/代码块”：收紧相邻间距，避免大块留白 */
+      .md ul + h1, .md ol + h1,
+      .md ul + h2, .md ol + h2,
+      .md ul + h3, .md ol + h3,
+      .md ul + p,  .md ol + p,
+      .md ul + blockquote, .md ol + blockquote,
+      .md ul + pre, .md ol + pre { margin-top: 6px; }
+
+      /* 标题本身保持紧凑（如果你已设置，可忽略或保留这组） */
+      .md h1 { margin: 14px 0 6px; }
+      .md h2 { margin: 12px 0 6px; }
+      .md h3 { margin: 10px 0 6px; }
+
+
+      /* 收紧列表和下文的间距 */
+      .md ul, .md ol {
+        margin: 8px 0 4px;   /* 上下 8px，底部只有 4px */
+        padding-left: 18px;
+      }
+      .md li { margin: 4px 0; }
+
+      /* 如果列表后面紧跟 <br>，就去掉它，避免叠加空白 */
+      .md ul + br, .md ol + br {
+        display: none;
+      }
+
+
     `;
+
+
+
+
     const root = document.createElement("div");
     root.innerHTML = `
       <div class="wrap">
