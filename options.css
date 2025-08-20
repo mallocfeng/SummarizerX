@@ -115,6 +115,14 @@ body{
 .eye-btn:hover{ background:#f2f4ff; color: var(--primary-600); }
 .eye-btn:focus-visible{ outline:2px solid var(--primary); }
 
+/* 禁用态（Trial 时锁定） */
+.ctrl[disabled]{
+  background:#f9fafb;
+  color:#9aa3b2;
+  cursor:not-allowed;
+}
+.eye-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
 /* 按钮组（通用） */
 .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .btn{
@@ -198,62 +206,46 @@ body{
   .dock-inner{ flex-direction: column; align-items: stretch; }
   .dock-right{ justify-content: flex-end; }
   .save-dock{ height: auto; padding: 10px 0; }
-  .main-with-dock{ padding-bottom: 120px; } /* 底栏增高时留白也加大 */
+  .main-with-dock{ padding-bottom: 120px; }
 }
 
-/* 可选：让下拉框在 Windows 上也保持美观 */
 /* 单独占一行的字段 */
-.field-full {
-  margin-bottom: 16px;
-}
+.field-full { margin-bottom: 16px; }
 
-/* 让 AI 平台下拉框更紧凑一些 */
+/* 下拉更紧凑 */
 select.ctrl.short {
-  max-width: 220px;   /* 控制宽度，不用占满一整行 */
+  max-width: 220px;
   height: 34px;
   line-height: 34px;
   padding: 0 28px 0 10px;
 }
 
-.label {
-  display: flex;
-  align-items: center;
-  gap: 6px; /* 图标和文字的间距 */
-}
-
-.label .icon {
-  color: #0056b3; /* 深蓝色 */
-  flex-shrink: 0;
-}
+.label { display: flex; align-items: center; gap: 6px; }
+.label .icon { color: #0056b3; flex-shrink: 0; }
 
 /* 限制 AI 平台下拉框的宽度 */
-#aiProvider.ctrl {
-  max-width: 400px;  /* 可以根据需要调整，比如 180px 或 200px */
-  display: inline-block;
-}
+#aiProvider.ctrl { max-width: 400px; display: inline-block; }
 
-/* 新增：保存栏占位（JS 会覆盖这里的高度） */
-#dock-spacer {
-  height: var(--dock-h);
-}
+/* 保存栏占位（JS 会覆盖这里的高度） */
+#dock-spacer { height: var(--dock-h); }
 
-/* 购买指南（放在 AI 平台选择后面） */
+/* 购买指南 */
 .buy-help-inline{
   display: inline-block;
-  margin-left: 12px;
-  font-size: 13px;
-  color: #475467;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #6b7280;
   vertical-align: middle;
-  white-space: nowrap;   /* 保持一行，不被拆开 */
+  white-space: nowrap;
 }
 .buy-help-inline a{
   color: #2563eb;
   text-decoration: underline;
   text-underline-offset: 2px;
+  margin: 0 2px;
 }
 .buy-help-inline a:hover{ filter: brightness(0.95); }
 
-/* 小屏下自动换到下一行，留点上边距 */
 @media (max-width: 800px){
   .buy-help-inline{
     display: block;
@@ -262,10 +254,5 @@ select.ctrl.short {
   }
 }
 
-.buy-help-inline{
-  margin-left: 8px;
-  font-size: 12px;
-  color: #6b7280;
-  white-space: nowrap;
-}
-.buy-help-inline a{ margin: 0 2px; }
+/* 通用隐藏工具类：用于 Trial 时隐藏 BaseURL 字段 */
+.hidden { display: none !important; }

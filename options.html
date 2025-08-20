@@ -23,20 +23,9 @@
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> 基础配置</h2>
 
-      <!-- ⬇︎ AI 平台切换：放到最上面，单独占一行 -->
-      <!-- <div class="field field-full">
-        <label class="label" for="aiProvider">AI 平台</label>
-        <select id="aiProvider" class="ctrl short">
-          <option value="openai">OpenAI（默认）</option>
-          <option value="deepseek">DeepSeek</option>
-          <option value="custom">自定义</option>
-        </select>
-        <p class="hint">切换平台将自动填写 Base URL 和模型；若手动修改任意字段，将自动切到「自定义」。</p>
-      </div> -->
-
       <div class="field field-full">
         <label class="label" for="aiProvider">
-          <!-- 价格标签 tag 图标 -->
+          <!-- 图标 -->
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               width="18" height="18" style="vertical-align: middle; margin-right:6px;">
             <defs>
@@ -52,9 +41,10 @@
         <select id="aiProvider" class="ctrl">
           <option value="openai">OpenAI（默认）</option>
           <option value="deepseek">DeepSeek</option>
+          <option value="trial">试用（限时）</option>
           <option value="custom">自定义</option>
         </select>
-        <!-- 新增：购买指南（紧跟在下拉框后，右侧留白展示） -->
+        <!-- 购买指南（紧跟在下拉框后，右侧留白展示） -->
         <span class="buy-help-inline">
           不会买？查看：
           <a id="link-buy-openai" href="#" target="_blank" rel="noopener">OpenAI 指南</a>
@@ -78,7 +68,8 @@
           </div>
         </div>
 
-        <div class="field">
+        <!-- 给 BaseURL 外层一个可控的 ID，便于 Trial 时整体隐藏 -->
+        <div class="field" id="field-baseURL">
           <label class="label">Base URL</label>
           <input id="baseURL" class="ctrl" placeholder="https://api.openai.com/v1" />
         </div>
@@ -151,8 +142,8 @@
     </section>
   </main>
 
-<!-- 新增：底部占位，避免被固定保存栏遮挡 -->
-<div id="dock-spacer" aria-hidden="true"></div>
+  <!-- 新增：底部占位，避免被固定保存栏遮挡 -->
+  <div id="dock-spacer" aria-hidden="true"></div>
 
   <!-- 固定底栏：全局统一保存 -->
   <aside class="save-dock">

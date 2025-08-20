@@ -149,6 +149,25 @@
     return html;
   }
 
+  function applyTrialLabelToFloatButton(shadowRoot) {
+    const btn = shadowRoot.getElementById("sx-run");
+    if (!btn) return;
+    chrome.storage.sync.get(["aiProvider"]).then(({ aiProvider }) => {
+      if ((aiProvider || "trial") === "trial") {
+        btn.textContent = "试用摘要";
+        btn.title = "当前为试用模式（通过代理调用），点击开始试用摘要";
+      } else {
+        btn.textContent = "提取并摘要";
+        btn.title = "点击提取正文并生成摘要";
+      }
+    }).catch(() => {
+      btn.textContent = "提取并摘要";
+      btn.title = "点击提取正文并生成摘要";
+    });
+  }
+  
+  
+
   // ========== DOM & 样式（Shadow） ==========
   function ensurePanel() {
     let host = document.getElementById(PANEL_ID);
@@ -498,6 +517,13 @@
   // ===== 打开/绑定 =====
   const host = ensurePanel();
   const shadow = host.shadowRoot;
+  applyTrialLabelToFloatButton(shadow);
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && changes.aiProvider) {
+    applyTrialLabelToFloatButton(shadow);
+  }
+});
 
   // 内容脚本不能直接用 chrome.tabs.query —— 让 background 告诉我们活动 tabId
   async function getActiveTabId() {

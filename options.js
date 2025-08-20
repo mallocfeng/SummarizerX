@@ -13,7 +13,8 @@ const DEFAULTS = {
   extract_mode: "fast",
   system_prompt_preset: "general_summary",
   system_prompt_custom: "",
-  aiProvider: "openai",
+  // ① 首次安装默认 Trial
+  aiProvider: "trial",
 };
 
 const PRESETS = {
@@ -36,8 +37,15 @@ const PROVIDER_PRESETS = {
     model_summarize: "deepseek-chat",
     apiKeyKey: "apiKey_deepseek",
   },
+  trial: {
+    baseURL: "https://mallocfeng1982.win/v1",
+    model_extract: "deepseek-chat",
+    model_summarize: "deepseek-chat",
+    apiKeyKey: "apiKey_trial",
+    lockFields: true,
+    apiKeyFixed: "trial"
+  },
   custom: {
-    // 自定义不套默认，保持用户可自由输入
     apiKeyKey: "apiKey_custom",
   }
 };
@@ -47,13 +55,70 @@ function setMeta(meta) {
   $("meta").textContent = `当前配置：provider=${meta.aiProvider}，extract=${meta.model_extract}，summary=${meta.model_summarize}，base=${meta.baseURL}，lang=${meta.output_lang || "auto"}，mode=${meta.extract_mode}`;
 }
 
-// 版本号
+// ========== 会话级“平台字段快照” ==========
+const providerSnapshots = {}; // { provider: { apiKey, baseURL, model_extract, model_summarize, extract_mode } }
+let currentProvider = null;
+
+function snapshotCurrentProvider() {
+  if (!currentProvider) return;
+  providerSnapshots[currentProvider] = {
+    apiKey: $("apiKey").value,
+    baseURL: $("baseURL").value,
+    model_extract: $("model_extract").value,
+    model_summarize: $("model_summarize").value,
+    extract_mode: $("extract_mode").value,
+  };
+}
+
+function applySnapshot(provider) {
+  const snap = providerSnapshots[provider];
+  if (!snap) return false;
+  $("apiKey").value = snap.apiKey ?? $("apiKey").value;
+  $("baseURL").value = snap.baseURL ?? $("baseURL").value;
+  $("model_extract").value = snap.model_extract ?? $("model_extract").value;
+  $("model_summarize").value = snap.model_summarize ?? $("model_summarize").value;
+  if (snap.extract_mode) $("extract_mode").value = snap.extract_mode;
+  return true;
+}
+
+// ② Trial 锁定/隐藏（含：强制正文提取方式=fast，隐藏 BaseURL）
+function setTrialLock(isLocked) {
+  const $apiKey = $("apiKey");
+  const $base   = $("baseURL");
+  const $baseWrap = $("field-baseURL");
+  const $ext    = $("model_extract");
+  const $sum    = $("model_summarize");
+  const $eyeBtn = $("toggleKey");
+  const $mode   = $("extract_mode");
+
+  // 锁定输入
+  [$apiKey, $base, $ext, $sum].forEach(i => { i.disabled = !!isLocked; });
+  if ($eyeBtn) $eyeBtn.disabled = !!isLocked;
+
+  // 强制/锁定提取方式
+  if (isLocked) {
+    $mode.value = "fast";
+    $mode.disabled = true;
+  } else {
+    $mode.disabled = false;
+  }
+
+  // 隐藏/显示 BaseURL 区域
+  if ($baseWrap) $baseWrap.classList.toggle("hidden", !!isLocked);
+
+  const tip = isLocked ? "试用模式下此项已锁定。如需自定义，请切换到 OpenAI/DeepSeek/自定义。" : "";
+  [$apiKey, $base, $ext, $sum, $mode].forEach(i => i.title = tip);
+  if ($eyeBtn) $eyeBtn.title = tip;
+}
+
+// 版本号 & 指南链接
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-version');
-  if (!el) return;
-  const { version, version_name } = chrome.runtime.getManifest();
-  el.textContent = `v${version}`;
-  el.title = version_name || version;
+  if (el) {
+    const { version, version_name } = chrome.runtime.getManifest();
+    el.textContent = `v${version}`;
+    el.title = version_name || version;
+  }
   const $openaiGuide = document.getElementById('link-buy-openai');
   const $deepseekGuide = document.getElementById('link-buy-deepseek');
   if ($openaiGuide)  $openaiGuide.href  = GUIDE_OPENAI;
@@ -68,6 +133,7 @@ function langSuffix() {
   return "\n\nEnsure the output strictly matches the target language.";
 }
 
+// 购买指南显示逻辑
 function reflectGuideLink(){
   const p = $("aiProvider").value;
   const o = document.getElementById('link-buy-openai');
@@ -88,22 +154,12 @@ function formatRulesSuffix() {
 }
 
 // —— 预设 + 语言尾注 → 覆盖到自定义文本框
-// function applyPresetToTextarea(force = false) {
-//   const box = $("system_prompt_custom");
-//   const presetKey = $("system_prompt_preset").value || "general_summary";
-//   const base = PRESETS[presetKey] || PRESETS.general_summary;
-//   const newText = base + langSuffix();
-//   if (!box.value.trim() || force) {
-//     box.value = newText;
-//   }
-// }
-
 function applyPresetToTextarea(force = false) {
   const box = $("system_prompt_custom");
   const presetKey = $("system_prompt_preset").value || "general_summary";
   const base = PRESETS[presetKey] || PRESETS.general_summary;
 
-  const newText = base + formatRulesSuffix() + langSuffix(); // ← 加上“只用 Markdown”硬规则
+  const newText = base + formatRulesSuffix() + langSuffix();
   if (!box.value.trim() || force) {
     box.value = newText;
   }
@@ -115,36 +171,53 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await chrome.storage.sync.get([
     "aiProvider",
-    "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_custom",
+    "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_custom", "apiKey_trial",
     "baseURL","model_extract","model_summarize",
+    "baseURL_custom", "model_extract_custom", "model_summarize_custom",
     "output_lang","extract_mode","system_prompt_preset","system_prompt_custom"
   ]);
 
-  // 平台（默认 openai）
-  const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
+  // 平台（默认 trial）
+  const aiProvider = d.aiProvider || DEFAULTS.aiProvider; // trial
   $("aiProvider").value = aiProvider;
+  currentProvider = aiProvider;
 
   // API Key：展示当前平台专用 Key（若没有，则 fallback 到通用 apiKey 或留空）
   const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
   const providerSavedKey = (providerKeyName && d[providerKeyName]) ? d[providerKeyName] : "";
   $("apiKey").value = providerSavedKey || d.apiKey || "";
 
-  // Base / 模型：如果 provider = openai / deepseek，优先用预设；否则用已存或默认
-  if (aiProvider === "openai" || aiProvider === "deepseek") {
+  // Base / 模型
+  if (aiProvider === "openai" || aiProvider === "deepseek" || aiProvider === "trial") {
     const p = PROVIDER_PRESETS[aiProvider];
     $("baseURL").value = p.baseURL;
     $("model_extract").value = p.model_extract;
     $("model_summarize").value = p.model_summarize;
   } else {
-    $("baseURL").value = d.baseURL || DEFAULTS.baseURL;
-    $("model_extract").value = d.model_extract || DEFAULTS.model_extract;
-    $("model_summarize").value = d.model_summarize || DEFAULTS.model_summarize;
+    $("baseURL").value = d.baseURL_custom || d.baseURL || DEFAULTS.baseURL;
+    $("model_extract").value = d.model_extract_custom || d.model_extract || DEFAULTS.model_extract;
+    $("model_summarize").value = d.model_summarize_custom || d.model_summarize || DEFAULTS.model_summarize;
   }
 
+  // 输出语言/提取方式
   $("output_lang").value = d.output_lang || DEFAULTS.output_lang;
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
-  $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
 
+  // Trial：强制 fast + 锁定 & 隐藏 BaseURL & 固定 key
+  if (aiProvider === "trial") {
+    $("extract_mode").value = "fast";
+    setTrialLock(true);
+    const p = PROVIDER_PRESETS.trial;
+    $("apiKey").value = p.apiKeyFixed || "trial";
+    $("baseURL").value = p.baseURL;
+    $("model_extract").value = p.model_extract;
+    $("model_summarize").value = p.model_summarize;
+  } else {
+    setTrialLock(false);
+  }
+
+  // System prompt
+  $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
   if (d.system_prompt_custom && d.system_prompt_custom.trim()) {
     $("system_prompt_custom").value = d.system_prompt_custom;
   } else {
@@ -159,15 +232,26 @@ async function loadSettings() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value
   });
-  reflectGuideLink(); // 更新购买指南链接显示
+  reflectGuideLink();
   updateBuyHelp($("aiProvider").value || "openai");
 }
 
 async function saveSettings() {
   const aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
+
+  // Trial：强制固定值，包含提取方式 fast
+  if (aiProvider === "trial") {
+    const p = PROVIDER_PRESETS.trial;
+    $("apiKey").value = p.apiKeyFixed || "trial";
+    $("baseURL").value = p.baseURL;
+    $("model_extract").value = p.model_extract;
+    $("model_summarize").value = p.model_summarize;
+    $("extract_mode").value = "fast";
+  }
+
   const payload = {
     aiProvider,
-    apiKey: $("apiKey").value.trim(), // 仍然保存一份“当前使用”的通用 Key
+    apiKey: $("apiKey").value.trim(),
     baseURL: ($("baseURL").value.trim() || DEFAULTS.baseURL).replace(/\/+$/,""),
     model_extract: $("model_extract").value.trim(),
     model_summarize: $("model_summarize").value.trim(),
@@ -177,13 +261,28 @@ async function saveSettings() {
     system_prompt_custom: $("system_prompt_custom").value.trim()
   };
 
-  // 同时把当前平台的 key 单独保存（方便切换时自动带回）
+  // 单平台 key 保存
   const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
-  if (providerKeyName) {
-    payload[providerKeyName] = payload.apiKey;
+  if (providerKeyName) payload[providerKeyName] = payload.apiKey;
+
+  // 自定义专属持久化
+  if (aiProvider === "custom") {
+    payload.baseURL_custom = payload.baseURL;
+    payload.model_extract_custom = payload.model_extract;
+    payload.model_summarize_custom = payload.model_summarize;
   }
 
   await chrome.storage.sync.set(payload);
+
+  // 更新会话快照
+  providerSnapshots[aiProvider] = {
+    apiKey: payload.apiKey,
+    baseURL: payload.baseURL,
+    model_extract: payload.model_extract,
+    model_summarize: payload.model_summarize,
+    extract_mode: payload.extract_mode,
+  };
+
   setStatus("已保存设置 ✅");
   setMeta(payload);
 }
@@ -194,16 +293,17 @@ async function saveSettings() {
 async function testApiKey() {
   const cleanupSlash = (s="") => s.replace(/\/+$/,"");
   try {
+    const provider = $("aiProvider").value;
     const key = $("apiKey").value.trim();
     const base = cleanupSlash($("baseURL").value.trim() || DEFAULTS.baseURL);
     const model = $("model_summarize").value.trim() || DEFAULTS.model_summarize;
-    if (!key) throw new Error("请先输入 API Key");
+    if (!key && provider !== "trial") throw new Error("请先输入 API Key");
     setStatus("⏳ 正在测试 API Key 与 Base URL…");
 
-    // --- 尝试 1：/v1/models（多数 OpenAI 兼容端可用）
+    // --- 尝试 1：/v1/models
     const resp1 = await fetch(`${base}/models`, {
       method: "GET",
-      headers: { "Authorization": `Bearer ${key}` }
+      headers: { "Authorization": `Bearer ${key || "trial"}` }
     });
 
     if (resp1.ok) {
@@ -211,7 +311,7 @@ async function testApiKey() {
       return;
     }
 
-    // --- 尝试 2：/v1/chat/completions（有些兼容端不实现 /models）
+    // --- 尝试 2：/v1/chat/completions
     const payload = {
       model,
       messages: [{ role: "user", content: "ping" }],
@@ -221,7 +321,7 @@ async function testApiKey() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${key}`
+        "Authorization": `Bearer ${key || "trial"}`
       },
       body: JSON.stringify(payload)
     });
@@ -256,27 +356,48 @@ let isProgrammaticProviderChange = false; // 程序性切换时，忽略 change 
 async function onProviderChange() {
   if (isProgrammaticProviderChange) return;
 
-  const provider = $("aiProvider").value || "openai";
+  // 切走前做快照
+  snapshotCurrentProvider();
+
+  const provider = $("aiProvider").value || DEFAULTS.aiProvider;
+  currentProvider = provider;
+
   const d = await chrome.storage.sync.get([
-    "apiKey","apiKey_openai","apiKey_deepseek","apiKey_custom"
+    "apiKey","apiKey_openai","apiKey_deepseek","apiKey_custom","apiKey_trial",
+    "baseURL_custom","model_extract_custom","model_summarize_custom"
   ]);
 
-  if (provider === "openai" || provider === "deepseek") {
-    const p = PROVIDER_PRESETS[provider];
-
-    // 1) 切换 Base / 模型为预设
+  if (provider === "trial") {
+    const p = PROVIDER_PRESETS.trial;
+    $("apiKey").value = p.apiKeyFixed || "trial";
     $("baseURL").value = p.baseURL;
     $("model_extract").value = p.model_extract;
     $("model_summarize").value = p.model_summarize;
-
-    // 2) 尝试填充该平台的已保存 Key（否则留空）
-    const keyName = p.apiKeyKey;
-    const saved = keyName ? (d[keyName] || "") : "";
-    $("apiKey").value = saved || ""; // 没保存过就留空
+    $("extract_mode").value = "fast";
+    setTrialLock(true);
+  } else if (provider === "openai" || provider === "deepseek") {
+    const restored = applySnapshot(provider);
+    if (!restored) {
+      const p = PROVIDER_PRESETS[provider];
+      $("baseURL").value = p.baseURL;
+      $("model_extract").value = p.model_extract;
+      $("model_summarize").value = p.model_summarize;
+      $("extract_mode").value = providerSnapshots[provider]?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
+    }
+    const keyName = PROVIDER_PRESETS[provider].apiKeyKey;
+    $("apiKey").value = (providerSnapshots[provider]?.apiKey) || d[keyName] || "";
+    setTrialLock(false);
   } else {
-    // custom：不动用户输入（如果需要也可从存储带回）
-    const saved = d.apiKey_custom || "";
-    if (saved) $("apiKey").value = saved;
+    // custom
+    const restored = applySnapshot("custom");
+    if (!restored) {
+      $("baseURL").value = d.baseURL_custom || $("baseURL").value || DEFAULTS.baseURL;
+      $("model_extract").value = d.model_extract_custom || $("model_extract").value || DEFAULTS.model_extract;
+      $("model_summarize").value = d.model_summarize_custom || $("model_summarize").value || DEFAULTS.model_summarize;
+      $("apiKey").value = d.apiKey_custom || d.apiKey || "";
+      $("extract_mode").value = providerSnapshots.custom?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
+    }
+    setTrialLock(false);
   }
 
   setMeta({
@@ -287,18 +408,20 @@ async function onProviderChange() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value
   });
-  reflectGuideLink(); // 更新购买指南链接显示
+  reflectGuideLink();
   updateBuyHelp(provider);
 }
 
-// —— 监听“会导致自定义”的输入，但 **不包含 apiKey**
+// —— 监听“会导致自定义”的输入，但 **Trial 不允许改；且不包含 apiKey**
 function markCustomIfManualChange() {
-  // 用户手动改了 Base/模型 → 切到 custom
   const sel = $("aiProvider");
+  if (sel.value === "trial") return; // 试用不可改
   if (sel.value !== "custom") {
+    snapshotCurrentProvider();
     isProgrammaticProviderChange = true;
     sel.value = "custom";
     isProgrammaticProviderChange = false;
+    onProviderChange();
   }
 }
 
@@ -332,11 +455,9 @@ function fitDockPadding() {
   if (!dock || !main) return;
 
   const h = dock.getBoundingClientRect().height || 0;
-  // 主内容底部留白 = 保存栏高度 + 16px 视觉间距
   main.style.paddingBottom = `${h + 16}px`;
   if (spacer) spacer.style.height = `${h}px`;
 }
-
 
 function updateBuyHelp(provider) {
   const open = document.getElementById('link-buy-openai');
@@ -345,16 +466,17 @@ function updateBuyHelp(provider) {
 
   if (!open || !deep || !sep) return;
 
-  // 可选：在这里统一设置 href（更稳，不怕文件名变化）
-  try {
-    const guideUrl = GUIDE_URL;
-    open.href = GUIDE_OPENAI
-    deep.href = GUIDE_DEEPSEEK;
-  } catch (e) {
-    // 如果不是扩展环境或无权限，忽略即可
+  open.href = GUIDE_OPENAI;
+  deep.href = GUIDE_DEEPSEEK;
+
+  // Trial 不需要引导
+  if (provider === 'trial') {
+    open.style.display = 'none';
+    deep.style.display = 'none';
+    sep.style.display  = 'none';
+    return;
   }
 
-  // 逻辑：custom 显示两个链接；openai 只显示 OpenAI；deepseek 只显示 DeepSeek
   if (provider === 'custom') {
     open.style.display = 'inline';
     deep.style.display = 'inline';
@@ -362,31 +484,22 @@ function updateBuyHelp(provider) {
   } else if (provider === 'openai') {
     open.style.display = 'inline';
     deep.style.display = 'none';
-    sep.style.display  = 'none'; // 只剩一个链接 → 不显示分隔点
+    sep.style.display  = 'none';
   } else if (provider === 'deepseek') {
     open.style.display = 'none';
     deep.style.display = 'inline';
-    sep.style.display  = 'none'; // 只剩一个链接 → 不显示分隔点
+    sep.style.display  = 'none';
   } else {
-    // 兜底：显示两个
     open.style.display = 'inline';
     deep.style.display = 'inline';
     sep.style.display  = 'inline';
   }
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
-  // 你原有的初始化逻辑……
-  // （保持不动）
-
-  // 初始化底部留白
   fitDockPadding();
-
-  // 窗口尺寸变化时更新
   window.addEventListener('resize', fitDockPadding);
 
-  // 监听保存栏高度变化（换行/文案变化等）
   const dock = document.querySelector('.save-dock');
   if (window.ResizeObserver && dock) {
     const ro = new ResizeObserver(() => fitDockPadding());
