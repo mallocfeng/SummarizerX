@@ -1,5 +1,7 @@
 // sidepanel.js —— 支持 "partial"：摘要先显示、正文后到再补
 // ✅ 修复：无权限/未注入时会尝试本页注入；仅在确实缺权限时提示“点击扩展图标重新授权”
+import { getSettings } from "./settings.js";
+let RUN_BTN_LABEL = "提取并摘要";
 
 const $ = (id) => document.getElementById(id);
 const onReady = new Promise((r) =>
@@ -127,12 +129,22 @@ function renderMarkdown(md = "") {
 /* =========
  * UI 辅助
  * ========= */
-function setButtonLoading(loading=true){
-  const btn=$("btn-run"); if(!btn) return;
-  btn.classList.toggle("loading",loading);
-  btn.disabled=!!loading;
-  btn.textContent=loading?"处理中…":"提取并摘要";
+// function setButtonLoading(loading=true){
+//   const btn=$("btn-run"); if(!btn) return;
+//   btn.classList.toggle("loading",loading);
+//   btn.disabled=!!loading;
+//   btn.textContent=loading?"处理中…":"提取并摘要";
+// }
+
+function setButtonLoading(loading = true) {
+  const btn = $("btn-run");
+  if (!btn) return;
+  btn.classList.toggle("loading", loading);
+  btn.disabled = !!loading;
+  // 加载时显示“处理中…”，结束时用动态文案
+  btn.textContent = loading ? "处理中…" : RUN_BTN_LABEL;
 }
+
 function showProgress(show=true){ $("progress")?.classList.toggle("hidden", !show); }
 function skeleton(){
   $("summary").innerHTML=`<div class="skl" style="width:90%"></div><div class="skl" style="width:72%"></div><div class="skl" style="width:84%"></div>`;
@@ -273,6 +285,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // 显示短版本，鼠标悬停显示更详细信息（可选）
   el.textContent = `v${version}`;
   el.title = version_name || version;
+});
+
+// 初始化按钮文案（Trial => “试用摘要”）
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const cfg = await getSettings();
+    RUN_BTN_LABEL = (cfg?.aiProvider === "trial") ? "试用摘要" : "提取并摘要";
+    const btn = $("btn-run");
+    if (btn && !btn.classList.contains("loading")) {
+      btn.textContent = RUN_BTN_LABEL;
+    }
+  } catch (e) {
+    // 读取不到也不致命，保持默认文案
+    console.warn("read settings failed:", e);
+  }
 });
 
 /* ============================
@@ -486,3 +513,17 @@ onReady.then(() => {
     if (box) box.remove();
   });
 });
+
+// 可选：状态更新时顺带刷新按钮文案（如果用户刚改了设置）
+(async () => {
+  try {
+    const cfg = await getSettings();
+    const newLabel = (cfg?.aiProvider === "trial") ? "试用摘要" : "提取并摘要";
+    if (newLabel !== RUN_BTN_LABEL) {
+      RUN_BTN_LABEL = newLabel;
+      if (!$("btn-run")?.classList.contains("loading")) {
+        $("btn-run").textContent = RUN_BTN_LABEL;
+      }
+    }
+  } catch {}
+})();

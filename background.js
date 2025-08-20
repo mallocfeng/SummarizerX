@@ -1,45 +1,18 @@
 // background.js —— 两阶段：先出“摘要”(status: partial)，后出“可读正文”(status: done)
 // 取消 sidepanel，改为页面悬浮面板；保留最小权限（activeTab 动态注入）
 
+// ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
+import { getSettings } from "./settings.js";
+
 const lastUrlByTab = new Map();
 const grantedTabs = new Set();
 
-const DEFAULT_CONFIG = {
-  baseURL: "https://api.openai.com/v1",
-  model_extract: "gpt-4o-mini",
-  model_summarize: "gpt-4o-mini",
-  output_lang: "",
-  extract_mode: "fast",
-  task_mode: "summary",
-  system_prompt_preset: "general_summary",
-  system_prompt_custom: ""
-};
-
+// ⬇️ 保留系统预设（可继续由本文件维护；若你也想统一到 settings.js，也可一起挪过去）
 const SYSTEM_PRESETS = {
   general_summary: "You are a precise assistant for distilling web articles. Be faithful and concise. Avoid speculation.",
   faithful_translation: "You are a professional translator. Preserve meaning, tone and technical terms faithfully. Avoid adding information.",
   tech_article_translation: "You are a technical translator for software articles. Keep code, commands and technical terms unchanged. Clarify ambiguous references."
 };
-
-// ---- 读设置
-async function getSettings() {
-  const d = await chrome.storage.sync.get([
-    "apiKey","baseURL","model_extract","model_summarize",
-    "output_lang","extract_mode","task_mode",
-    "system_prompt_preset","system_prompt_custom"
-  ]);
-  return {
-    apiKey: d.apiKey || "",
-    baseURL: d.baseURL || DEFAULT_CONFIG.baseURL,
-    model_extract: d.model_extract || DEFAULT_CONFIG.model_extract,
-    model_summarize: d.model_summarize || DEFAULT_CONFIG.model_summarize,
-    output_lang: (d.output_lang ?? DEFAULT_CONFIG.output_lang),
-    extract_mode: d.extract_mode || DEFAULT_CONFIG.extract_mode,
-    task_mode: d.task_mode || DEFAULT_CONFIG.task_mode,
-    system_prompt_preset: d.system_prompt_preset || DEFAULT_CONFIG.system_prompt_preset,
-    system_prompt_custom: d.system_prompt_custom || DEFAULT_CONFIG.system_prompt_custom
-  };
-}
 
 // ---- 会话状态（按 tabId）
 const S = chrome.storage.session;
@@ -142,16 +115,25 @@ function textToMarkdown(t = "") {
 
 // ---- 主流程
 async function runForTab(tabId) {
-  const cfg = await getSettings();
-  if (!cfg.apiKey) throw new Error("请先到设置页填写并保存 API Key");
+  const cfg = await getSettings(); // ← 改动 2：统一从 settings.js 取（含 trial 默认）
+  // 允许 trial 无 apiKey；非 trial 仍需 key
+  const isTrial = (cfg.aiProvider === "trial");
+  if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
 
   await setState(tabId, { status: "running" });
 
-  const { title, text, url, pageLang, markdown } = await getPageRawByTabId(tabId);
+  const { title, text, url, pageLang } = await getPageRawByTabId(tabId);
   const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text);
 
-  const quickMd = (typeof markdown === "string" && markdown.trim()) ? markdown : textToMarkdown(typeof text === "string" ? text : "");
-  const sysForSummary = buildSystemPrompt({ custom: cfg.system_prompt_custom, preset: cfg.system_prompt_preset, finalLang, task: cfg.task_mode });
+  const quickMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim())
+    ? cfg.markdown
+    : textToMarkdown(typeof text === "string" ? text : "");
+  const sysForSummary = buildSystemPrompt({
+    custom: cfg.system_prompt_custom,
+    preset: cfg.system_prompt_preset,
+    finalLang,
+    task: cfg.task_mode
+  });
 
   let summaryPrompt =
     `Based on the content below, produce:\n` +
@@ -162,21 +144,34 @@ async function runForTab(tabId) {
   summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
 
   const summaryFast = await chatCompletion({
-    baseURL: cfg.baseURL, apiKey: cfg.apiKey, model: cfg.model_summarize,
-    system: sysForSummary, prompt: summaryPrompt, temperature: 0.1
+    baseURL: cfg.baseURL,      // trial 情况下，这里已经是你的代理地址（由 settings.js 提供）
+    apiKey:  cfg.apiKey || "trial", // trial 没 key 用 “trial” 兜底；正常模式用用户 key
+    model:   cfg.model_summarize,
+    system:  sysForSummary,
+    prompt:  summaryPrompt,
+    temperature: 0.1
   });
 
   await setState(tabId, {
     status: "partial",
     summary: summaryFast,
     cleaned: "",
-    meta: { baseURL: cfg.baseURL, model_extract: cfg.model_extract, model_summarize: cfg.model_summarize, output_lang: finalLang, extract_mode: cfg.extract_mode, task_mode: cfg.task_mode }
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode
+    }
   });
 
   // 正文
   let cleanedMarkdown = "";
   if (cfg.extract_mode === "fast") {
-    const preferMd = (typeof markdown === "string" && markdown.trim().length > 0) ? markdown : textToMarkdown(typeof text === "string" ? text : "");
+    const preferMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim().length > 0)
+      ? cfg.markdown
+      : textToMarkdown(typeof text === "string" ? text : "");
     const NOTICE_ZH = "当前“正文提取方式”为**本地快速模式**，以下正文为**原文**显示。若希望按目标语言显示正文，请在设置中将“正文提取方式”切换为 **AI 清洗模式**。";
     const NOTICE_EN = "Extract mode is **Local Fast**. The readable body below is shown **in the original language**. If you want the body to follow the target language, switch “Extract Mode” to **AI Clean** in Settings.";
     const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
@@ -195,14 +190,28 @@ async function runForTab(tabId) {
       langLineNative(finalLang)
     ].join("\n");
     const promptClean = `Title: ${title || "(none)"}\nURL: ${url}\n\nRaw content (possibly noisy):\n${clipped}\n\nReturn ONLY the cleaned main body as Markdown.`;
-    cleanedMarkdown = await chatCompletion({ baseURL: cfg.baseURL, apiKey: cfg.apiKey, model: cfg.model_extract, system: sysClean, prompt: promptClean, temperature: 0.0 });
+    cleanedMarkdown = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey:  cfg.apiKey || "trial",
+      model:   cfg.model_extract,
+      system:  sysClean,
+      prompt:  promptClean,
+      temperature: 0.0
+    });
   }
 
   await setState(tabId, {
     status: "done",
     summary: summaryFast,
     cleaned: cleanedMarkdown,
-    meta: { baseURL: cfg.baseURL, model_extract: cfg.model_extract, model_summarize: cfg.model_summarize, output_lang: finalLang, extract_mode: cfg.extract_mode, task_mode: cfg.task_mode }
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode
+    }
   });
 }
 
@@ -220,7 +229,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
-      // 🚀 关键改动：**立刻**回复 ok，然后“后台异步”跑两阶段任务
+      // 🚀 关键：立刻回复 ok，然后“后台异步”跑两阶段任务
       await setState(msg.tabId, { status: "running" }); // 抢先置 running
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
@@ -246,6 +255,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg?.type === "GET_MODEL_INFO") {
+      // 改动 3：这里也用 settings.js 的配置，保持和 UI 一致
       const cfg = await getSettings();
       safeReply({ ok: true, data: {
         baseURL: cfg.baseURL,
@@ -286,12 +296,6 @@ async function closeAllFloatPanels() {
     }
   } catch {}
 }
-
-// chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-//   if (!changeInfo.url && changeInfo.status !== "loading") return;
-//   closeAllFloatPanels();
-// });
-
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // 只要开始加载或 URL 变化，就清掉该 tab 的缓存状态
