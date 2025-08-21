@@ -4,8 +4,6 @@
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
 import { getSettings } from "./settings.js";
 
-const lastUrlByTab = new Map();
-const grantedTabs = new Set();
 
 // ⬇️ 保留系统预设（可继续由本文件维护；若你也想统一到 settings.js，也可一起挪过去）
 const SYSTEM_PRESETS = {
@@ -255,17 +253,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg?.type === "GET_MODEL_INFO") {
-      // 改动 3：这里也用 settings.js 的配置，保持和 UI 一致
-      const cfg = await getSettings();
-      safeReply({ ok: true, data: {
-        baseURL: cfg.baseURL,
-        model_extract: cfg.model_extract,
-        model_summarize: cfg.model_summarize,
-        output_lang: cfg.output_lang || "auto",
-        extract_mode: cfg.extract_mode,
-        task_mode: cfg.task_mode
-      }});
-      return;
     }
   })();
 
@@ -280,7 +267,7 @@ async function injectFloatPanel(tabId) {
 
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
-  try { grantedTabs.add(tab.id); await injectFloatPanel(tab.id); }
+  try { await injectFloatPanel(tab.id); }
   catch (e) { console.warn("injectFloatPanel failed:", e); }
 });
 
@@ -308,6 +295,3 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
-
-chrome.tabs.onRemoved.addListener((tabId) => { grantedTabs.delete(tabId); lastUrlByTab.delete(tabId); });
-chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => { grantedTabs.delete(removedTabId); lastUrlByTab.delete(removedTabId); });

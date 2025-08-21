@@ -162,6 +162,7 @@ async function loadSettings() {
   });
   reflectGuideLink();
   updateBuyHelp(aiProvider);
+  toggleBuyHelpInline(aiProvider);
 }
 
 async function saveSettings() {
@@ -303,6 +304,7 @@ async function onProviderChange() {
   });
   reflectGuideLink();
   updateBuyHelp(provider);
+  toggleBuyHelpInline(provider);
 }
 
 // 用户手动改 Base/模型 → 切自定义（Trial 不允许）
@@ -358,6 +360,13 @@ function updateBuyHelp(provider) {
   else { open.style.display='inline'; deep.style.display='inline'; sep.style.display='inline'; }
 }
 
+function toggleBuyHelpInline(provider){
+  const help = document.querySelector('.buy-help-inline');
+  if (!help) return;
+  // 规则：Trial 隐藏，其它平台显示
+  help.style.display = (provider === 'trial') ? 'none' : '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   fitDockPadding();
   window.addEventListener('resize', fitDockPadding);
@@ -367,6 +376,21 @@ document.addEventListener('DOMContentLoaded', () => {
     ro.observe(dock);
   }
 });
+
+// (function(){
+//   function toggleBuyHelp(){
+//     const sel = document.getElementById('aiProvider');
+//     const help = document.querySelector('.buy-help-inline');
+//     if (!sel || !help) return;
+//     help.style.display = (sel.value === 'trial') ? 'none' : '';
+//   }
+//   document.addEventListener('DOMContentLoaded', () => {
+//     const sel = document.getElementById('aiProvider');
+//     if (!sel) return;
+//     toggleBuyHelp();              // 初始
+//     sel.addEventListener('change', toggleBuyHelp); // 变更
+//   });
+// })();
 
 /* =========================
  * 事件绑定

@@ -1,19 +1,18 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX 麦乐可 AI 摘要阅读器",
-  "version": "1.6.5.1",
+  "version": "1.6.5.2",
   "description": "提取当前网页主要内容，支持本地快速/AI 清洗两种模式，并生成摘要或翻译。包含独立设置页（System Prompt 等）。",
-  "permissions": ["activeTab", "scripting", "sidePanel", "storage", "tabs"],
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": {
-    "default_title": "打开 AI 摘要侧栏",
+    "default_title": "打开/关闭右侧悬浮面板",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
       "48": "icons/icon-48.png"
     }
   },
-  "side_panel": { "default_path": "sidepanel.html" },
   "options_ui": { "page": "options.html", "open_in_tab": true },
   "icons": {
     "16": "icons/icon-16.png",
