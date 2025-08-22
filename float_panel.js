@@ -171,6 +171,13 @@
   // ===== 手动主题覆盖（auto / light / dark） =====
   let themeOverride = 'auto';
   function computeTheme(){
+    // AUTO：优先跟随系统 prefers-color-scheme；获取不到时再退回旧的亮度推断
+    try{
+      const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq && typeof mq.matches === 'boolean') {
+        return mq.matches ? 'dark' : 'light';
+      }
+    }catch{}
     return isDarkBackground() ? 'dark' : 'light';
   }
   function applyThemeWithOverride(shadow){
@@ -336,12 +343,27 @@
 
       /* —— 外框 —— */
       .wrap{
-        height:100vh; display:flex; flex-direction:column;
+        position:relative; height:100vh; display:flex; flex-direction:column;
         background: var(--bg-grad);
         border-left:1px solid var(--border);
         box-shadow:-6px 0 16px rgba(17,24,39,.06);
         color: var(--text);
       }
+
+      /* —— 可拖拽调宽手柄 —— */
+      .dragbar{
+        position:absolute; top:0; left:0; height:100%; width:12px;
+        cursor: col-resize; user-select:none; -webkit-user-select:none;
+        background: transparent; /* 默认透明，保持零视觉干扰 */
+      }
+      /* 悬停时给出视觉暗示（细竖条） */
+      .dragbar::after{
+        content:""; position:absolute; top:0; bottom:0; right:-1px; width:3px;
+        background: linear-gradient(180deg, rgba(102,112,133,.15), rgba(102,112,133,.02));
+        opacity:.0; transition: opacity .15s ease;
+      }
+      .dragbar:hover::after{ opacity:.85; }
+      .wrap.dragging{ cursor: col-resize; }
 
       /* 顶栏 + 按钮（与 options 风格一致的扁平风） */
       .appbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(180deg,#ffffff,#f4f7ff); border-bottom:1px solid var(--border); }
@@ -590,6 +612,14 @@
       // 定时兜底：防止站点通过样式表切换未触发属性变化
       let themeTick = setInterval(() => { try { if (themeOverride === 'auto') applyThemeWithOverride(shadow); } catch {} }, 1500);
 
+      // 系统主题切换监听：AUTO 跟随系统变化
+      try {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const onSystemThemeChange = () => { if (themeOverride === 'auto') applyThemeWithOverride(shadow); };
+        if (mq && mq.addEventListener) mq.addEventListener('change', onSystemThemeChange);
+        else if (mq && mq.addListener) mq.addListener(onSystemThemeChange);
+      } catch {}
+
       // 交互：关闭
       shadow.getElementById("sx-close")?.addEventListener("click", () => {
         try { themeObserver.disconnect(); } catch {}
@@ -603,25 +633,64 @@
         try { await chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" }); } catch {}
       });
 
-      // 交互：拖宽
+      // 交互：拖宽（支持鼠标/触摸，限制最小/最大宽度）
       const drag = shadow.getElementById("sx-drag");
+      const wrapEl = shadow.querySelector('.wrap');
       let dragging = false;
-      drag?.addEventListener("mousedown", (e) => {
-        dragging = true; e.preventDefault();
-        const onMove = (ev) => {
-          if (!dragging) return;
-          const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-          const fromRight = vw - ev.clientX;
-          const w = Math.min(Math.max(fromRight, 320), Math.min(720, vw - 80));
-          host.style.width = `${w}px`;
-        };
-        const onUp = () => {
-          dragging = false;
-          window.removeEventListener("mousemove", onMove, true);
-          window.removeEventListener("mouseup", onUp, true);
-        };
-        window.addEventListener("mousemove", onMove, true);
-        window.addEventListener("mouseup", onUp, true);
+
+      function clampWidth(px){
+        const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+        const minW = Math.min(320, vw - 80);        // 至少留一点页面可见
+        const maxW = Math.max(320, Math.min(720, vw - 80));
+        return Math.max(minW, Math.min(maxW, px));
+      }
+      function startDrag(){
+        dragging = true;
+        wrapEl && wrapEl.classList.add('dragging');
+        // 禁止选中
+        document.documentElement.style.userSelect = 'none';
+      }
+      function endDrag(){
+        dragging = false;
+        wrapEl && wrapEl.classList.remove('dragging');
+        document.documentElement.style.userSelect = '';
+        window.removeEventListener('mousemove', onMouseMove, true);
+        window.removeEventListener('mouseup', onMouseUp, true);
+        window.removeEventListener('touchmove', onTouchMove, { capture:true, passive:false });
+        window.removeEventListener('touchend', onTouchEnd, { capture:true });
+      }
+      function setWidthByClientX(clientX){
+        const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+        const fromRight = vw - clientX;            // 右侧固定，算到右边的距离
+        const w = clampWidth(fromRight);
+        host.style.width = `${w}px`;
+      }
+
+      function onMouseMove(ev){ if(!dragging) return; ev.preventDefault(); setWidthByClientX(ev.clientX); }
+      function onMouseUp(){ if(!dragging) return; endDrag(); }
+
+      function onTouchMove(ev){ if(!dragging) return; if(ev.touches && ev.touches[0]){ setWidthByClientX(ev.touches[0].clientX); } ev.preventDefault(); }
+      function onTouchEnd(){ if(!dragging) return; endDrag(); }
+
+      drag?.addEventListener('mousedown', (e) => {
+        startDrag();
+        e.preventDefault();
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+      });
+      drag?.addEventListener('touchstart', (e) => {
+        startDrag();
+        e.preventDefault();
+        window.addEventListener('touchmove', onTouchMove, { capture:true, passive:false });
+        window.addEventListener('touchend', onTouchEnd, { capture:true });
+      }, { passive:false });
+
+      // 双击手柄在两档宽度间快速切换（适配窄屏时自动夹在范围内）
+      drag?.addEventListener('dblclick', () => {
+        const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+        const cur = parseInt(getComputedStyle(host).width, 10) || 420;
+        const target = cur < 520 ? 560 : 380;
+        host.style.width = `${clampWidth(target)}px`;
       });
 
       // 关闭 notice（并清理相邻多余 <br>，消除关闭后顶部大空隙）
