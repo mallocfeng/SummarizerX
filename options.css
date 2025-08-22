@@ -16,6 +16,9 @@
   --accent:#10b981;
   --surface-soft:#fafbff;
 
+  --link:#2563eb;
+  --label-icon:#0056b3;
+
   --ring: 0 0 0 3px rgba(37,99,235,0.15);
 
   /* 底栏尺寸 */
@@ -41,7 +44,7 @@ body{
 
 /* 内容区域为避免被底栏遮挡，预留内边距 */
 .main-with-dock{
-  padding-bottom: calc(var(--dock-h) + 16px);
+  padding-bottom: var(--dock-h);
 }
 
 /* =========================
@@ -138,13 +141,13 @@ body{
   border-radius: inherit;
   background:
     radial-gradient(140% 100% at 50% -10%,
-      rgba(255,255,255,0.36) 0%,
+      rgba(255,255,255,0.28) 0%,        /* 由 0.36 → 0.28 更柔和 */
       rgba(255,255,255,0.16) 38%,
       rgba(255,255,255,0.06) 62%,
       rgba(255,255,255,0.00) 75%
     ),
     linear-gradient(to bottom,
-      rgba(255,255,255,0.65) 0%,
+      rgba(255,255,255,0.50) 0%,        /* 由 0.65 → 0.50 减少过曝 */
       rgba(255,255,255,0.18) 14%,
       rgba(255,255,255,0.00) 28%
     ),
@@ -181,7 +184,9 @@ body{
 @media (max-width: 800px){ .grid{ grid-template-columns:1fr; } }
 
 .field{ display:block; }
-.label{ display:block; font-size:12px; color:#475467; font-weight:600; margin:0 0 6px; }
+.label{ display:flex; align-items: center; gap: 6px; font-size:12px; color:#475467; font-weight:600; margin:0 0 6px; }
+
+.label .icon { color: var(--label-icon); flex-shrink: 0; }
 
 /* 输入控件 → 玻璃输入 */
 .ctrl{
@@ -250,11 +255,10 @@ body{
 .btn:hover{ background: rgba(255,255,255,0.70); border-color: rgba(255,255,255,0.72); }
 .btn:active{ transform: translateY(1px); }
 .btn.primary{
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0)) /* 顶部高光 */,
-    linear-gradient(180deg, rgba(37,99,235,0.84), rgba(31,95,224,0.78));
-  border-color: rgba(255,255,255,0.68);
+  background: linear-gradient(180deg, var(--primary), var(--primary-600));
+  border-color: var(--primary-600);
   color:#fff;
+  box-shadow: 0 6px 16px rgba(111,135,168,.18), inset 0 -1px 0 rgba(255,255,255,.15);
 }
 
 /* =========================
@@ -336,6 +340,61 @@ body{
   max-width: 520px;
 }
 
+/* ========== 主题切换（与浮窗一致的胶囊按钮 + 图标） ========== */
+
+/* —— 主题切换按钮：兼容无 .theme-btn 类的写法 —— */
+/* 基础尺寸与布局（应用于 .theme-btn 或 seg 内的任意 button） */
+.theme-toggle .seg button,
+.theme-btn{
+  width:34px; height:34px;
+  display:grid; place-items:center;
+  border:none; border-radius:999px;
+  cursor:pointer; background:transparent;
+  color:#334155;
+  padding:0;
+}
+/* 激活态（class active 或 aria-selected=true 都兼容） */
+.theme-toggle .seg button.active,
+.theme-toggle .seg button[aria-selected="true"],
+.theme-btn.active,
+.theme-btn[aria-selected="true"]{
+  background: rgba(255,255,255,0.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30);
+}
+/* SVG 图标统一尺寸/不遮点击 */
+.theme-toggle .seg button svg,
+.theme-btn svg{ width:18px; height:18px; pointer-events:none; }
+
+/* 统一图标绘制，提升浅色模式下对比度 */
+.theme-toggle .seg button svg, .theme-btn svg{
+  stroke: currentColor;
+  fill: none;
+  opacity: .85;
+}
+.theme-toggle .seg button.active svg,
+.theme-toggle .seg button[aria-selected="true"] svg,
+.theme-btn.active svg,
+.theme-btn[aria-selected="true"] svg{ opacity: 1; }
+
+.theme-toggle{ display:flex; align-items:center; gap:10px; }
+.theme-toggle .seg{
+  display:flex; align-items:center; gap:6px;
+  background: rgba(255,255,255,0.35);
+  border:1px solid rgba(255,255,255,0.45);
+  border-radius:999px; padding:4px;
+}
+.theme-toggle .label{
+  display:flex; align-items:center; justify-content:center;
+  height:34px; line-height:34px;    /* 与按钮等高 */
+  font-size:12px; font-weight:700;  /* 更稳重 */
+  color:#475569; margin-right:2px;  /* 轻微间距优化 */
+}
+
+/* 基础外观已在上面“兼容”块声明，这里仅保留差异项（若 .theme-btn 单独使用也生效） */
+.theme-btn{ color:#334155; }
+.theme-btn.active{ background: rgba(255,255,255,0.45); box-shadow: inset 0 1px 0 rgba(255,255,255,0.30); }
+.theme-btn svg{ pointer-events:none; }
+
 /* =========================
  * 响应式优化
  * ========================= */
@@ -345,7 +404,6 @@ body{
   .save-dock{ padding: 12px 0; }
   .main-with-dock{ padding-bottom: 120px; }
 }
-
 .save-dock .status-line{ margin-top: 2px; }
 
 /* 单独占一行的字段 */
@@ -360,13 +418,13 @@ select.ctrl.short {
 }
 
 .label { display: flex; align-items: center; gap: 6px; }
-.label .icon { color: #0056b3; flex-shrink: 0; }
+.label .icon { color: var(--label-icon); flex-shrink: 0; }
 
 /* 限制 AI 平台下拉框的宽度 */
 #aiProvider.ctrl { max-width: 400px; display: inline-block; }
 
 /* 保存栏占位（JS 会覆盖这里的高度） */
-#dock-spacer { height: var(--dock-h); }
+#dock-spacer { height: 12px; }
 
 /* 购买指南 */
 .buy-help-inline{
@@ -378,7 +436,7 @@ select.ctrl.short {
   white-space: nowrap;
 }
 .buy-help-inline a{
-  color: #2563eb;
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 2px;
   margin: 0 2px;
@@ -407,6 +465,206 @@ select.ctrl.short {
   }
 }
 
-/* body:has(#aiProvider option[value="trial"]:checked) .buy-help-inline {
-  display: none !important;
-} */
+/* =========================
+ * 深色模式（系统偏好）
+ * ========================= */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b1220;
+    --card:#0f172a;              /* 更深的玻璃基底 */
+    --border:#26324a;
+    --text:#e5e7eb;
+    --muted:#9aa3b2;
+
+    /* 莫兰迪蓝（低饱和） */
+    --primary:#6f87a8;
+    --primary-600:#4a6691;
+    --primary-50:#0b1220;
+
+    --accent:#10b981;
+    --surface-soft:#0c1323;
+
+    /* 链接/图标在深色下更亮些 */
+    --link:#93c5fd;
+    --label-icon:#93c5fd;
+
+    /* 玻璃参数（更暗更薄） */
+    --glass-bg: rgba(51, 65, 85, 0.32);
+    --glass-stroke: rgba(255,255,255,0.14);
+    --glass-inner: rgba(255,255,255,0.08);
+    --glass-shadow: 0 2px 2px rgba(0,0,0,0.35);
+  }
+
+  /* 输入控件在深色下的玻璃风 */
+  .ctrl{
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: var(--text);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+  }
+  .ctrl::placeholder{ color:#9aa3b2; }
+  .ctrl:hover{ border-color: rgba(255,255,255,0.24); }
+  .ctrl:focus{
+    border-color: rgba(255,255,255,0.32);
+    box-shadow: 0 0 0 3px rgba(147,197,253,0.18), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  /* 说明/提示卡片 */
+  .help{
+    color:#cbd5e1;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+  }
+  .meta{
+    color:#a8b1c2;
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.16);
+  }
+  .hint{ color:#94a3b8; }
+
+  /* 底部保存栏 */
+  .save-dock{
+    background: rgba(26, 34, 48, 0.45);
+    border-top: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.32);
+  }
+
+  /* 快捷键反色 */
+  .shortcut code{ background:#0b1220; color:#e5e7eb; }
+
+  /* 一致的状态字色 */
+  .status-text{ color:#94a3b8; }
+
+  .theme-toggle .label{ color:#94a3b8; }
+  .theme-toggle .seg{ background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
+  .theme-toggle .seg button,
+  .theme-btn{ color:#d1d5db; }
+  .theme-toggle .seg button.active,
+  .theme-toggle .seg button[aria-selected="true"],
+  .theme-btn.active,
+  .theme-btn[aria-selected="true"]{
+    background: rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+  }
+}
+
+/* 主题切换：最小可点击面积与间距保障（防止无类名时过于紧凑） */
+.theme-toggle{ min-height: 40px; }
+.theme-toggle .seg{ gap: 6px; }
+
+/* 细化 save-dock 与内容的垂直节奏 */
+.section.card .help + *{ margin-top: 8px; }
+
+/* =====================================================
+ * 显式主题覆盖（通过 <html data-theme="...">）
+ * 放在文件末尾，确保覆盖上方样式
+ * ===================================================== */
+
+/* ========== 显式：浅色（提高对比度与可读性 + 轻玻璃） ========== */
+html[data-theme="light"] {
+  --bg:#f5f7fe;
+  --card:#ffffff;
+  --border:#dfe6f3;
+  --text:#111827;
+  --muted:#475569;
+
+  --primary:#6f87a8;
+  --primary-600:#4a6691;
+  --primary-50:#eef2ff;
+
+  --accent:#10b981;
+  --surface-soft:#f8faff;
+
+  --link:#2563eb;
+  --label-icon:#2563eb;
+
+  --glass-bg: rgba(167,199,231,0.34);
+  --glass-stroke: rgba(255,255,255,0.55);
+  --glass-inner: rgba(255,255,255,0.28);
+  --glass-shadow: 0 6px 14px rgba(17,24,39,0.06);
+}
+
+/* 顶部与卡片：淡蓝玻璃 + 背滤 */
+html[data-theme="light"] .hero{
+  background: linear-gradient(180deg, rgba(245,249,255,0.90), rgba(236,243,255,0.82));
+  border-color:#e0e9f6;
+  box-shadow: 0 8px 18px rgba(17,24,39,0.07);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+}
+html[data-theme="light"] .section.card{
+  background: linear-gradient(180deg, rgba(240,246,255,0.88), rgba(233,240,255,0.82));
+  border-color:#e0e9f6;
+  box-shadow: 0 6px 14px rgba(17,24,39,0.06);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+}
+
+/* 说明/次级文字：统一提升对比 */
+html[data-theme="light"] .hero-sub,
+html[data-theme="light"] .hint,
+html[data-theme="light"] .status-text{ color:#475569; }
+html[data-theme="light"] .label{ color:#334155; }
+
+/* 输入控件：白底 + 可见边框 */
+html[data-theme="light"] .ctrl{
+  background:#fff;
+  border:1px solid #d1d5db;
+  color:#111827;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+}
+html[data-theme="light"] .ctrl::placeholder{ color:#6b7280; }
+html[data-theme="light"] .ctrl:hover{ border-color:#cbd5e1; }
+html[data-theme="light"] .ctrl:focus{
+  border-color:#b6c2d0;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.18), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+
+/* 说明/提示卡片 */
+html[data-theme="light"] .help{
+  color:#475569;
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(226,232,240,1);
+}
+html[data-theme="light"] .meta{
+  color:#475569;
+  background: rgba(255,255,255,0.75);
+  border-color: rgba(226,232,240,1);
+}
+
+/* 底部状态栏：与卡片同风格的轻玻璃 */
+html[data-theme="light"] .save-dock{
+  background: linear-gradient(180deg, rgba(240,246,255,0.90), rgba(232,239,251,0.84));
+  border-top: 1px solid rgba(255,255,255,0.55);
+  box-shadow: 0 -4px 10px rgba(17,24,39,0.06);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+}
+
+/* 主题胶囊：更清晰的亮色外观与激活态 */
+html[data-theme="light"] .theme-toggle .seg{ background:#f4f6fb; border-color:#d9e4f5; }
+html[data-theme="light"] .theme-toggle .seg button{ color:#5b6b7f; }
+/* 选中态：深蓝底 + 白色图标，明显可见 */
+html[data-theme="light"] .theme-toggle .seg button.active,
+html[data-theme="light"] .theme-toggle .seg button[aria-selected="true"],
+html[data-theme="light"] .theme-btn.active,
+html[data-theme="light"] .theme-btn[aria-selected="true"]{
+  background: var(--primary-600);
+  color:#fff !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.65), 0 0 0 1px rgba(74,102,145,.15);
+}
+html[data-theme="light"] .theme-toggle .seg button.active svg,
+html[data-theme="light"] .theme-toggle .seg button[aria-selected="true"] svg{
+  opacity: 1 !important;
+  stroke:#fff !important;
+}
+
+/* ========== 显式：深色（确保点击立即生效） ========== */
+html[data-theme="dark"] .theme-toggle .seg button.active,
+html[data-theme="dark"] .theme-toggle .seg button[aria-selected="true"],
+html[data-theme="dark"] .theme-btn.active,
+html[data-theme="dark"] .theme-btn[aria-selected="true"]{
+  background: var(--primary-600);
+  color:#fff;
+  box-shadow: none;
+}

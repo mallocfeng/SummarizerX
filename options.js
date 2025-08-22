@@ -13,6 +13,94 @@ const PRESETS = {
   tech_article_translation: "You are a technical translator for software articles. Keep code, commands and technical terms unchanged. Clarify ambiguous references."
 };
 
+// ========= 主题切换（自动 / 浅色 / 深色） =========
+const THEME_STORAGE_KEY = 'options_theme_override';
+// 与浮窗一致，保持两处选择同步（面板使用 float_theme_override）
+const FLOAT_THEME_KEY = 'float_theme_override';
+
+function computeAutoTheme(){
+  try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch { return 'light'; }
+}
+function applyDocumentTheme(mode){
+  const m = (mode === 'auto') ? computeAutoTheme() : (mode || 'light');
+  // 将主题写到 <html data-theme="..."></html>
+  document.documentElement.setAttribute('data-theme', m === 'dark' ? 'dark' : 'light');
+}
+function markOptionsThemeButtonsActive(mode){
+  const wrap = document.getElementById('opt-theme');
+  if (!wrap) return;
+  // 兼容任意带 data-mode 的按钮/图标，不再强依赖 .theme-btn 类
+  wrap.querySelectorAll('[data-mode]')
+    .forEach(b => {
+      const on = b.getAttribute('data-mode') === mode;
+      if (b.classList) b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+}
+function initOptionsThemeToggle(){
+  // 幂等初始化：当 #opt-theme 尚未渲染时，等待其出现
+  const doInit = () => {
+    const wrap = document.getElementById('opt-theme');
+    if (!wrap || wrap.__sx_inited) return;
+    wrap.__sx_inited = true;
+
+    // 初始：读取存储并应用（优先 options，其次浮窗，最后 auto）
+    chrome.storage.sync.get([THEME_STORAGE_KEY, FLOAT_THEME_KEY]).then((all) => {
+      const optVal = all[THEME_STORAGE_KEY];
+      const floatVal = all[FLOAT_THEME_KEY];
+      const current = ['auto','light','dark'].includes(optVal)
+        ? optVal
+        : (['auto','light','dark'].includes(floatVal) ? floatVal : 'auto');
+      markOptionsThemeButtonsActive(current);
+      applyDocumentTheme(current);
+      // 若 options 还未设置，但浮窗有值，则写回 options，保持后续一致
+      if (!['auto','light','dark'].includes(optVal) && ['auto','light','dark'].includes(floatVal)) {
+        chrome.storage.sync.set({ [THEME_STORAGE_KEY]: current }).catch(()=>{});
+      }
+    }).catch(() => {
+      markOptionsThemeButtonsActive('auto');
+      applyDocumentTheme('auto');
+    });
+
+    // 点击切换（识别任意 data-mode 元素）
+    wrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('#opt-theme [data-mode]');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-mode');
+      if (!['auto','light','dark'].includes(mode)) return;
+      // 两处存储同时写，保持浮窗与设置页一致
+      chrome.storage.sync.set({ [THEME_STORAGE_KEY]: mode, [FLOAT_THEME_KEY]: mode }).catch(()=>{});
+      markOptionsThemeButtonsActive(mode);
+      applyDocumentTheme(mode);
+    });
+
+    // 自动模式下跟随系统切换
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const onChange = () => {
+        chrome.storage.sync.get([THEME_STORAGE_KEY]).then((all) => {
+          if (all[THEME_STORAGE_KEY] === 'auto') applyDocumentTheme('auto');
+        }).catch(()=>{});
+      };
+      if (mq && mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq && mq.addListener) mq.addListener(onChange);
+    } catch {}
+  };
+
+  // 1) 立即尝试一次
+  doInit();
+
+  // 2) 若此时尚无 #opt-theme，则监听 DOM，出现后再初始化（只触发一次）
+  if (!document.getElementById('opt-theme') && window.MutationObserver) {
+    const mo = new MutationObserver(() => {
+      if (document.getElementById('opt-theme')) {
+        try { doInit(); } finally { mo.disconnect(); }
+      }
+    });
+    mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
+  }
+}
+
 // ========== 会话级“平台字段快照” ==========
 const providerSnapshots = {}; // { provider: { apiKey, baseURL, model_extract, model_summarize, extract_mode } }
 let currentProvider = null;
@@ -80,6 +168,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const $deepseekGuide = document.getElementById('link-buy-deepseek');
   if ($openaiGuide)  $openaiGuide.href  = GUIDE_OPENAI;
   if ($deepseekGuide) $deepseekGuide.href = GUIDE_DEEPSEEK;
+
+  // 初始化主题三态切换（自动/浅色/深色）
+  initOptionsThemeToggle();
+  // 确保首次渲染就根据存储应用一次（容错）
+  chrome.storage.sync.get([THEME_STORAGE_KEY, FLOAT_THEME_KEY]).then((all)=>{
+    const v = all[THEME_STORAGE_KEY] || all[FLOAT_THEME_KEY] || 'auto';
+    applyDocumentTheme(v);
+  }).catch(()=>{});
 });
 
 function reflectGuideLink(){
@@ -340,8 +436,9 @@ function fitDockPadding() {
   const spacer = document.getElementById('dock-spacer');
   if (!dock || !main) return;
   const h = dock.getBoundingClientRect().height || 0;
-  main.style.paddingBottom = `${h + 16}px`;
-  if (spacer) spacer.style.height = `${h}px`;
+  const SAFE_GAP = 12; // 页面滚动到底部时，内容与底栏之间保留的可视间隙
+  main.style.paddingBottom = `${h + SAFE_GAP}px`;
+  if (spacer) spacer.style.height = `${SAFE_GAP}px`;
 }
 
 function updateBuyHelp(provider) {
