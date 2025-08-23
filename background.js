@@ -295,3 +295,144 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
+
+
+
+
+
+// ===== SummarizerX — Selection Translate (context menu) =====
+
+// 菜单常量
+const MENU_ID_TRANSLATE = 'sx_translate_selection';
+
+// 根据设置返回目标语言 'zh' | 'en'（默认 zh）
+async function getTargetLang() {
+  const { output_lang = 'zh' } = await chrome.storage.sync.get({ output_lang: 'zh' });
+  const v = String(output_lang || '').trim().toLowerCase();
+  if (['en','en-us','english','英语','英語'].includes(v)) return 'en';
+  return 'zh';
+}
+
+// 创建/更新右键菜单（标题随设置语言变化）
+async function ensureContextMenu() {
+  try { await chrome.contextMenus.remove(MENU_ID_TRANSLATE); } catch {}
+  const lang = await getTargetLang();
+  const title = lang === 'en' ? 'SummarizerX: Translate selection → English'
+                              : 'SummarizerX：翻译所选文本 → 中文';
+  chrome.contextMenus.create({
+    id: MENU_ID_TRANSLATE,
+    title,
+    contexts: ['selection']
+  });
+}
+
+// 安装/启动时建一次；设置变化时也更新标题
+chrome.runtime.onInstalled.addListener(ensureContextMenu);
+chrome.runtime.onStartup?.addListener?.(ensureContextMenu);
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.output_lang) ensureContextMenu();
+});
+
+// 右键点击：让内容脚本执行翻译动作
+// chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+//   if (info.menuItemId !== MENU_ID_TRANSLATE || !tab?.id) return;
+//   chrome.tabs.sendMessage(tab.id, { type: 'SX_TRANSLATE_SELECTION' });
+// });
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== MENU_ID_TRANSLATE || !tab?.id) return;
+
+  // 先让当前页移除浮动面板（不影响翻译气泡）
+  try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+
+  // 再触发“选区翻译”
+  chrome.tabs.sendMessage(tab.id, { type: 'SX_TRANSLATE_SELECTION' });
+});
+
+
+// —— 统一的后台翻译执行（内容脚本发消息到这里）——
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === 'SX_TRANSLATE_REQUEST') {
+    (async () => {
+      try {
+        const res = await doTranslate(msg.text);
+        sendResponse({ ok: true, result: res });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true; // 异步
+  }
+});
+
+// 实际的翻译实现：读取设置，选模型/基址/Key，然后 Chat Completions
+async function doTranslate(text) {
+  const all = await chrome.storage.sync.get(null);
+
+  // 平台与凭据
+  const provider = all.aiProvider || 'trial';
+  const key = provider === 'trial'
+    ? 'trial'
+    : (all.apiKey || all.openai_api_key || all.deepseek_api_key || '');
+  const base = (all.baseURL || 'https://api.openai.com/v1').replace(/\/+$/,'');
+  const model = all.model_summarize || 'gpt-4o-mini';
+
+  const target = await getTargetLang(); // 'zh' | 'en'
+  const prompt = target === 'en'
+    ? `You are a professional translator. Translate faithfully into **English** without adding or omitting information.\n\n---\n${text}`
+    : `You are a professional translator. Translate faithfully into **Simplified Chinese** without adding or omitting information.\n\n---\n${text}`;
+
+  const body = { model, messages: [{ role: 'user', content: prompt }], temperature: 0 };
+
+  const resp = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const tx = await safeReadText(resp);
+    throw new Error(`HTTP ${resp.status} ${tx}`);
+  }
+  const json = await resp.json();
+  return json?.choices?.[0]?.message?.content?.trim() || '(Empty)';
+}
+
+async function safeReadText(res){ try { return await res.text(); } catch { return ''; } }
+
+
+
+
+
+// 统一处理：收到“关闭浮窗/侧边栏”消息时：
+// 1) 尝试关闭该 tab 的 Side Panel（如果有）
+// 2) 通知该 tab 的内容脚本移除“浮动面板”DOM（不动翻译气泡）
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  (async () => {
+    if (msg?.type !== 'SX_FLOATPANEL_CLOSE') return;
+
+    try {
+      // 优先用消息来源 tabId；否则取当前活动 tab
+      let tabId = sender?.tab?.id;
+      if (typeof tabId !== 'number') {
+        const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (active?.id) tabId = active.id;
+      }
+
+      // 1) 关 Side Panel（可用就关）
+      if (typeof tabId === 'number' && chrome.sidePanel?.setOptions) {
+        try { await chrome.sidePanel.setOptions({ tabId, enabled: false }); } catch {}
+      }
+
+      // 2) 通知页面删除浮动面板根节点（id 如 #sx-float-panel）
+      if (typeof tabId === 'number') {
+        try { await chrome.tabs.sendMessage(tabId, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+      }
+
+      sendResponse?.({ ok: true });
+    } catch (e) {
+      sendResponse?.({ ok: false, error: e?.message || String(e) });
+    }
+  })();
+
+  return true; // 异步
+});

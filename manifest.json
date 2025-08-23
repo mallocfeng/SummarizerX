@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "SummarizerX 麦乐可 AI 摘要阅读器",
   "version": "1.6.5.4",
-  "description": "Summarize and translate webpages with local/AI modes. 支持网页摘要与翻译，含快速/AI 模式。",
-  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": {
     "default_title": "打开/关闭右侧悬浮面板",
@@ -19,5 +19,12 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["selection_translate.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
