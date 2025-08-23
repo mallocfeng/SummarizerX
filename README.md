@@ -100,6 +100,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 📑 浮动面板：无需跳转页面即可查看摘要  
 - 🌙 主题支持：明亮和暗黑模式，保护视力  
 - 🖱️ 右键菜单翻译：在网页中选中文本，右键即可快速调用 AI 翻译
+ - 🧾 全文翻译：将整页可见内容按段落翻译，在原文下方以引用块内联展示；可在右键菜单“全文翻译 / 显示原文”间切换  
 
 ### 🖼 软件截图
 
