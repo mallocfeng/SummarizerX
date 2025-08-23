@@ -198,7 +198,37 @@ Language choice is saved in `chrome.storage.sync` and will be remembered next ti
 - **Functions**: `getCurrentLanguage()`, `t()`, `tSync()`, `updatePageLanguage()`  
 - **Flow**: save → update language attribute → re-render UI
 
-### 📌 Changelog v1.6.7.0
+#### 📂 File layout (i18n related)
+```
+├── i18n.js              # Central translation config and helpers
+├── options.html         # Settings page (language switcher in header)
+├── options.js           # Applies UI texts via t()/tSync(); persists ui_language
+├── float_panel.js       # Floating panel texts follow selected UI language
+├── selection_translate.js # Copy/close labels and bubble title localized
+└── manifest.json        # Action title localized (static fallback)
+```
+
+#### ➕ Add new texts
+1) Add keys in `i18n.js` under both `zh` and `en` (e.g. `mySection.myKey`).  
+2) Read them in code with `await t('mySection.myKey')` (or `tSync('mySection.myKey','en')`).  
+3) Update UI by setting `element.textContent = ...`.
+
+Example:
+```javascript
+// i18n.js
+zh: { mySection: { hello: "你好" } },
+en: { mySection: { hello: "Hello" } }
+
+// usage
+titleEl.textContent = await t('mySection.hello');
+```
+
+#### 🧪 Troubleshooting (i18n)
+- Text not updating: ensure element IDs exist and `updateUIText()` runs after DOM ready.  
+- Wrong language: check `chrome.storage.sync.get('ui_language')`.  
+- Import error in content scripts: make sure `chrome.runtime.getURL('i18n.js')` is used for dynamic import.
+
+### 📌 Changelog v1.6.7
 - ✨ Added Chinese/English bilingual support  
 - 🎨 Language switcher UI  
 - 🔧 Refactored i18n architecture  
@@ -234,7 +264,37 @@ Language choice is saved in `chrome.storage.sync` and will be remembered next ti
 - **主要函数**：`getCurrentLanguage()`、`t()`、`tSync()`、`updatePageLanguage()`  
 - **流程**：保存设置 → 更新语言属性 → 重新渲染界面  
 
-### 📌 更新日志 v1.6.7.0
+#### 📂 相关文件结构（i18n）
+```
+├── i18n.js              # 翻译配置与工具函数
+├── options.html         # 设置页（顶部语言切换器）
+├── options.js           # 通过 t()/tSync() 应用文本；保存 ui_language
+├── float_panel.js       # 浮窗面板文案随 UI 语言切换
+├── selection_translate.js # 复制/关闭按钮与标题本地化
+└── manifest.json        # 扩展图标标题（静态兜底）
+```
+
+#### ➕ 添加新文案
+1）在 `i18n.js` 同时增加 `zh` 与 `en` 的键值（如 `mySection.myKey`）。  
+2）代码里用 `await t('mySection.myKey')`（或 `tSync('mySection.myKey','zh')`）读取。  
+3）更新 UI：如 `el.textContent = ...`。
+
+示例：
+```javascript
+// i18n.js
+zh: { mySection: { hello: "你好" } },
+en: { mySection: { hello: "Hello" } }
+
+// 使用
+titleEl.textContent = await t('mySection.hello');
+```
+
+#### 🧪 常见问题（i18n）
+- 文案不更新：确认元素 ID 正确、`updateUIText()` 在 DOM Ready 后执行。  
+- 语言不对：检查 `chrome.storage.sync.get('ui_language')`。  
+- 动态导入报错：内容脚本里使用 `chrome.runtime.getURL('i18n.js')` 进行导入。
+
+### 📌 更新日志 v1.6.7
 - ✨ 新增中英文双语支持  
 - 🎨 添加语言切换器UI  
 - 🔧 重构国际化架构  
