@@ -467,9 +467,19 @@ async function doTranslate(text) {
   const model = all.model_summarize || 'gpt-4o-mini';
 
   const target = await getTargetLang(); // 'zh' | 'en'
-  const prompt = target === 'en'
-    ? `You are a professional translator. Translate faithfully into **English** without adding or omitting information.\n\n---\n${text}`
-    : `You are a professional translator. Translate faithfully into **Simplified Chinese** without adding or omitting information.\n\n---\n${text}`;
+  const strictRules = [
+    'RULES:',
+    '- Output PLAIN TEXT only. No Markdown, no quotes, no brackets, no lists.',
+    '- Do NOT add explanations, notes, comments, or any extra words.',
+    '- No prefixes/suffixes (e.g., "Translation:").',
+    '- Preserve original paragraph breaks; do not merge or split.',
+    '- Do not use code fences or HTML.',
+    '- Translate faithfully; do not omit or add content.'
+  ].join('\n');
+  const instruction = (target === 'en')
+    ? 'Translate the following into English.'
+    : '将以下内容翻译为简体中文。';
+  const prompt = `${instruction}\n${strictRules}\n\nSOURCE:\n${text}`;
 
   const body = { model, messages: [{ role: 'user', content: prompt }], temperature: 0 };
 

@@ -80,6 +80,11 @@ All processing happens locally or via your configured AI API key. No data is sen
 - Reload the extension or browser if UI glitches occur  
 - Check console logs for errors in developer tools  
 
+### 🧭 Translation Mode — Output Rules
+
+- **English**: In translation mode, AI outputs plain text only. No Markdown, no quotes, no extra commentary. Preserve paragraph breaks.
+- **中文**：翻译模式下严格输出纯文本；不包含 Markdown/引号/额外说明，保持原段落换行。
+
 ### 📌 Roadmap
 
 - [ ] Dark mode improvements  
@@ -164,6 +169,11 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 提取失败时，尝试手动选中文本  
 - UI 异常时，重启扩展或浏览器  
 - 使用开发者工具查看控制台日志排查错误  
+
+### 🧭 翻译模式输出规则
+
+- **中文**：翻译模式下严格输出纯文本；不包含 Markdown/引号/额外说明，保持原段落换行。
+- **English**: In translation mode, AI outputs plain text only. No Markdown, no quotes, no extra commentary. Preserve paragraph breaks.
 
 ### 📌 开发计划
 

@@ -50,6 +50,7 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 🎨 Inline translation blocks now use an opaque light background in light mode with dark text, improving readability on dark sites.
 - 🔄 Theme selection is synchronized in real-time between the settings page and the floating panel.
 - 🧼 Minor polishing on settings footer alignment and meta text width.
+ - 🧭 Translation mode now enforces PLAIN TEXT output: no Markdown, no extra commentary, preserved paragraph breaks.
 
 ### 中文
 - 🖱️ 新增：右键翻译选中文本（在气泡中即时显示 AI 译文）。
@@ -57,3 +58,4 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 🎨 内联翻译区域在亮色模式下使用不透明浅灰底、深色文字，避免深色站点上看不清。
 - 🔄 设置页与浮窗面板主题选择可实时双向同步。
 - 🧼 设置页底部对齐与 meta 文本显示宽度小优化。
+ - 🧭 翻译模式严格输出纯文本：不含 Markdown/额外说明，保持原段落换行。
