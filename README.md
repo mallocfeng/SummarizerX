@@ -198,7 +198,7 @@ Language choice is saved in `chrome.storage.sync` and will be remembered next ti
 - **Functions**: `getCurrentLanguage()`, `t()`, `tSync()`, `updatePageLanguage()`  
 - **Flow**: save → update language attribute → re-render UI
 
-### 📌 Changelog v1.6.6.0
+### 📌 Changelog v1.6.7.0
 - ✨ Added Chinese/English bilingual support  
 - 🎨 Language switcher UI  
 - 🔧 Refactored i18n architecture  
@@ -234,7 +234,7 @@ Language choice is saved in `chrome.storage.sync` and will be remembered next ti
 - **主要函数**：`getCurrentLanguage()`、`t()`、`tSync()`、`updatePageLanguage()`  
 - **流程**：保存设置 → 更新语言属性 → 重新渲染界面  
 
-### 📌 更新日志 v1.6.6.0
+### 📌 更新日志 v1.6.7.0
 - ✨ 新增中英文双语支持  
 - 🎨 添加语言切换器UI  
 - 🔧 重构国际化架构  
