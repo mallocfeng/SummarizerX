@@ -304,6 +304,9 @@ chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
 
 // 菜单常量
 const MENU_ID_TRANSLATE = 'sx_translate_selection';
+const MENU_ID_TRANSLATE_FULL = 'sx_translate_full';
+// 记录各 tab 是否已处于“全文对照翻译插入”状态
+const inlineStateByTab = new Map(); // tabId -> boolean
 
 // 根据设置返回目标语言 'zh' | 'en'（默认 zh）
 async function getTargetLang() {
@@ -316,6 +319,7 @@ async function getTargetLang() {
 // 创建/更新右键菜单（标题随设置语言变化）
 async function ensureContextMenu() {
   try { await chrome.contextMenus.remove(MENU_ID_TRANSLATE); } catch {}
+  try { await chrome.contextMenus.remove(MENU_ID_TRANSLATE_FULL); } catch {}
   
   // 获取UI语言设置
   const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
@@ -337,7 +341,48 @@ async function ensureContextMenu() {
     title,
     contexts: ['selection']
   });
+
+  // Full-page inline translation（默认：翻译；若已翻译，则在 onShown 动态改“显示原文”）
+  let fullTitle;
+  if (ui_language === 'en') {
+    fullTitle = targetLang === 'en'
+      ? 'SummarizerX: Translate full page (inline → English)'
+      : 'SummarizerX: Translate full page (inline → Chinese)';
+  } else {
+    fullTitle = targetLang === 'en'
+      ? 'SummarizerX：全文翻译（段落对照 → 英文）'
+      : 'SummarizerX：全文翻译（段落对照 → 中文）';
+  }
+
+  chrome.contextMenus.create({
+    id: MENU_ID_TRANSLATE_FULL,
+    title: fullTitle,
+    contexts: ['page']
+  });
+
+  // 利用 onShown 动态切换标题
 }
+
+// 动态变更“全文翻译/显示原文”的标题
+chrome.contextMenus.onShown?.addListener(async (info, tab) => {
+  try{
+    if (!tab?.id) return;
+    const inline = inlineStateByTab.get(tab.id) === true;
+    const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+    let title = '';
+    if (inline) {
+      title = (ui_language === 'en') ? 'SummarizerX: Restore original (remove inline translations)'
+                                    : 'SummarizerX：显示原文（移除对照翻译）';
+    } else {
+      const targetLang = await getTargetLang();
+      title = (ui_language === 'en')
+        ? (targetLang === 'en' ? 'SummarizerX: Translate full page (inline → English)' : 'SummarizerX: Translate full page (inline → Chinese)')
+        : (targetLang === 'en' ? 'SummarizerX：全文翻译（段落对照 → 英文）' : 'SummarizerX：全文翻译（段落对照 → 中文）');
+    }
+    chrome.contextMenus.update(MENU_ID_TRANSLATE_FULL, { title });
+    chrome.contextMenus.refresh?.();
+  }catch{}
+});
 
 // 安装/启动时建一次；设置变化时也更新标题
 chrome.runtime.onInstalled.addListener(ensureContextMenu);
@@ -355,13 +400,36 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== MENU_ID_TRANSLATE || !tab?.id) return;
-
-  // 先让当前页移除浮动面板（不影响翻译气泡）
-  try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
-
-  // 再触发“选区翻译”
-  chrome.tabs.sendMessage(tab.id, { type: 'SX_TRANSLATE_SELECTION' });
+  if (!tab?.id) return;
+  if (info.menuItemId === MENU_ID_TRANSLATE) {
+    try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+    chrome.tabs.sendMessage(tab.id, { type: 'SX_TRANSLATE_SELECTION' });
+    return;
+  }
+  if (info.menuItemId === MENU_ID_TRANSLATE_FULL) {
+    const inline = inlineStateByTab.get(tab.id) === true;
+    try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+    // 立即切换本地状态并更新菜单标题（无需等待前端完成），确保下一次右键立刻看到切换后的文案
+    inlineStateByTab.set(tab.id, !inline);
+    try {
+      const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+      let title = '';
+      if (!inline) {
+        // 我们将要“插入翻译”，所以切到“显示原文”
+        title = (ui_language === 'en') ? 'SummarizerX: Restore original (remove inline translations)'
+                                      : 'SummarizerX：显示原文（移除对照翻译）';
+      } else {
+        const targetLang = await getTargetLang();
+        title = (ui_language === 'en')
+          ? (targetLang === 'en' ? 'SummarizerX: Translate full page (inline → English)' : 'SummarizerX: Translate full page (inline → Chinese)')
+          : (targetLang === 'en' ? 'SummarizerX：全文翻译（段落对照 → 英文）' : 'SummarizerX：全文翻译（段落对照 → 中文）');
+      }
+      chrome.contextMenus.update(MENU_ID_TRANSLATE_FULL, { title });
+      chrome.contextMenus.refresh?.();
+    } catch {}
+    chrome.tabs.sendMessage(tab.id, { type: inline ? 'SX_RESTORE_FULL_PAGE' : 'SX_TRANSLATE_FULL_PAGE' });
+    return;
+  }
 });
 
 
@@ -377,6 +445,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     })();
     return true; // 异步
+  }
+  if (msg?.type === 'SX_INLINE_TRANSLATED_CHANGED') {
+    try {
+      const tabId = sender?.tab?.id;
+      if (typeof tabId === 'number') inlineStateByTab.set(tabId, !!msg.inline);
+    } catch {}
   }
 });
 

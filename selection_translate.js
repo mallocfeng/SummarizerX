@@ -57,6 +57,49 @@
     el.setAttribute('data-theme', t); // 冗余标记，增强选择器稳定性
   }
 
+  // ===== 内联译文块样式（随主题联动） =====
+  function styleInlineQuoteForTheme(q, theme){
+    const isDark = theme === 'dark';
+    // 统一基本样式（间距已在调用处设置）
+    q.style.borderLeft = isDark ? '3px solid #64748b' : '3px solid #94a3b8';
+    // 深色：深底 + 白字；浅色：不透明浅灰底 + 深色字（避免透明导致暗底站点上看不清）
+    const bg = isDark ? '#0f172a' : '#f1f5f9';
+    const fg = isDark ? '#ffffff' : '#0f172a';
+    try {
+      q.style.setProperty('background-color', bg, 'important');
+      q.style.setProperty('color', fg, 'important');
+    } catch {
+      q.style.backgroundColor = bg;
+      q.style.color = fg;
+    }
+  }
+  async function restyleAllInlineTranslations(){
+    const theme = await resolveBubbleTheme();
+    document.querySelectorAll('blockquote[data-sx-inline-translation="1"]').forEach((q)=>{
+      try{ styleInlineQuoteForTheme(q, theme); }catch{}
+    });
+  }
+
+  // 绑定主题监听：当主题切换时，实时重渲染已插入的译文块
+  let __sxInlineThemeWatchersBound = false;
+  function bindInlineThemeWatchersOnce(){
+    if (__sxInlineThemeWatchersBound) return;
+    __sxInlineThemeWatchersBound = true;
+    try {
+      chrome.storage.onChanged.addListener(async (changes, area)=>{
+        if (area==='sync' && (changes.options_theme_override || changes.float_theme_override)) {
+          try { await restyleAllInlineTranslations(); } catch {}
+        }
+      });
+    } catch {}
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const fn = async ()=> { try { await restyleAllInlineTranslations(); } catch {} };
+      if (mq && mq.addEventListener) mq.addEventListener('change', fn);
+      else if (mq && mq.addListener) mq.addListener(fn);
+    } catch {}
+  }
+
   // --- 在开始翻译前关闭 floatpanel，避免遮挡 ---
   async function closeFloatPanelIfAny() {
     try {
@@ -469,6 +512,132 @@
   // 背景脚本右键菜单触发
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'SX_TRANSLATE_SELECTION') startTranslateFlow();
+    if (msg?.type === 'SX_TRANSLATE_FULL_PAGE') translateFullPageInline();
+    if (msg?.type === 'SX_RESTORE_FULL_PAGE') restoreFullPageInline();
     // 忽略 SX_CLOSE_FLOAT_PANEL：那是让内容浮窗收起，不影响翻译气泡
   });
+
+  /* ===================== 全文分块翻译并内联插入 ===================== */
+  // 通过“运行代号”方式实现可中断：当 restore 或新一次翻译启动时，递增 runId
+  let __sxFullTranslateRunId = 0;
+  function ensureInlineTranslateStyles(){
+    try{
+      if (document.getElementById('sx-inline-translate-style')) return;
+      const st = document.createElement('style');
+      st.id = 'sx-inline-translate-style';
+      st.textContent = `
+        @keyframes sx-it-spin { to { transform: rotate(360deg); } }
+        .sx-it-spinner{ display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; animation: sx-it-spin .8s linear infinite; opacity:.6; margin-right:6px; vertical-align:-2px; }
+      `;
+      document.head.appendChild(st);
+    }catch{}
+  }
+  async function translateFullPageInline(){
+    try{
+      const myRun = ++__sxFullTranslateRunId;
+      ensureInlineTranslateStyles();
+      bindInlineThemeWatchersOnce();
+      // 简单分块策略：收集主要可见段落与显著标题
+      const blocks = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+        acceptNode(node){
+          const tag = node.tagName?.toLowerCase();
+          if (!tag) return NodeFilter.FILTER_SKIP;
+          // 跳过不可见/无文本的容器
+          const cs = getComputedStyle(node);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_SKIP;
+          if (['script','style','noscript','iframe','canvas','svg','menu','nav','aside','footer'].includes(tag)) return NodeFilter.FILTER_SKIP;
+          if (/^h[1-6]$/.test(tag)) return NodeFilter.FILTER_ACCEPT;
+          if (['p','li','blockquote'].includes(tag)) return NodeFilter.FILTER_ACCEPT;
+          return NodeFilter.FILTER_SKIP;
+        }
+      });
+      while (walker.nextNode()) {
+        const el = walker.currentNode;
+        const text = (el.innerText || '').trim();
+        if (text) blocks.push(el);
+      }
+      if (!blocks.length) return;
+
+      // 翻译辅助：批量请求（逐段串行，避免速率限制；也可按需并行）
+      const translatedCache = new Map();
+      const translateText = async (t) => {
+        const key = t.slice(0,512);
+        if (translatedCache.has(key)) return translatedCache.get(key);
+        const resp = await chrome.runtime.sendMessage({ type: 'SX_TRANSLATE_REQUEST', text: t });
+        if (!resp?.ok) throw new Error(resp?.error || 'Translate failed');
+        translatedCache.set(key, resp.result);
+        return resp.result;
+      };
+
+      for (const el of blocks){
+        // 若在处理中被“恢复原文”或新翻译覆盖，则中断
+        if (myRun !== __sxFullTranslateRunId) return;
+        const src = (el.innerText || '').trim();
+        if (!src) continue;
+        // 先插入“加载中”的译文块占位
+        const q = document.createElement('blockquote');
+        // 上下对等间距（用 !important 抵御站点样式覆盖）
+        q.style.setProperty('margin-top','10px','important');
+        q.style.setProperty('margin-bottom','14px','important');
+        q.style.padding = '6px 10px';
+        // 根据主题着色
+        try { styleInlineQuoteForTheme(q, await resolveBubbleTheme()); } catch {}
+        q.style.whiteSpace = 'pre-wrap';
+        q.style.lineHeight = '1.6';
+        q.dataset.sxInlineTranslation = '1';
+        const sp = document.createElement('span'); sp.className = 'sx-it-spinner';
+        const txt = document.createElement('span'); txt.textContent = 'Translating…';
+        q.appendChild(sp); q.appendChild(txt);
+        // 为避免“原段落的 margin-bottom + 引用块的 margin-top”叠加造成上方空隙大，统一消除原段落的底部外边距
+        try {
+          const prev = el.style.marginBottom || '';
+          el.dataset.sxPrevMb = prev;
+          el.dataset.sxElAdjusted = '1';
+          el.style.setProperty('margin-bottom','0','important');
+        } catch {}
+
+        const tag = (el.tagName || '').toLowerCase();
+        if (tag === 'li') {
+          // 列表项内显示，避免把 blockquote 插到 <ul> 里引起异常布局
+          q.style.setProperty('margin-top','10px','important');
+          q.style.setProperty('margin-bottom','10px','important');
+          el.appendChild(q);
+        } else {
+          el.insertAdjacentElement('afterend', q);
+        }
+
+        // 翻译并替换占位内容
+        const translated = await translateText(src);
+        if (myRun !== __sxFullTranslateRunId) { try{ q.remove(); }catch{} return; }
+        q.textContent = translated;
+      }
+
+      if (myRun === __sxFullTranslateRunId) {
+        try { await chrome.runtime.sendMessage({ type: 'SX_INLINE_TRANSLATED_CHANGED', inline: true }); } catch {}
+      }
+    }catch(e){
+      console.warn('Translate full page failed:', e);
+      try{ alert('Full-page translate failed: ' + (e?.message || e)); }catch{}
+    }
+  }
+
+  async function restoreFullPageInline(){
+    try{
+      // 递增运行代号，中断尚未完成的翻译流程
+      __sxFullTranslateRunId++;
+      // 移除所有我们插入的译文块
+      document.querySelectorAll('blockquote[data-sx-inline-translation="1"]').forEach(n => n.remove());
+      // 恢复被我们调整过 margin-bottom 的原段落
+      document.querySelectorAll('[data-sx-el-adjusted="1"]').forEach(el => {
+        try{
+          const prev = el.dataset.sxPrevMb || '';
+          if (prev) el.style.marginBottom = prev; else el.style.removeProperty('margin-bottom');
+          delete el.dataset.sxPrevMb;
+          delete el.dataset.sxElAdjusted;
+        }catch{}
+      });
+      try { await chrome.runtime.sendMessage({ type: 'SX_INLINE_TRANSLATED_CHANGED', inline: false }); } catch {}
+    }catch(e){ console.warn('Restore full page failed:', e); }
+  }
 })();

@@ -228,11 +228,11 @@ titleEl.textContent = await t('mySection.hello');
 - Wrong language: check `chrome.storage.sync.get('ui_language')`.  
 - Import error in content scripts: make sure `chrome.runtime.getURL('i18n.js')` is used for dynamic import.
 
-### 📌 Changelog v1.6.7
-- ✨ Added Chinese/English bilingual support  
-- 🎨 Language switcher UI  
-- 🔧 Refactored i18n architecture  
-- 📝 Updated docs and tests  
+### 📌 Changelog v1.6.8
+- 🎨 Inline translation blocks follow theme with correct light background (opaque)  
+- 🔄 Theme sync between settings page and floating panel is instantaneous  
+- 🐞 Fixed context menu title instant toggle after full-page translate/restore  
+- 🧼 Minor CSS refinements on settings footer alignment and meta text area  
 
 ---
 
@@ -294,11 +294,11 @@ titleEl.textContent = await t('mySection.hello');
 - 语言不对：检查 `chrome.storage.sync.get('ui_language')`。  
 - 动态导入报错：内容脚本里使用 `chrome.runtime.getURL('i18n.js')` 进行导入。
 
-### 📌 更新日志 v1.6.7
-- ✨ 新增中英文双语支持  
-- 🎨 添加语言切换器UI  
-- 🔧 重构国际化架构  
-- 📝 完善文档和测试  
+### 📌 更新日志 v1.6.8
+- 🎨 内联翻译引用块在亮色模式使用不透明浅灰底，深色文字  
+- 🔄 设置页与浮窗的主题切换实现双向实时联动  
+- 🐞 全文翻译与显示原文的右键菜单标题即刻切换  
+- 🧼 设置页底部对齐与 meta 文本区样式小幅优化  
 
 ---
 

@@ -100,6 +100,22 @@ function initOptionsThemeToggle(){
     });
     mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
   }
+
+  // 3) 监听存储变化：当浮窗或其他页切换主题时，设置页（若已打开）立即联动
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'sync') return;
+      const hasOpt = !!changes[THEME_STORAGE_KEY];
+      const hasFloat = !!changes[FLOAT_THEME_KEY];
+      if (!hasOpt && !hasFloat) return;
+      const next = (changes[THEME_STORAGE_KEY]?.newValue)
+        ?? (changes[FLOAT_THEME_KEY]?.newValue);
+      if (!['auto','light','dark'].includes(next)) return;
+      // 应用到文档与按钮高亮
+      applyDocumentTheme(next);
+      markOptionsThemeButtonsActive(next);
+    });
+  } catch {}
 }
 
 // ========== 会话级“平台字段快照” ==========

@@ -835,10 +835,10 @@
 
       // 读取已保存的外观偏好并初始化按钮状态
       try{
-        chrome.storage.sync.get(['float_theme_override']).then(({ float_theme_override }) => {
-          if (['auto','light','dark'].includes(float_theme_override)) {
-            themeOverride = float_theme_override;
-          }
+        chrome.storage.sync.get(['options_theme_override','float_theme_override']).then(({ options_theme_override, float_theme_override }) => {
+          const pick = (v)=> (['auto','light','dark'].includes(v) ? v : null);
+          const v = pick(options_theme_override) || pick(float_theme_override) || 'auto';
+          themeOverride = v;
           applyThemeWithOverride(shadow);
           markThemeButtonsActive(shadow);
         }).catch(() => {
@@ -859,7 +859,8 @@
           const mode = btn.dataset.mode;
           if (!['auto','light','dark'].includes(mode)) return;
           themeOverride = mode;
-          try{ chrome.storage.sync.set({ float_theme_override: themeOverride }); }catch{}
+          // 双向联动：同时写入浮窗与设置页 key
+          try{ chrome.storage.sync.set({ float_theme_override: themeOverride, options_theme_override: themeOverride }); }catch{}
           applyThemeWithOverride(shadow);
           markThemeButtonsActive(shadow);
         });
@@ -1059,4 +1060,18 @@
       }
     }
   });
+
+  // 监听存储变更：当设置页切换主题时，浮窗跟随更新并高亮按钮
+  try{
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'sync') return;
+      if (!changes.options_theme_override && !changes.float_theme_override) return;
+      const next = (changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue);
+      if (['auto','light','dark'].includes(next)) {
+        themeOverride = next;
+        try { applyThemeWithOverride(shadow); } catch {}
+        try { markThemeButtonsActive(shadow); } catch {}
+      }
+    });
+  }catch{}
 })();

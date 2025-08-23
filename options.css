@@ -465,9 +465,10 @@ body{
 }
 .theme-toggle .label{
   display:flex; align-items:center; justify-content:center;
-  height:34px; line-height:34px;    /* 与按钮等高 */
+  height:42px; line-height:42px;    /* 与胶囊总高一致（按钮34 + 上下各4内边距） */
   font-size:12px; font-weight:700;  /* 恢复原始字体大小 */
   color:#475569; margin-right:2px;  /* 恢复原始间距 */
+  position: relative; top: 1px;     /* 细调：略向下对齐到图标视觉中心 */
 }
 
 /* 基础外观已在上面“兼容”块声明，这里仅保留差异项（若 .theme-btn 单独使用也生效） */
