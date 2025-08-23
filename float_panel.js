@@ -3,6 +3,22 @@
 // 增强：广播 + 轮询兜底（避免错过后台广播导致停在 partial）
 
 (() => {
+  // 导入国际化模块
+  let i18nModule = null;
+  
+  // 异步加载国际化模块
+  async function loadI18n() {
+    if (i18nModule) return i18nModule;
+    try {
+      const moduleUrl = chrome.runtime.getURL('i18n.js');
+      i18nModule = await import(moduleUrl);
+      return i18nModule;
+    } catch (e) {
+      console.warn('Failed to load i18n module:', e);
+      return null;
+    }
+  }
+  
   const PANEL_ID = "sx-float-panel";
   const MARK = "__SX_FLOAT_PANEL_READY__";
   if (window[MARK]) return;
@@ -37,6 +53,91 @@
     return String(txt)
       .replace(/\r\n?/g, "\n")
       .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n");
+  }
+
+  // 更新UI文本为当前语言
+  async function updateUIText() {
+    const i18n = await loadI18n();
+    if (!i18n) return;
+    
+    try {
+      const currentLang = await i18n.getCurrentLanguage();
+      
+      // 更新应用标题
+      const appTitle = shadow.getElementById('sx-app-title');
+      if (appTitle) {
+        if (currentLang === 'zh') {
+          appTitle.textContent = '麦乐可 AI 摘要阅读器';
+        } else {
+          appTitle.textContent = 'SummarizerX AI Reader';
+        }
+      }
+      
+      // 更新按钮文本
+      const runBtn = shadow.getElementById('sx-run');
+      if (runBtn) {
+        if (currentLang === 'zh') {
+          runBtn.textContent = '提取并摘要';
+        } else {
+          runBtn.textContent = 'Extract & Summarize';
+        }
+      }
+      
+      // 更新设置按钮
+      const settingsBtn = shadow.getElementById('sx-settings');
+      if (settingsBtn) {
+        if (currentLang === 'zh') {
+          settingsBtn.textContent = '设置';
+          settingsBtn.title = '设置';
+        } else {
+          settingsBtn.textContent = 'Settings';
+          settingsBtn.title = 'Settings';
+        }
+      }
+      
+      // 更新关闭按钮
+      const closeBtn = shadow.getElementById('sx-close');
+      if (closeBtn) {
+        if (currentLang === 'zh') {
+          closeBtn.title = '关闭';
+          closeBtn.setAttribute('aria-label', '关闭');
+        } else {
+          closeBtn.title = 'Close';
+          closeBtn.setAttribute('aria-label', 'Close');
+        }
+      }
+      
+      // 更新主题标签
+      const themeLabel = shadow.getElementById('sx-theme-label');
+      if (themeLabel) {
+        themeLabel.textContent = currentLang === 'zh' ? '外观' : 'Appearance';
+      }
+      
+      // 更新底部说明
+      const footerNote = shadow.getElementById('sx-footer-note');
+      if (footerNote) {
+        if (currentLang === 'zh') {
+          footerNote.textContent = '注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。';
+        } else {
+          footerNote.textContent = 'Note: Some pages (like chrome://, extension pages, PDF viewers) do not support injection.';
+        }
+      }
+      
+      // 更新卡片标题
+      const summaryCard = shadow.getElementById('sx-summary');
+      const cleanedCard = shadow.getElementById('sx-cleaned');
+      
+      if (summaryCard) {
+        summaryCard.setAttribute('data-title', currentLang === 'zh' ? '摘要' : 'Summary');
+      }
+      
+      if (cleanedCard) {
+        cleanedCard.setAttribute('data-title', currentLang === 'zh' ? '可读正文' : 'Readable Content');
+      }
+      
+    } catch (e) {
+      console.warn('Failed to update UI text:', e);
+    }
   }
 
   // 安全构建扩展资源 URL（内容脚本/非扩展环境下兜底）
@@ -286,13 +387,16 @@
   function applyTrialLabelToFloatButton(shadowRoot) {
     const btn = shadowRoot.getElementById("sx-run");
     if (!btn) return;
-    chrome.storage.sync.get(["aiProvider"]).then(({ aiProvider }) => {
+    chrome.storage.sync.get(["aiProvider"]).then(async ({ aiProvider }) => {
+      const i18n = await loadI18n();
+      const currentLang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+      
       if ((aiProvider || "trial") === "trial") {
-        btn.textContent = "试用摘要";
-        btn.title = "当前为试用模式（通过代理调用），点击开始试用摘要";
+        btn.textContent = currentLang === 'zh' ? "试用摘要" : "Trial Summary";
+        btn.title = currentLang === 'zh' ? "当前为试用模式（通过代理调用），点击开始试用摘要" : "Currently in trial mode (via proxy), click to start trial summary";
       } else {
-        btn.textContent = "提取并摘要";
-        btn.title = "点击提取正文并生成摘要";
+        btn.textContent = currentLang === 'zh' ? "提取并摘要" : "Extract & Summarize";
+        btn.title = currentLang === 'zh' ? "点击提取正文并生成摘要" : "Click to extract content and generate summary";
       }
     }).catch(() => {
       btn.textContent = "提取并摘要";
@@ -538,10 +642,10 @@
       <div class="wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title">麦乐可 AI 摘要阅读器</div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
-            <button id="sx-run" class="btn primary">提取并摘要</button>
+            <button id="sx-run" class="btn primary" id="sx-run-btn">提取并摘要</button>
             <button id="sx-close" class="btn icon" title="关闭" aria-label="关闭">✕</button>
           </div>
         </div>
@@ -556,9 +660,9 @@
         </div>
         <div class="footer">
           <div class="footer-row">
-            <small>注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
+            <small id="sx-footer-note">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
             <div class="theme-toggle" id="sx-theme">
-              <span class="label">外观</span>
+              <span class="label" id="sx-theme-label">外观</span>
               <div class="seg" role="tablist" aria-label="外观切换">
                 <button class="theme-btn" data-mode="auto" role="tab" aria-selected="true" aria-label="自动" title="自动">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -600,7 +704,10 @@
       </div>`;
 
     // 将初始化逻辑封装，待模板插入后执行
-    const initAfterHTML = () => {
+    const initAfterHTML = async () => {
+      // 更新UI文本为当前语言
+      await updateUIText();
+      
       // ===== 根据页面背景亮度设置主题，并保持监听 =====
       try { applyThemeWithOverride(shadow); } catch {}
 
@@ -758,7 +865,7 @@
         });
       }
 
-      setEmpty(shadow);
+      await setEmpty(shadow);
     };
 
     // 合并版：直接使用内置模板，不依赖外部 HTML 文件
@@ -768,11 +875,14 @@
     return host;
   }
 
-  function setEmpty(shadow) {
+  async function setEmpty(shadow) {
+    const i18n = await loadI18n();
+    const currentLang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+    
     shadow.getElementById("sx-summary").innerHTML =
-      `<div class="empty"><div class="icon">📝</div><div class="title">暂无摘要</div><div class="hint">点击上方“提取并摘要”</div></div>`;
+      `<div class="empty"><div class="icon">📝</div><div class="title">${currentLang === 'zh' ? '暂无摘要' : 'No Summary'}</div><div class="hint">${currentLang === 'zh' ? '点击上方"提取并摘要"' : 'Click "Extract & Summarize" above'}</div></div>`;
     shadow.getElementById("sx-cleaned").innerHTML =
-      `<div class="empty"><div class="icon">📄</div><div class="title">暂无可读正文</div><div class="hint">点击上方“提取并摘要”</div></div>`;
+      `<div class="empty"><div class="icon">📄</div><div class="title">${currentLang === 'zh' ? '暂无可读正文' : 'No Readable Content'}</div><div class="hint">${currentLang === 'zh' ? '点击上方"提取并摘要"' : 'Click "Extract & Summarize" above'}</div></div>`;
   }
   function setSkeleton(shadow) {
     shadow.getElementById("sx-summary").innerHTML =
@@ -785,13 +895,16 @@
     shadow.getElementById("sx-progress").classList.toggle("hidden", !loading);
   }
 
-  function renderToDom(shadow, summary, cleaned) {
+  async function renderToDom(shadow, summary, cleaned) {
+    const i18n = await loadI18n();
+    const currentLang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+    
     const $s = shadow.getElementById("sx-summary");
     const $c = shadow.getElementById("sx-cleaned");
 
     $s.innerHTML = summary
       ? stripInlineColor(renderMarkdown(summary))
-      : `<div class="empty"><div class="icon">📝</div><div class="title">暂无摘要</div></div>`;
+      : `<div class="empty"><div class="icon">📝</div><div class="title">${currentLang === 'zh' ? '暂无摘要' : 'No Summary'}</div></div>`;
 
     if (cleaned === null) {
       $c.innerHTML =
@@ -801,7 +914,7 @@
     } else {
       $c.innerHTML = cleaned
         ? stripInlineColor(renderMarkdown(cleaned))
-        : `<div class="empty"><div class="icon">📄</div><div class="title">暂无可读正文</div></div>`;
+        : `<div class="empty"><div class="icon">📄</div><div class="title">${currentLang === 'zh' ? '暂无可读正文' : 'No Readable Content'}</div></div>`;
     }
   }
 
@@ -844,20 +957,22 @@
         const st = await getState(tabId);
         if (st.status === "done") {
           setLoading(shadow, false);
-          renderToDom(shadow, st.summary, st.cleaned);
+          await renderToDom(shadow, st.summary, st.cleaned);
           stopPolling();
           return;
         }
         if (st.status === "error") {
           setLoading(shadow, false);
+          const i18n = await loadI18n();
+          const currentLang = i18n ? await i18n.getCurrentLanguage() : 'zh';
           shadow.getElementById("sx-summary").innerHTML =
-            `<div class="alert"><div class="alert-content"><p>发生错误，请重试。</p></div></div>`;
+            `<div class="alert"><div class="alert-content"><p>${currentLang === 'zh' ? '发生错误，请重试。' : 'An error occurred, please try again.'}</p></div></div>`;
           stopPolling();
           return;
         }
         if (st.status === "partial") {
           setLoading(shadow, true);
-          renderToDom(shadow, st.summary, null);
+          await renderToDom(shadow, st.summary, null);
         } else if (st.status === "running") {
           setLoading(shadow, true);
           setSkeleton(shadow);

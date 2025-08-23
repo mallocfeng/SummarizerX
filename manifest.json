@@ -1,12 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "SummarizerX 麦乐可 AI 摘要阅读器",
-  "version": "1.6.6.0",
+  "name": "SummarizerX AI Reader",
+  "version": "1.6.7.0",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
   "background": { "service_worker": "background.js", "type": "module" },
+  "web_accessible_resources": [
+    {
+      "resources": ["i18n.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
-    "default_title": "打开/关闭右侧悬浮面板",
+    "default_title": "Open/Close right sidebar",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

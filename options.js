@@ -1,5 +1,6 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
 import { DEFAULTS, PROVIDER_PRESETS, getSettings } from "./settings.js";
+import { getCurrentLanguage, t, tSync, updatePageLanguage } from "./i18n.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -128,7 +129,7 @@ function applySnapshot(provider) {
 }
 
 // Trial 锁定/隐藏（含：强制正文提取方式=fast，隐藏 BaseURL）
-function setTrialLock(isLocked) {
+async function setTrialLock(isLocked) {
   const $apiKey = $("apiKey");
   const $base   = $("baseURL");
   const $baseWrap = $("field-baseURL");     // 记得在 HTML 里为 BaseURL 外层包一个 id="field-baseURL"
@@ -146,18 +147,34 @@ function setTrialLock(isLocked) {
   }
   if ($baseWrap) $baseWrap.classList.toggle("hidden", !!isLocked);
 
-  const tip = isLocked ? "试用模式下此项已锁定。如需自定义，请切换到 OpenAI/DeepSeek/自定义。" : "";
+  const tip = isLocked ? await t("settings.trialLocked") : "";
   [$apiKey, $base, $ext, $sum, $mode].forEach(i => { if (i) i.title = tip; });
   if ($eyeBtn) $eyeBtn.title = tip;
 }
 
-function setStatus(text) { $("status").textContent = text; }
-function setMeta(meta) {
-  $("meta").textContent = `当前配置：provider=${meta.aiProvider}，extract=${meta.model_extract}，summary=${meta.model_summarize}，base=${meta.baseURL}，lang=${meta.output_lang || "auto"}，mode=${meta.extract_mode}`;
+async function setStatus(key) { 
+  const text = await t(key);
+  $("status").textContent = text; 
+}
+async function setMeta(meta) {
+  // 生成更简洁的配置信息，使用更短的标签
+  const configParts = [
+    `p=${meta.aiProvider}`,
+    `e=${meta.model_extract}`,
+    `s=${meta.model_summarize}`,
+    `l=${meta.output_lang || "auto"}`,
+    `m=${meta.extract_mode}`
+  ];
+  
+  const currentLang = await getCurrentLanguage();
+  const prefix = currentLang === 'zh' ? '配置：' : 'Config: ';
+  const separator = currentLang === 'zh' ? '，' : ', ';
+  
+  $("meta").textContent = `${prefix}${configParts.join(separator)}`;
 }
 
 // 版本号 & 指南链接
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const el = document.getElementById('app-version');
   if (el) {
     const { version, version_name } = chrome.runtime.getManifest();
@@ -176,6 +193,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const v = all[THEME_STORAGE_KEY] || all[FLOAT_THEME_KEY] || 'auto';
     applyDocumentTheme(v);
   }).catch(()=>{});
+
+  // 初始化国际化
+  await initI18n();
 });
 
 function reflectGuideLink(){
@@ -239,7 +259,7 @@ async function loadSettings() {
   $("output_lang").value = d.output_lang || DEFAULTS.output_lang;
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
 
-  if (aiProvider === "trial") setTrialLock(true); else setTrialLock(false);
+  if (aiProvider === "trial") await setTrialLock(true); else await setTrialLock(false);
 
   $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
   if (d.system_prompt_custom && d.system_prompt_custom.trim()) {
@@ -248,7 +268,7 @@ async function loadSettings() {
     applyPresetToTextarea(true);
   }
 
-  setMeta({
+  await setMeta({
     aiProvider,
     baseURL: $("baseURL").value,
     model_extract: $("model_extract").value,
@@ -301,8 +321,8 @@ async function saveSettings() {
     extract_mode: payload.extract_mode,
   };
 
-  setStatus("已保存设置 ✅");
-  setMeta(payload);
+  await setStatus("settings.saved");
+  await setMeta(payload);
 }
 
 /* =========================
@@ -315,14 +335,14 @@ async function testApiKey() {
     const key = $("apiKey").value.trim() || (provider === "trial" ? "trial" : "");
     const base = cleanupSlash($("baseURL").value.trim() || DEFAULTS.baseURL);
     const model = $("model_summarize").value.trim() || DEFAULTS.model_summarize;
-    if (!key && provider !== "trial") throw new Error("请先输入 API Key");
-    setStatus("⏳ 正在测试 API Key 与 Base URL…");
+    if (!key && provider !== "trial") throw new Error(await t("settings.noApiKey"));
+    await setStatus("settings.testing");
 
     const resp1 = await fetch(`${base}/models`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${key}` }
     });
-    if (resp1.ok) { setStatus("✅ 测试通过：/models 可访问，Key 有效"); return; }
+    if (resp1.ok) { await setStatus("settings.testSuccess"); return; }
 
     const payload = { model, messages: [{ role: "user", content: "ping" }], temperature: 0 };
     const resp2 = await fetch(`${base}/chat/completions`, {
@@ -330,13 +350,14 @@ async function testApiKey() {
       headers: { "Content-Type":"application/json", "Authorization": `Bearer ${key}` },
       body: JSON.stringify(payload)
     });
-    if (resp2.ok) { setStatus("✅ 测试通过：/chat/completions 可访问，Key 有效"); return; }
+    if (resp2.ok) { await setStatus("settings.testSuccessChat"); return; }
 
     const t1 = await safeReadText(resp1);
     const t2 = await safeReadText(resp2);
     throw new Error(`两种探测均失败。\n/models => ${resp1.status} ${t1}\n/chat/completions => ${resp2.status} ${t2}`);
   } catch (e) {
-    setStatus("❌ 测试失败：" + (e?.message || String(e)));
+    const errorText = await t("settings.testFailed");
+    setStatus(errorText + (e?.message || String(e)));
   }
 }
 async function safeReadText(res) { try { return await res.text(); } catch { return "(no body)"; } }
@@ -362,7 +383,7 @@ async function onProviderChange() {
     $("model_extract").value = p.model_extract;
     $("model_summarize").value = p.model_summarize;
     $("extract_mode").value = "fast";
-    setTrialLock(true);
+    await setTrialLock(true);
   } else if (provider === "openai" || provider === "deepseek") {
     const restored = applySnapshot(provider);
     if (!restored) {
@@ -376,7 +397,7 @@ async function onProviderChange() {
     const keyName = PROVIDER_PRESETS[provider].apiKeyKey;
     const kv = await chrome.storage.sync.get([keyName]);
     $("apiKey").value = (providerSnapshots[provider]?.apiKey) || kv[keyName] || "";
-    setTrialLock(false);
+    await setTrialLock(false);
   } else {
     // custom
     const restored = applySnapshot("custom");
@@ -387,10 +408,10 @@ async function onProviderChange() {
       $("model_summarize").value = $("model_summarize").value || DEFAULTS.model_summarize;
       $("extract_mode").value = providerSnapshots.custom?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
     }
-    setTrialLock(false);
+    await setTrialLock(false);
   }
 
-  setMeta({
+  await setMeta({
     aiProvider: provider,
     baseURL: $("baseURL").value,
     model_extract: $("model_extract").value,
@@ -416,16 +437,18 @@ function markCustomIfManualChange() {
   }
 }
 
-function onPresetChange() {
+async function onPresetChange() {
   const box = $("system_prompt_custom");
   if (box.value.trim()) {
-    if (confirm("自定义提示词已有内容，是否覆盖？")) applyPresetToTextarea(true);
+    const confirmText = await t("settings.confirmOverride");
+    if (confirm(confirmText)) applyPresetToTextarea(true);
   } else applyPresetToTextarea(true);
 }
-function onOutputLangChange() {
+async function onOutputLangChange() {
   const box = $("system_prompt_custom");
   if (box.value.trim()) {
-    if (confirm("自定义提示词已有内容，是否根据新语言覆盖？")) applyPresetToTextarea(true);
+    const confirmText = await t("settings.confirmLangOverride");
+    if (confirm(confirmText)) applyPresetToTextarea(true);
   } else applyPresetToTextarea(true);
 }
 
@@ -455,6 +478,133 @@ function updateBuyHelp(provider) {
   else if (provider === 'openai') { open.style.display='inline'; deep.style.display='none'; sep.style.display='none'; }
   else if (provider === 'deepseek') { open.style.display='none'; deep.style.display='inline'; sep.style.display='none'; }
   else { open.style.display='inline'; deep.style.display='inline'; sep.style.display='inline'; }
+}
+
+// ========== 国际化功能 ==========
+async function initI18n() {
+  // 更新页面语言属性
+  await updatePageLanguage();
+  
+  // 加载当前语言设置
+  const currentLang = await getCurrentLanguage();
+  
+  // 更新语言切换器状态
+  updateLanguageSwitcher(currentLang);
+  
+  // 更新界面文本
+  await updateUIText();
+  
+  // 绑定语言切换事件
+  bindLanguageEvents();
+}
+
+function updateLanguageSwitcher(lang) {
+  const zhBtn = document.getElementById('lang-zh');
+  const enBtn = document.getElementById('lang-en');
+  
+  if (zhBtn && enBtn) {
+    zhBtn.classList.toggle('active', lang === 'zh');
+    enBtn.classList.toggle('active', lang === 'en');
+  }
+}
+
+async function updateUIText() {
+  const lang = await getCurrentLanguage();
+  
+  // 更新标题和副标题
+  updateElementText('settings-title', await t('settings.title'));
+  updateElementText('settings-subtitle', await t('settings.subtitle'));
+  
+  // 更新基础配置
+  updateElementText('basic-config', await t('settings.basicConfig'));
+  updateElementText('ai-platform', await t('settings.aiPlatform'));
+  updateElementText('trial-option', await t('settings.trial'));
+  updateElementText('openai-option', await t('settings.openai'));
+  updateElementText('deepseek-option', await t('settings.deepseek'));
+  updateElementText('custom-option', await t('settings.custom'));
+  updateElementText('buy-help-text', await t('settings.buyHelp'));
+  updateElementText('link-buy-openai', await t('settings.openaiGuide'));
+  updateElementText('link-buy-deepseek', await t('settings.deepseekGuide'));
+  updateElementText('platform-hint', await t('settings.hint'));
+  
+  // 更新表单标签
+  updateElementText('api-key-label', await t('settings.apiKey'));
+  updateElementText('base-url-label', await t('settings.baseURL'));
+  updateElementText('extract-model-label', await t('settings.extractModel'));
+  updateElementText('summarize-model-label', await t('settings.summarizeModel'));
+  updateElementText('output-lang-label', await t('settings.outputLang'));
+  updateElementText('auto-option', await t('settings.auto'));
+  updateElementText('chinese-option', await t('settings.chinese'));
+  updateElementText('english-option', await t('settings.english'));
+  updateElementText('extract-mode-label', await t('settings.extractMode'));
+  updateElementText('fast-option', await t('settings.fastLocal'));
+  updateElementText('ai-option', await t('settings.aiExtract'));
+  
+  // 更新System Prompt
+  updateElementText('system-prompt-title', await t('settings.systemPrompt'));
+  updateElementText('presets-label', await t('settings.presets'));
+  updateElementText('general-summary-option', await t('settings.generalSummary'));
+  updateElementText('faithful-translation-option', await t('settings.faithfulTranslation'));
+  updateElementText('tech-article-translation-option', await t('settings.techArticleTranslation'));
+  updateElementText('preset-hint', await t('settings.presetHint'));
+  updateElementText('custom-prompt-label', await t('settings.customPrompt'));
+  
+  // 更新快捷键设置
+  updateElementText('shortcuts-title', await t('settings.shortcuts'));
+  updateElementText('shortcut-desc', await t('settings.shortcutDesc'));
+  updateElementText('open-shortcut', await t('settings.setShortcut'));
+  updateElementText('shortcut-hint', await t('settings.shortcutHint'));
+  
+  // 更新底部按钮
+  updateElementText('appearance-label', await t('settings.appearance'));
+  updateElementText('btn-test', await t('settings.testApi'));
+  updateElementText('btn-save', await t('settings.saveAll'));
+  
+  // 更新状态文本
+  updateElementText('status', await t('settings.ready'));
+  
+  // 更新主题按钮标题
+  const themeBtns = document.querySelectorAll('.theme-btn');
+  for (const btn of themeBtns) {
+    const mode = btn.getAttribute('data-mode');
+    if (mode === 'auto') btn.title = await t('settings.autoTheme');
+    else if (mode === 'light') btn.title = await t('settings.lightTheme');
+    else if (mode === 'dark') btn.title = await t('settings.darkTheme');
+  }
+}
+
+function updateElementText(elementId, text) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = text;
+  }
+}
+
+function bindLanguageEvents() {
+  const zhBtn = document.getElementById('lang-zh');
+  const enBtn = document.getElementById('lang-en');
+  
+  if (zhBtn) {
+    zhBtn.addEventListener('click', () => switchLanguage('zh'));
+  }
+  
+  if (enBtn) {
+    enBtn.addEventListener('click', () => switchLanguage('en'));
+  }
+}
+
+async function switchLanguage(lang) {
+  // 保存语言设置
+  await chrome.storage.sync.set({ ui_language: lang });
+  
+  // 更新页面语言属性
+  await updatePageLanguage();
+  
+  // 更新语言切换器状态
+  updateLanguageSwitcher(lang);
+  
+  // 更新界面文本
+  await updateUIText();
 }
 
 function toggleBuyHelpInline(provider){

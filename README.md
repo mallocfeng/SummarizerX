@@ -170,6 +170,78 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 ---
 
+## 🌍 Internationalization (i18n)
+
+**SummarizerX AI Reader** now supports bilingual interface (Chinese & English). Users can switch language in settings and all UI text will update instantly.
+
+### ✨ Features
+- **中文（默认）**：完整的中文界面  
+- **English**：full English UI  
+- **Realtime switching**：no restart required, changes take effect immediately
+
+### 🎨 Coverage
+- ✅ Settings page (options.html)  
+- ✅ Floating panel (float_panel.js)  
+- ✅ Translation bubble (selection_translate.js)  
+- ✅ Extension icon title  
+- ✅ Error and status messages  
+
+### 🚀 How to Use
+1. Open the extension settings page  
+2. Find the language switcher at the top (中文 / English)  
+3. Click to switch instantly  
+
+Language choice is saved in `chrome.storage.sync` and will be remembered next time.
+
+### 🛠 Technical Details
+- **i18n.js**: centralized bilingual config  
+- **Functions**: `getCurrentLanguage()`, `t()`, `tSync()`, `updatePageLanguage()`  
+- **Flow**: save → update language attribute → re-render UI
+
+### 📌 Changelog v1.6.6.0
+- ✨ Added Chinese/English bilingual support  
+- 🎨 Language switcher UI  
+- 🔧 Refactored i18n architecture  
+- 📝 Updated docs and tests  
+
+---
+
+## 🌍 国际化支持
+
+**SummarizerX AI Reader** 现已支持中英文双语界面。用户可以在设置页面切换语言，界面文本会即时更新。
+
+### ✨ 功能特性
+- **中文（默认）**：完整的中文界面  
+- **English**：完整的英文界面  
+- **实时切换**：无需重启扩展，立即生效  
+
+### 🎨 覆盖范围
+- ✅ 设置页面（options.html）  
+- ✅ 浮窗面板（float_panel.js）  
+- ✅ 翻译气泡（selection_translate.js）  
+- ✅ 扩展图标标题  
+- ✅ 错误提示和状态信息  
+
+### 🚀 使用方法
+1. 打开扩展设置页面  
+2. 在页面顶部找到语言切换器（中文 / English）  
+3. 点击即可切换  
+
+语言选择会保存到 `chrome.storage.sync`，下次会自动记住。
+
+### 🛠 技术说明
+- **i18n.js**：集中管理的双语配置文件  
+- **主要函数**：`getCurrentLanguage()`、`t()`、`tSync()`、`updatePageLanguage()`  
+- **流程**：保存设置 → 更新语言属性 → 重新渲染界面  
+
+### 📌 更新日志 v1.6.6.0
+- ✨ 新增中英文双语支持  
+- 🎨 添加语言切换器UI  
+- 🔧 重构国际化架构  
+- 📝 完善文档和测试  
+
+---
+
 ## 📜 License
 
 MIT License © 2025 [Malloc Feng](https://github.com/mallocfeng)

@@ -316,9 +316,22 @@ async function getTargetLang() {
 // 创建/更新右键菜单（标题随设置语言变化）
 async function ensureContextMenu() {
   try { await chrome.contextMenus.remove(MENU_ID_TRANSLATE); } catch {}
-  const lang = await getTargetLang();
-  const title = lang === 'en' ? 'SummarizerX: Translate selection → English'
-                              : 'SummarizerX：翻译所选文本 → 中文';
+  
+  // 获取UI语言设置
+  const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+  const targetLang = await getTargetLang();
+  
+  let title;
+  if (ui_language === 'en') {
+    title = targetLang === 'en' 
+      ? 'SummarizerX: Translate selection → English'
+      : 'SummarizerX: Translate selection → Chinese';
+  } else {
+    title = targetLang === 'en' 
+      ? 'SummarizerX：翻译所选文本 → 英文'
+      : 'SummarizerX：翻译所选文本 → 中文';
+  }
+  
   chrome.contextMenus.create({
     id: MENU_ID_TRANSLATE,
     title,
@@ -330,7 +343,9 @@ async function ensureContextMenu() {
 chrome.runtime.onInstalled.addListener(ensureContextMenu);
 chrome.runtime.onStartup?.addListener?.(ensureContextMenu);
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes.output_lang) ensureContextMenu();
+  if (area === 'sync' && (changes.output_lang || changes.ui_language)) {
+    ensureContextMenu();
+  }
 });
 
 // 右键点击：让内容脚本执行翻译动作

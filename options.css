@@ -65,13 +65,56 @@ body{
 }
 .wrap{ max-width: 980px; margin: 0 auto; padding: 0 16px; }
 
+.hero-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
 .hero-title{
   margin:0;
   font-size:22px;
   font-weight:800;
   letter-spacing:.3px;
   display:flex; align-items:center; gap:10px;
+  flex: 1;
 }
+
+.language-switcher{
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  padding: 2px;
+  backdrop-filter: blur(8px);
+}
+
+.lang-btn{
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.lang-btn:hover{
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text);
+}
+
+.lang-btn.active{
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 .hero-sub{ margin:6px 0 0; color:#6b7280; font-size:13px; }
 .badge{
   font-size:12px; color:#0f5132; background:#dcfce7; border:1px solid #bbf7d0;
@@ -237,7 +280,7 @@ body{
  * ========================= */
 .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .btn{
-  padding:10px 14px;
+  padding:10px 14px; /* 恢复原始内边距 */
   border-radius:12px;
   cursor:pointer;
   font-weight:600;
@@ -251,6 +294,14 @@ body{
     inset 0 1px 0 rgba(255,255,255,0.32);
   backdrop-filter: saturate(180%) blur(8px);
   -webkit-backdrop-filter: saturate(180%) blur(8px);
+  
+  /* 优化长文本显示 */
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+  max-width: 160px; /* 恢复原始最大宽度 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .btn:hover{ background: rgba(255,255,255,0.70); border-color: rgba(255,255,255,0.72); }
 .btn:active{ transform: translateY(1px); }
@@ -324,8 +375,23 @@ body{
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;
 }
-.dock-left{ display:flex; flex-direction:column; gap:6px; min-width: 240px; }
-.dock-right{ display:flex; gap:10px; flex-wrap:wrap; }
+.dock-left{ 
+  display:flex; 
+  flex-direction:column; 
+  gap:6px; 
+  min-width: 380px; /* 进一步增加最小宽度 */
+  max-width: 520px; /* 增加最大宽度 */
+  flex-shrink: 1; /* 允许收缩 */
+}
+.dock-right{ 
+  display:flex; 
+  gap:10px; /* 恢复原始间距 */
+  flex-wrap:nowrap; /* 防止换行 */
+  align-items: center;
+  min-width: 0; /* 允许收缩 */
+  flex: 1; /* 占用剩余空间 */
+  justify-content: flex-end; /* 右对齐 */
+}
 
 /* 状态行（底栏内） */
 .status-line{ display:flex; align-items:center; gap:8px; }
@@ -337,7 +403,16 @@ body{
   margin:0;
   border-style: dashed;
   color:#475467;
-  max-width: 520px;
+  max-width: 100%; /* 适应容器宽度 */
+  /* 允许多行显示，不再截断 */
+  white-space: normal;
+  word-break: break-word;
+  overflow: auto;            /* 内容过多时允许滚动 */
+  text-overflow: unset;
+  max-height: 9.1em;        /* 约 7 行（随需要可调）*/
+  font-size: 11px;           /* 保持较小字体 */
+  line-height: 1.3;          /* 行高与上方一致 */
+  padding: 6px 8px;          /* 内边距保持 */
 }
 
 /* ========== 主题切换（与浮窗一致的胶囊按钮 + 图标） ========== */
@@ -376,7 +451,12 @@ body{
 .theme-btn.active svg,
 .theme-btn[aria-selected="true"] svg{ opacity: 1; }
 
-.theme-toggle{ display:flex; align-items:center; gap:10px; }
+.theme-toggle{ 
+  display:flex; 
+  align-items:center; 
+  gap:10px; /* 恢复原始间距 */
+  flex-shrink: 0; /* 防止主题切换器被压缩 */
+}
 .theme-toggle .seg{
   display:flex; align-items:center; gap:6px;
   background: rgba(255,255,255,0.35);
@@ -386,8 +466,8 @@ body{
 .theme-toggle .label{
   display:flex; align-items:center; justify-content:center;
   height:34px; line-height:34px;    /* 与按钮等高 */
-  font-size:12px; font-weight:700;  /* 更稳重 */
-  color:#475569; margin-right:2px;  /* 轻微间距优化 */
+  font-size:12px; font-weight:700;  /* 恢复原始字体大小 */
+  color:#475569; margin-right:2px;  /* 恢复原始间距 */
 }
 
 /* 基础外观已在上面“兼容”块声明，这里仅保留差异项（若 .theme-btn 单独使用也生效） */
@@ -400,10 +480,28 @@ body{
  * ========================= */
 @media (max-width: 720px){
   .dock-inner{ flex-direction: column; align-items: stretch; }
-  .dock-right{ justify-content: flex-end; }
+  .dock-left{ 
+    min-width: auto; /* 移除最小宽度限制 */
+    max-width: none; /* 移除最大宽度限制 */
+  }
+  .dock-right{ 
+    justify-content: flex-end; 
+    gap: 8px; /* 减小间距 */
+    flex-wrap: wrap; /* 在小屏幕上允许换行 */
+  }
+  .btn {
+    padding: 8px 12px; /* 减小按钮内边距 */
+    font-size: 12px; /* 减小字体 */
+    max-width: 120px; /* 进一步限制宽度 */
+  }
+  .save-dock .meta {
+    white-space: normal; /* 在小屏幕上允许换行 */
+    font-size: 10px; /* 在小屏幕上进一步减小字体 */
+    padding: 4px 6px; /* 减小内边距 */
+  }
+}
   .save-dock{ padding: 12px 0; }
   .main-with-dock{ padding-bottom: 120px; }
-}
 .save-dock .status-line{ margin-top: 2px; }
 
 /* 单独占一行的字段 */

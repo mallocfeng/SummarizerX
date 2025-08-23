@@ -1,4 +1,20 @@
 (() => {
+  // 导入国际化模块
+  let i18nModule = null;
+  
+  // 异步加载国际化模块
+  async function loadI18n() {
+    if (i18nModule) return i18nModule;
+    try {
+      const moduleUrl = chrome.runtime.getURL('i18n.js');
+      i18nModule = await import(moduleUrl);
+      return i18nModule;
+    } catch (e) {
+      console.warn('Failed to load i18n module:', e);
+      return null;
+    }
+  }
+  
   // Keep-alive so the translate bubble won't be removed by other cleanup logic (e.g., floatpanel close)
   let keepAliveMO = null;
   // Set to false only when user explicitly closes the bubble
@@ -198,7 +214,7 @@
 
       <div class="bubble" id="sx-bubble" data-theme="dark">
         <div class="header" id="sx-drag-handle">
-          <div class="title">SummarizerX · Translate</div>
+          <div class="title" id="sx-title">SummarizerX · Translate</div>
           <div class="toolbar">
             <button class="tbtn" id="sx-copy" title="Copy result">Copy</button>
             <button class="close" id="sx-close" aria-label="Close">✕</button>
@@ -228,13 +244,24 @@
     }
     setupKeepAlive();
 
+    // 更新UI文本为当前语言
+    updateUIText();
+    
     // 关闭/复制
     closeBtn.addEventListener('click', removeUI);
     copyBtn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(contentEl.textContent || ''); } catch {}
       // 小提示（不打扰）
-      copyBtn.textContent = 'Copied';
-      setTimeout(()=> (copyBtn.textContent = 'Copy'), 800);
+      const i18n = await loadI18n();
+      if (i18n) {
+        copyBtn.textContent = await i18n.t('floatPanel.copied');
+        setTimeout(async () => {
+          copyBtn.textContent = await i18n.t('floatPanel.copy');
+        }, 800);
+      } else {
+        copyBtn.textContent = 'Copied';
+        setTimeout(()=> (copyBtn.textContent = 'Copy'), 800);
+      }
     });
 
     // 延后一帧绑定“外点关闭”，避免打开时被误判
@@ -290,6 +317,38 @@
     host.remove();
     __sxUserMovedBubble = false;
     host = wrap = contentEl = closeBtn = spinner = shadowRootEl = copyBtn = null;
+  }
+
+  // 更新UI文本为当前语言
+  async function updateUIText() {
+    const i18n = await loadI18n();
+    if (!i18n) return;
+    
+    try {
+      const title = shadow.getElementById('sx-title');
+      const copyBtn = shadow.getElementById('sx-copy');
+      const closeBtn = shadow.getElementById('sx-close');
+      
+      if (title) {
+        const currentLang = await i18n.getCurrentLanguage();
+        if (currentLang === 'zh') {
+          title.textContent = 'SummarizerX · 翻译';
+        } else {
+          title.textContent = 'SummarizerX · Translate';
+        }
+      }
+      
+      if (copyBtn) {
+        copyBtn.textContent = await i18n.t('floatPanel.copy');
+        copyBtn.title = await i18n.t('floatPanel.copy');
+      }
+      
+      if (closeBtn) {
+        closeBtn.setAttribute('aria-label', await i18n.t('floatPanel.close'));
+      }
+    } catch (e) {
+      console.warn('Failed to update UI text:', e);
+    }
   }
 
   function escToClose(e){ if (e.key === 'Escape') removeUI(); }
