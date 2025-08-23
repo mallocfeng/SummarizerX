@@ -15,6 +15,7 @@
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
+- 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
 
 ### 🖼 Screenshots
 
@@ -29,6 +30,12 @@
 </p>
 <p align="center">
   <img src="images/4.png" width="820" alt="Screenshot 4" />
+</p>
+<p align="center">
+  <img src="images/8.png" width="820" alt="Screenshot 8" />
+</p>
+<p align="center">
+  <img src="images/9.png" width="820" alt="Screenshot 9" />
 </p>
 
 ### 🚀 Installation
@@ -49,6 +56,7 @@
 - Select text or let it auto-extract the main content  
 - Choose summarize or translate options  
 - Customize prompts and modes in settings  
+- Use the new **right-click menu** to translate selected text instantly
 
 ### ⚙️ Settings Reference
 
@@ -90,6 +98,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - ⚙️ 个性化设置：自定义提示词、模式、快捷键和界面偏好  
 - 📑 浮动面板：无需跳转页面即可查看摘要  
 - 🌙 主题支持：明亮和暗黑模式，保护视力  
+- 🖱️ 右键菜单翻译：在网页中选中文本，右键即可快速调用 AI 翻译
 
 ### 🖼 软件截图
 
@@ -104,6 +113,12 @@ All processing happens locally or via your configured AI API key. No data is sen
 </p>
 <p align="center">
   <img src="images/4.png" width="820" alt="截图 4" />
+</p>
+<p align="center">
+  <img src="images/8.png" width="820" alt="截图 8" />
+</p>
+<p align="center">
+  <img src="images/9.png" width="820" alt="截图 9" />
 </p>
 
 ### 🚀 安装方法
@@ -124,6 +139,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 选中文本或自动提取正文  
 - 选择摘要或翻译功能  
 - 在设置中自定义提示词和模式  
+- 使用新增的 **右键菜单翻译** 功能，立即翻译所选文本
 
 ### ⚙️ 设置说明
 
