@@ -16,6 +16,7 @@
 - 📑 Floating Panel: View summaries without leaving the current page  
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
+ - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
 
 ### 🖼 Screenshots
 
@@ -140,6 +141,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 选择摘要或翻译功能  
 - 在设置中自定义提示词和模式  
 - 使用新增的 **右键菜单翻译** 功能，立即翻译所选文本
+ - 使用 **全文翻译** 右键菜单，在原文下方以引用块展示译文，并可在“全文翻译 / 显示原文”间切换
 
 ### ⚙️ 设置说明
 
@@ -229,9 +231,10 @@ titleEl.textContent = await t('mySection.hello');
 - Import error in content scripts: make sure `chrome.runtime.getURL('i18n.js')` is used for dynamic import.
 
 ### 📌 Changelog v1.6.8
+- 🖱️ New: Translate Selection via context menu (instant AI translation bubble)  
+- 🧾 New: Translate Full Page with inline quote blocks under originals; toggle to Show Original  
 - 🎨 Inline translation blocks follow theme with correct light background (opaque)  
 - 🔄 Theme sync between settings page and floating panel is instantaneous  
-- 🐞 Fixed context menu title instant toggle after full-page translate/restore  
 - 🧼 Minor CSS refinements on settings footer alignment and meta text area  
 
 ---
@@ -295,9 +298,10 @@ titleEl.textContent = await t('mySection.hello');
 - 动态导入报错：内容脚本里使用 `chrome.runtime.getURL('i18n.js')` 进行导入。
 
 ### 📌 更新日志 v1.6.8
+- 🖱️ 新增：右键“翻译所选文本”，即时在气泡中展示 AI 翻译  
+- 🧾 新增：右键“全文翻译”，在原文下方以引用块内联展示译文，可切换“显示原文”  
 - 🎨 内联翻译引用块在亮色模式使用不透明浅灰底，深色文字  
 - 🔄 设置页与浮窗的主题切换实现双向实时联动  
-- 🐞 全文翻译与显示原文的右键菜单标题即刻切换  
 - 🧼 设置页底部对齐与 meta 文本区样式小幅优化  
 
 ---
