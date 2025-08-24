@@ -252,8 +252,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return;
     }
 
-    if (msg?.type === "GET_MODEL_INFO") {
-    }
+    // 移除空分支：GET_MODEL_INFO 未使用
   })();
 
   return true; // 保持消息通道

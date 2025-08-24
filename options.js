@@ -8,11 +8,7 @@ const GUIDE_URL = chrome.runtime.getURL('help_buy_api.html');
 const GUIDE_OPENAI  = `${GUIDE_URL}#openai`;
 const GUIDE_DEEPSEEK = `${GUIDE_URL}#deepseek`;
 
-const PRESETS = {
-  general_summary: "You are a precise assistant for distilling web articles. Be faithful and concise. Avoid speculation.",
-  faithful_translation: "You are a professional translator. Preserve meaning, tone and technical terms faithfully. Avoid adding information.",
-  tech_article_translation: "You are a technical translator for software articles. Keep code, commands and technical terms unchanged. Clarify ambiguous references."
-};
+// 说明：PRESETS 已由 PRESET_TEXT 统一管理；移除重复未使用的 PRESETS 常量
 
 // ========= 主题切换（自动 / 浅色 / 深色） =========
 const THEME_STORAGE_KEY = 'options_theme_override';

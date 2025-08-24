@@ -17,6 +17,7 @@
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
+ - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
 
 ### 🖼 Screenshots
 
@@ -58,6 +59,7 @@
 - Choose summarize or translate options  
 - Customize prompts and modes in settings  
 - Use the new **right-click menu** to translate selected text instantly
+ - Use **Translate full page** from the right-click menu to insert translations below each paragraph as quote blocks; switch back via **Show original**
 
 ### ⚙️ Settings Reference
 
@@ -85,14 +87,6 @@ All processing happens locally or via your configured AI API key. No data is sen
 - **English**: In translation mode, AI outputs plain text only. No Markdown, no quotes, no extra commentary. Preserve paragraph breaks.
 - **中文**：翻译模式下严格输出纯文本；不包含 Markdown/引号/额外说明，保持原段落换行。
 
-### 📌 Roadmap
-
-- [ ] Dark mode improvements  
-- [ ] Export summaries to Markdown and PDF  
-- [ ] Multi-language UI support  
-
----
-
 ## 中文简介
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
@@ -106,6 +100,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 🌙 主题支持：明亮和暗黑模式，保护视力  
 - 🖱️ 右键菜单翻译：在网页中选中文本，右键即可快速调用 AI 翻译
  - 🧾 全文翻译：将整页可见内容按段落翻译，在原文下方以引用块内联展示；可在右键菜单“全文翻译 / 显示原文”间切换  
+ - 🌍 双语界面（中文/English）：设置页可切换语言，界面文案即时更新
 
 ### 🖼 软件截图
 
@@ -147,6 +142,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 选择摘要或翻译功能  
 - 在设置中自定义提示词和模式  
 - 使用新增的 **右键菜单翻译** 功能，立即翻译所选文本
+ - 在网页空白处右键选择 **全文翻译**，系统会在每段原文下方插入引用块译文；需要恢复时选择 **显示原文**
  - 使用 **全文翻译** 右键菜单，在原文下方以引用块展示译文，并可在“全文翻译 / 显示原文”间切换
 
 ### ⚙️ 设置说明
@@ -175,147 +171,6 @@ All processing happens locally or via your configured AI API key. No data is sen
 - **中文**：翻译模式下严格输出纯文本；不包含 Markdown/引号/额外说明，保持原段落换行。
 - **English**: In translation mode, AI outputs plain text only. No Markdown, no quotes, no extra commentary. Preserve paragraph breaks.
 
-### 📌 开发计划
-
-- [ ] 优化暗黑模式  
-- [ ] 支持导出 Markdown 和 PDF  
-- [ ] 多语言界面支持  
-
----
-
-## 🌍 Internationalization (i18n)
-
-**SummarizerX AI Reader** now supports bilingual interface (Chinese & English). Users can switch language in settings and all UI text will update instantly.
-
-### ✨ Features
-- **中文（默认）**：完整的中文界面  
-- **English**：full English UI  
-- **Realtime switching**：no restart required, changes take effect immediately
-
-### 🎨 Coverage
-- ✅ Settings page (options.html)  
-- ✅ Floating panel (float_panel.js)  
-- ✅ Translation bubble (selection_translate.js)  
-- ✅ Extension icon title  
-- ✅ Error and status messages  
-
-### 🚀 How to Use
-1. Open the extension settings page  
-2. Find the language switcher at the top (中文 / English)  
-3. Click to switch instantly  
-
-Language choice is saved in `chrome.storage.sync` and will be remembered next time.
-
-### 🛠 Technical Details
-- **i18n.js**: centralized bilingual config  
-- **Functions**: `getCurrentLanguage()`, `t()`, `tSync()`, `updatePageLanguage()`  
-- **Flow**: save → update language attribute → re-render UI
-
-#### 📂 File layout (i18n related)
-```
-├── i18n.js              # Central translation config and helpers
-├── options.html         # Settings page (language switcher in header)
-├── options.js           # Applies UI texts via t()/tSync(); persists ui_language
-├── float_panel.js       # Floating panel texts follow selected UI language
-├── selection_translate.js # Copy/close labels and bubble title localized
-└── manifest.json        # Action title localized (static fallback)
-```
-
-#### ➕ Add new texts
-1) Add keys in `i18n.js` under both `zh` and `en` (e.g. `mySection.myKey`).  
-2) Read them in code with `await t('mySection.myKey')` (or `tSync('mySection.myKey','en')`).  
-3) Update UI by setting `element.textContent = ...`.
-
-Example:
-```javascript
-// i18n.js
-zh: { mySection: { hello: "你好" } },
-en: { mySection: { hello: "Hello" } }
-
-// usage
-titleEl.textContent = await t('mySection.hello');
-```
-
-#### 🧪 Troubleshooting (i18n)
-- Text not updating: ensure element IDs exist and `updateUIText()` runs after DOM ready.  
-- Wrong language: check `chrome.storage.sync.get('ui_language')`.  
-- Import error in content scripts: make sure `chrome.runtime.getURL('i18n.js')` is used for dynamic import.
-
-### 📌 Changelog v1.6.8
-- 🖱️ New: Translate Selection via context menu (instant AI translation bubble)  
-- 🧾 New: Translate Full Page with inline quote blocks under originals; toggle to Show Original  
-- 🎨 Inline translation blocks follow theme with correct light background (opaque)  
-- 🔄 Theme sync between settings page and floating panel is instantaneous  
-- 🧼 Minor CSS refinements on settings footer alignment and meta text area  
-
----
-
-## 🌍 国际化支持
-
-**SummarizerX AI Reader** 现已支持中英文双语界面。用户可以在设置页面切换语言，界面文本会即时更新。
-
-### ✨ 功能特性
-- **中文（默认）**：完整的中文界面  
-- **English**：完整的英文界面  
-- **实时切换**：无需重启扩展，立即生效  
-
-### 🎨 覆盖范围
-- ✅ 设置页面（options.html）  
-- ✅ 浮窗面板（float_panel.js）  
-- ✅ 翻译气泡（selection_translate.js）  
-- ✅ 扩展图标标题  
-- ✅ 错误提示和状态信息  
-
-### 🚀 使用方法
-1. 打开扩展设置页面  
-2. 在页面顶部找到语言切换器（中文 / English）  
-3. 点击即可切换  
-
-语言选择会保存到 `chrome.storage.sync`，下次会自动记住。
-
-### 🛠 技术说明
-- **i18n.js**：集中管理的双语配置文件  
-- **主要函数**：`getCurrentLanguage()`、`t()`、`tSync()`、`updatePageLanguage()`  
-- **流程**：保存设置 → 更新语言属性 → 重新渲染界面  
-
-#### 📂 相关文件结构（i18n）
-```
-├── i18n.js              # 翻译配置与工具函数
-├── options.html         # 设置页（顶部语言切换器）
-├── options.js           # 通过 t()/tSync() 应用文本；保存 ui_language
-├── float_panel.js       # 浮窗面板文案随 UI 语言切换
-├── selection_translate.js # 复制/关闭按钮与标题本地化
-└── manifest.json        # 扩展图标标题（静态兜底）
-```
-
-#### ➕ 添加新文案
-1）在 `i18n.js` 同时增加 `zh` 与 `en` 的键值（如 `mySection.myKey`）。  
-2）代码里用 `await t('mySection.myKey')`（或 `tSync('mySection.myKey','zh')`）读取。  
-3）更新 UI：如 `el.textContent = ...`。
-
-示例：
-```javascript
-// i18n.js
-zh: { mySection: { hello: "你好" } },
-en: { mySection: { hello: "Hello" } }
-
-// 使用
-titleEl.textContent = await t('mySection.hello');
-```
-
-#### 🧪 常见问题（i18n）
-- 文案不更新：确认元素 ID 正确、`updateUIText()` 在 DOM Ready 后执行。  
-- 语言不对：检查 `chrome.storage.sync.get('ui_language')`。  
-- 动态导入报错：内容脚本里使用 `chrome.runtime.getURL('i18n.js')` 进行导入。
-
-### 📌 更新日志 v1.6.8
-- 🖱️ 新增：右键“翻译所选文本”，即时在气泡中展示 AI 翻译  
-- 🧾 新增：右键“全文翻译”，在原文下方以引用块内联展示译文，可切换“显示原文”  
-- 🎨 内联翻译引用块在亮色模式使用不透明浅灰底，深色文字  
-- 🔄 设置页与浮窗的主题切换实现双向实时联动  
-- 🧼 设置页底部对齐与 meta 文本区样式小幅优化  
-
----
 
 ## 📜 License
 
