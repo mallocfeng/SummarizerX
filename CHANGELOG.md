@@ -42,20 +42,22 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 
 ---
 
-## v1.6.8
+## v1.7.0
 
-### English
-- 🖱️ New: Translate Selection via context menu (quick AI bubble translate).
-- 🧾 New: Translate Full Page shows inline quote blocks under originals; toggle with Show Original.
-- 🎨 Inline translation blocks now use an opaque light background in light mode with dark text, improving readability on dark sites.
-- 🔄 Theme selection is synchronized in real-time between the settings page and the floating panel.
-- 🧼 Minor polishing on settings footer alignment and meta text width.
- - 🧭 Translation mode now enforces PLAIN TEXT output: no Markdown, no extra commentary, preserved paragraph breaks.
+### English (Stable)
+- 🖱️ Translate Selection via context menu (quick AI bubble translate).
+- 🧾 Translate Full Page with inline quote blocks; toggle with Show Original.
+- 🎨 Inline translations respect theme with improved light/dark readability.
+- 🔄 Real-time theme sync between settings and floating panel.
+- 🧼 UI polish on settings alignment and meta width.
+- 🧭 Translation mode enforces PLAIN TEXT output (no Markdown/extras).
+- 🐛 Fix: context menu title stays in sync with inline translation state (reset on navigation, cleanup on tab close, immediate update on state change).
 
-### 中文
-- 🖱️ 新增：右键翻译选中文本（在气泡中即时显示 AI 译文）。
-- 🧾 新增：全文翻译，在原文下方内联显示引用块译文；可切换“显示原文”。
-- 🎨 内联翻译区域在亮色模式下使用不透明浅灰底、深色文字，避免深色站点上看不清。
-- 🔄 设置页与浮窗面板主题选择可实时双向同步。
-- 🧼 设置页底部对齐与 meta 文本显示宽度小优化。
- - 🧭 翻译模式严格输出纯文本：不含 Markdown/额外说明，保持原段落换行。
+### 中文（稳定版）
+- 🖱️ 右键翻译选中文本（气泡即时显示 AI 译文）。
+- 🧾 全文翻译：原文下方内联显示引用块译文；可切换“显示原文”。
+- 🎨 内联翻译块随主题联动，亮/暗模式可读性更好。
+- 🔄 设置页与浮窗面板主题选择实时双向同步。
+- 🧼 设置页底部对齐与 meta 文本显示宽度优化。
+- 🧭 翻译模式严格输出纯文本：不含 Markdown/额外说明，保持原段落换行。
+- 🐛 修复：右键菜单标题与内联翻译实际状态保持同步（导航重置、标签页关闭清理、状态变更即时更新）。
