@@ -557,7 +557,11 @@
         const text = (el.innerText || '').trim();
         if (text) blocks.push(el);
       }
-      if (!blocks.length) return;
+      if (!blocks.length) {
+        // 没有可翻译块：回告后台保持“未内联”状态，避免菜单误显示“显示原文”
+        try { await chrome.runtime.sendMessage({ type: 'SX_INLINE_TRANSLATED_CHANGED', inline: false }); } catch {}
+        return;
+      }
 
       // 翻译辅助：批量请求（逐段串行，避免速率限制；也可按需并行）
       const translatedCache = new Map();
@@ -608,7 +612,14 @@
         }
 
         // 翻译并替换占位内容
-        const translated = await translateText(src);
+        let translated = '';
+        try {
+          translated = await translateText(src);
+        } catch (e) {
+          // 单段翻译失败：移除占位并继续下一个；若全部失败，则最终走失败分支
+          try{ q.remove(); }catch{}
+          continue;
+        }
         if (myRun !== __sxFullTranslateRunId) { try{ q.remove(); }catch{} return; }
         q.textContent = translated;
       }
@@ -619,6 +630,8 @@
     }catch(e){
       console.warn('Translate full page failed:', e);
       try{ alert('Full-page translate failed: ' + (e?.message || e)); }catch{}
+      // 失败时回告后台重置菜单状态
+      try { await chrome.runtime.sendMessage({ type: 'SX_INLINE_TRANSLATED_CHANGED', inline: false }); } catch {}
     }
   }
 

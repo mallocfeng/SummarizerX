@@ -287,6 +287,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // 只要开始加载或 URL 变化，就清掉该 tab 的缓存状态
   if (changeInfo.status === "loading" || changeInfo.url) {
     chrome.storage.session.remove(STATE_KEY(tabId));
+    // 重置“全文翻译内联”状态，避免新页面沿用旧状态
+    try { inlineStateByTab.set(tabId, false); } catch {}
   }
 
   if (!changeInfo.url && changeInfo.status !== "loading") return;
@@ -294,6 +296,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
+
+// 标签页关闭时清理状态
+try {
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    try { inlineStateByTab.delete(tabId); } catch {}
+  });
+} catch {}
 
 
 
@@ -448,7 +457,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'SX_INLINE_TRANSLATED_CHANGED') {
     try {
       const tabId = sender?.tab?.id;
-      if (typeof tabId === 'number') inlineStateByTab.set(tabId, !!msg.inline);
+      if (typeof tabId === 'number') {
+        const inline = !!msg.inline;
+        inlineStateByTab.set(tabId, inline);
+        // 即时更新菜单标题（提高可见一致性）
+        (async () => {
+          try {
+            const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+            const targetLang = await getTargetLang();
+            let title = '';
+            if (inline) {
+              title = (ui_language === 'en') ? 'SummarizerX: Restore original (remove inline translations)'
+                                            : 'SummarizerX：显示原文（移除对照翻译）';
+            } else {
+              title = (ui_language === 'en')
+                ? (targetLang === 'en' ? 'SummarizerX: Translate full page (inline → English)' : 'SummarizerX: Translate full page (inline → Chinese)')
+                : (targetLang === 'en' ? 'SummarizerX：全文翻译（段落对照 → 英文）' : 'SummarizerX：全文翻译（段落对照 → 中文）');
+            }
+            chrome.contextMenus.update(MENU_ID_TRANSLATE_FULL, { title });
+            chrome.contextMenus.refresh?.();
+          } catch {}
+        })();
+      }
     } catch {}
   }
 });
