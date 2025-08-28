@@ -26,23 +26,7 @@
   </header>
 
   <main class="wrap main-with-dock">
-    <!-- 实时配置预览（不改变任何功能，仅增强显示） -->
-    <section class="section card" aria-label="Live Config Preview">
-      <h2 class="section-title"><span class="dot"></span> <span>Live Preview</span></h2>
-      <div id="pv-summary" v-scope>
-        <div class="pv-chips">
-          <span class="chip" title="AI Provider">p: {{ state.aiProvider || '—' }}</span>
-          <span class="chip" title="Extract Model">e: {{ state.model_extract || '—' }}</span>
-          <span class="chip" title="Summarize Model">s: {{ state.model_summarize || '—' }}</span>
-          <span class="chip" title="Output Language">l: {{ (state.output_lang || 'auto') }}</span>
-          <span class="chip" title="Extract Mode">m: {{ state.extract_mode || 'fast' }}</span>
-          <span class="chip" title="Theme">t: {{ theme || 'auto' }}</span>
-        </div>
-        <div class="pv-actions">
-          <button class="btn btn-small" @click="copyConfig" :disabled="copying">{{ copying ? 'Copying…' : 'Copy config' }}</button>
-        </div>
-      </div>
-    </section>
+    
     <!-- 基础配置 -->
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> <span id="basic-config">基础配置</span></h2>

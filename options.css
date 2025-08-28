@@ -47,17 +47,7 @@ body{
   padding-bottom: var(--dock-h);
 }
 
-/* Live Preview chips */
-.pv-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-.chip{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:4px 8px; border-radius:999px; font: 12px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  background: rgba(2,6,23,.06); color:#0f172a; border: 1px solid rgba(2,6,23,.12);
-}
-[data-theme="dark"] .chip{ background: rgba(148,163,184,.14); color:#e2e8f0; border-color: rgba(148,163,184,.28); }
-
-.pv-actions{ margin-top:10px; }
-.btn-small{ font-size:12px; padding:6px 10px; }
+/* (removed) live preview styles */
 
 /* (reverted) busy badges removed to avoid layout impact */
 
