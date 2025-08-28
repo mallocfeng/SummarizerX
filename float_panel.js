@@ -479,10 +479,12 @@
       .btn{
         padding:8px 12px; border:1px solid var(--border); border-radius:10px;
         cursor:pointer; background:#fff; color:var(--text); font-weight:600;
-        transition: transform .05s ease, box-shadow .2s ease, background .2s, border-color .2s;
+        transition: transform .06s ease, box-shadow .24s ease, background .24s, border-color .24s;
+        position: relative; overflow: hidden;
       }
       .btn:hover{ background:#f8fafc; border-color:#dbe2f1; }
       .btn:active{ transform: translateY(1px); }
+      .btn:focus-visible{ box-shadow: 0 0 0 3px rgba(37,99,235,0.20), inset 0 1px 0 rgba(255,255,255,.35); outline: none; }
       .btn.primary{
         background: linear-gradient(180deg, var(--primary), var(--primary-600));
         color:#fff; border-color: var(--primary-600);
@@ -493,6 +495,9 @@
         font-size:18px; border-radius:10px;
       }
       .btn[disabled]{ opacity:.6; cursor:not-allowed; }
+      /* Ripple */
+      .btn .ripple{ position:absolute; pointer-events:none; width:12px; height:12px; border-radius:50%; background: currentColor; opacity:.18; transform: translate(-50%,-50%) scale(1); animation: sxRipple .6s ease-out forwards; }
+      @keyframes sxRipple { from{ opacity:.22; transform: translate(-50%,-50%) scale(1);} to{ opacity:0; transform: translate(-50%,-50%) scale(18);} }
       .btn .spin{ width:14px; height:14px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; display:inline-block; animation: sxSpin .8s linear infinite; margin-right:6px; vertical-align:-2px; }
       @keyframes sxSpin { to { transform: rotate(360deg); } }
 
@@ -750,6 +755,16 @@
         try { clearInterval(themeTick); } catch {}
         host.remove();
         window[MARK] = false;
+      });
+
+      // 按钮水波纹（统一绑定）
+      shadow.addEventListener('click', (ev) => {
+        const b = ev.target.closest('.btn');
+        if (!b) return;
+        const rect = b.getBoundingClientRect();
+        const x = ev.clientX - rect.left; const y = ev.clientY - rect.top;
+        const r = document.createElement('span'); r.className='ripple'; r.style.left = x+'px'; r.style.top = y+'px';
+        b.appendChild(r); setTimeout(()=>{ try{ r.remove(); }catch{} }, 650);
       });
 
       // 交互：设置
