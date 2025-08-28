@@ -517,7 +517,18 @@
         color: var(--text);
         transition: background .28s ease, color .28s ease, border-color .28s ease, box-shadow .28s ease, transform .24s ease, opacity .24s ease;
       }
-      .card.revive{ animation: sxFadeInUp .28s ease both; }
+      .card:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(17,24,39,0.08); }
+      .card.revive{ animation: sxPop .24s cubic-bezier(.2,.7,.3,1) both; }
+      @keyframes sxPop { 0%{ opacity:0; transform: translateY(6px) scale(.995); box-shadow: 0 2px 8px rgba(17,24,39,0.03);} 100%{ opacity:1; transform: translateY(0) scale(1); box-shadow: 0 4px 12px rgba(17,24,39,0.06);} }
+      /* 进入时的轻微高光扫过 */
+      .card.revive .md{ position: relative; }
+      .card.revive .md::before{
+        content:""; position:absolute; top:0; bottom:0; left:-30%; width:30%;
+        background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 100%);
+        filter: blur(2px); opacity:.0; pointer-events:none;
+        animation: sxSheen .65s ease .06s both;
+      }
+      @keyframes sxSheen { 0%{ transform: translateX(0); opacity:0; } 10%{ opacity:.55; } 100%{ transform: translateX(260%); opacity:0; } }
       @keyframes sxFadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       .card.card-head::before{
         content:"";
