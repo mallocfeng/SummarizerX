@@ -6,7 +6,7 @@
 
 ## English
 
-Current stable: v1.7.0
+Current stable: v1.7.1
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -91,7 +91,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 ## 中文简介
 
-当前稳定版：v1.7.0
+当前稳定版：v1.7.1
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 

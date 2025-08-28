@@ -42,6 +42,16 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 
 ---
 
+## v1.7.1
+
+### English (Patch)
+- 🛠 Fix: Options – auto-hide API key when switching to Trial even if eye toggle was previously open.
+
+### 中文（补丁）
+- 🛠 修复：切换到试用模式时自动隐藏 API Key，即便之前“眼睛”处于打开状态。
+
+---
+
 ## v1.7.0
 
 ### English (Stable)
