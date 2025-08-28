@@ -150,6 +150,9 @@ async function setTrialLock(isLocked) {
   const $eyeBtn = $("toggleKey");
   const $mode   = $("extract_mode");
 
+  // 当进入试用模式时，强制将 API Key 的显示重置为“隐藏”（password），避免眼睛保持打开状态导致泄露
+  if (isLocked && $apiKey) { try { $apiKey.type = 'password'; } catch {} }
+
   [$apiKey, $base, $ext, $sum].forEach(i => { if (i) i.disabled = !!isLocked; });
   if ($eyeBtn) $eyeBtn.disabled = !!isLocked;
 
