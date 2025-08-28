@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI 摘要阅读器 - 设置</title>
   <link rel="stylesheet" href="options.css" />
+  <script src="vendor/petite-vue.iife.js" defer></script>
 </head>
 <body>
   <!-- 顶部抬头区 -->
@@ -204,5 +205,14 @@
   </aside>
 
   <script type="module" src="options.js"></script>
+  <script defer>
+    document.addEventListener('DOMContentLoaded', function(){
+      try{ if (window.PetiteVue && typeof window.PetiteVue.createApp==='function') {
+        // 基础挂载，不改变现有 DOM；为后续渐进增强预留
+        const root = document.body;
+        window.PetiteVue.createApp({}).mount(root);
+      }}catch{}
+    });
+  </script>
 </body>
 </html>

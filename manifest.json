@@ -7,7 +7,7 @@
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
     {
-      "resources": ["i18n.js"],
+      "resources": ["i18n.js", "vendor/petite-vue.iife.js"],
       "matches": ["<all_urls>"]
     }
   ],
