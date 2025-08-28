@@ -30,8 +30,7 @@
     <!-- 基础配置 -->
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> <span id="basic-config">基础配置</span></h2>
-
-      <div class="field field-full">
+      <div class="field field-full" id="sx-ui-scope" v-scope="{ ui: window.SXUI }">
         <label class="label" for="aiProvider">
           <!-- 图标 -->
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -46,7 +45,7 @@
           </svg>
           <span id="ai-platform">AI 平台</span>
         </label>
-        <select id="aiProvider" class="ctrl">
+        <select id="aiProvider" class="ctrl" :class="{ 'ctrl-focus': ui.focus.aiProvider }" @focus="ui.focus.aiProvider=true" @blur="ui.focus.aiProvider=false">
           <option value="trial" id="trial-option">试用（推荐体验）</option> <!-- ← 新增这一行放最上，UI 默认显示它 -->
           <option value="openai" id="openai-option">OpenAI（默认）</option>
           <option value="deepseek" id="deepseek-option">DeepSeek</option>
@@ -62,11 +61,13 @@
         <p class="hint" id="platform-hint">切换平台将自动填写 Base URL 和模型；若手动修改任意字段，将自动切到「自定义」。</p>
       </div>
 
-      <div class="grid">
+      <div class="grid" v-scope="{ ui: window.SXUI }">
         <div class="field">
           <label class="label" id="api-key-label">OpenAI API Key</label>
           <div class="eye-wrap">
-            <input id="apiKey" class="ctrl" type="password" placeholder="sk-..." />
+            <input id="apiKey" class="ctrl" type="password" placeholder="sk-..."
+              :class="{ 'ctrl-focus': ui.focus.apiKey }"
+              @focus="ui.focus.apiKey = true" @blur="ui.focus.apiKey = false" />
             <button id="toggleKey" class="eye-btn" type="button" aria-label="显示/隐藏">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
@@ -79,22 +80,28 @@
         <!-- 给 BaseURL 外层一个可控的 ID，便于 Trial 时整体隐藏 -->
         <div class="field" id="field-baseURL">
           <label class="label" id="base-url-label">Base URL</label>
-          <input id="baseURL" class="ctrl" placeholder="https://api.openai.com/v1" />
+          <input id="baseURL" class="ctrl" placeholder="https://api.openai.com/v1"
+            :class="{ 'ctrl-focus': ui.focus.baseURL }"
+            @focus="ui.focus.baseURL = true" @blur="ui.focus.baseURL = false" />
         </div>
 
         <div class="field">
           <label class="label" id="extract-model-label">清洗模型（extract）</label>
-          <input id="model_extract" class="ctrl" placeholder="gpt-4o-mini" />
+          <input id="model_extract" class="ctrl" placeholder="gpt-4o-mini"
+            :class="{ 'ctrl-focus': ui.focus.model_extract }"
+            @focus="ui.focus.model_extract = true" @blur="ui.focus.model_extract = false" />
         </div>
 
         <div class="field">
           <label class="label" id="summarize-model-label">摘要/翻译模型（summarize）</label>
-          <input id="model_summarize" class="ctrl" placeholder="gpt-4o-mini" />
+          <input id="model_summarize" class="ctrl" placeholder="gpt-4o-mini"
+            :class="{ 'ctrl-focus': ui.focus.model_summarize }"
+            @focus="ui.focus.model_summarize = true" @blur="ui.focus.model_summarize = false" />
         </div>
 
         <div class="field">
           <label class="label" id="output-lang-label">输出语言（Output Language）</label>
-          <select id="output_lang" class="ctrl">
+          <select id="output_lang" class="ctrl" :class="{ 'ctrl-focus': ui.focus.output_lang }" @focus="ui.focus.output_lang=true" @blur="ui.focus.output_lang=false">
             <option value="" id="auto-option">自动（Auto）</option>
             <option value="zh" id="chinese-option">中文（Chinese）</option>
             <option value="en" id="english-option">English（英文）</option>
@@ -103,7 +110,7 @@
 
         <div class="field">
           <label class="label" id="extract-mode-label">正文提取方式（Extract Mode）</label>
-          <select id="extract_mode" class="ctrl">
+          <select id="extract_mode" class="ctrl" :class="{ 'ctrl-focus': ui.focus.extract_mode }" @focus="ui.focus.extract_mode=true" @blur="ui.focus.extract_mode=false">
             <option value="fast" id="fast-option">本地快速（推荐）</option>
             <option value="ai" id="ai-option">AI 清洗</option>
           </select>

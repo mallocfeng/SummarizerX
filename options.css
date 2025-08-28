@@ -270,6 +270,8 @@ body{
     0 0 0 3px rgba(255,255,255,0.18),
     inset 0 1px 0 rgba(255,255,255,0.35);
 }
+.ctrl.ctrl-focus{ transition: box-shadow .2s ease, border-color .2s ease; }
+.ctrl.ctrl-focus:focus{ box-shadow: 0 0 0 4px rgba(37,99,235,0.25), inset 0 1px 0 rgba(255,255,255,0.35); border-color:#b6c2d0; }
 .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; line-height:1.6; min-height: 160px; }
 
 /* 眼睛按钮（显示/隐藏 Key） */
