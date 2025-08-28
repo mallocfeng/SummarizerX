@@ -4,9 +4,9 @@
 
 ### Chrome Web Store / 官方页面
 
-- English: Get it on the Chrome Web Store → [SummarizerX AI Reader](https://chromewebstore.google.com/detail/summarizerx-ai-reader/okpefajonbfdnojdmobecjdajcohhoje?hl=en&authuser=0)
+- English: Get it on the Chrome Web Store → <a href="https://chromewebstore.google.com/detail/summarizerx-ai-reader/okpefajonbfdnojdmobecjdajcohhoje?hl=en&authuser=0" target="_blank" rel="noopener noreferrer">SummarizerX AI Reader</a>
   - If you find it helpful, please consider leaving a **5-star review** — thank you!
-- 中文：从 Chrome 应用商店安装 → [SummarizerX AI Reader（官方页面）](https://chromewebstore.google.com/detail/summarizerx-ai-reader/okpefajonbfdnojdmobecjdajcohhoje?hl=en&authuser=0)
+- 中文：从 Chrome 应用商店安装 → <a href="https://chromewebstore.google.com/detail/summarizerx-ai-reader/okpefajonbfdnojdmobecjdajcohhoje?hl=en&authuser=0" target="_blank" rel="noopener noreferrer">SummarizerX AI Reader（官方页面）</a>
   - 如果觉得好用，诚邀给我们一个**五星好评**，非常感谢！
 
 ---
