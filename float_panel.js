@@ -23,6 +23,7 @@
   const MARK = "__SX_FLOAT_PANEL_READY__";
   if (window[MARK]) return;
   window[MARK] = true;
+  let currentLangCache = 'zh';
 
   // ========== 工具 ==========
   const escapeHtml = (str) =>
@@ -62,6 +63,7 @@
     
     try {
       const currentLang = await i18n.getCurrentLanguage();
+      currentLangCache = currentLang === 'en' ? 'en' : 'zh';
       
       // 更新应用标题
       const appTitle = shadow.getElementById('sx-app-title');
@@ -75,12 +77,9 @@
       
       // 更新按钮文本
       const runBtn = shadow.getElementById('sx-run');
-      if (runBtn) {
-        if (currentLang === 'zh') {
-          runBtn.textContent = '提取并摘要';
-        } else {
-          runBtn.textContent = 'Extract & Summarize';
-        }
+      if (runBtn && !runBtn.disabled) {
+        // 非加载态时恢复静态文案（加载态由 setLoading 控制）
+        runBtn.textContent = (currentLang === 'zh') ? '提取并摘要' : 'Extract & Summarize';
       }
       
       // 更新设置按钮
@@ -493,6 +492,8 @@
         font-size:18px; border-radius:10px;
       }
       .btn[disabled]{ opacity:.6; cursor:not-allowed; }
+      .btn .spin{ width:14px; height:14px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; display:inline-block; animation: sxSpin .8s linear infinite; margin-right:6px; vertical-align:-2px; }
+      @keyframes sxSpin { to { transform: rotate(360deg); } }
 
       /* 进度条 */
       .progress{ height:2px; background:transparent; position:relative; overflow:hidden; }
@@ -892,8 +893,18 @@
       `<div class="skl" style="width:96%"></div><div class="skl" style="width:64%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
   }
   function setLoading(shadow, loading) {
-    shadow.getElementById("sx-run").disabled = !!loading;
-    shadow.getElementById("sx-progress").classList.toggle("hidden", !loading);
+    const runBtn = shadow.getElementById("sx-run");
+    const bar = shadow.getElementById("sx-progress");
+    if (runBtn) {
+      runBtn.disabled = !!loading;
+      if (loading) {
+        const txt = (currentLangCache === 'en') ? 'Processing…' : '处理中…';
+        runBtn.innerHTML = `<span class="spin"></span><span>${txt}</span>`;
+      } else {
+        runBtn.textContent = (currentLangCache === 'en') ? 'Extract & Summarize' : '提取并摘要';
+      }
+    }
+    if (bar) bar.classList.toggle("hidden", !loading);
   }
 
   async function renderToDom(shadow, summary, cleaned) {
