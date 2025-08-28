@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI 摘要阅读器 - 设置</title>
   <link rel="stylesheet" href="options.css" />
+  <script>
+    // 提前定义 SXUI，确保 petite-vue 初始化 v-scope 时可用
+    window.SXUI = window.SXUI || {
+      eyeOpen: false,
+      focus: { aiProvider:false, apiKey:false, baseURL:false, model_extract:false, model_summarize:false, output_lang:false, extract_mode:false }
+    };
+  </script>
   <script src="vendor/petite-vue.iife.js" defer></script>
 </head>
 <body>

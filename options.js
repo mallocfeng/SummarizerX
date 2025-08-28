@@ -394,16 +394,18 @@ document.addEventListener('DOMContentLoaded', () => {
 // 改写点击逻辑：在原有功能基础上，增加 eyeOpen 状态同步
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('toggleKey');
-  if (!btn) return;
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    try{
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const input = $("apiKey");
       if (!input) return;
       input.type = (input.type === 'password') ? 'text' : 'password';
       if (window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
-    }catch{}
-  });
+    });
+  }
+  // 初始同步一次（若因 provider 切换被锁定为 trial 时也重置）
+  const input = $("apiKey");
+  if (input && window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
 });
 
 /* =========================
