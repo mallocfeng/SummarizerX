@@ -375,7 +375,10 @@ async function testApiKey() {
   } catch (e) {
     const errorText = await t("settings.testFailed");
     setStatus(errorText + (e?.message || String(e)));
+    try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail:{ ok:false } })); }catch{}
+    return;
   }
+  try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail:{ ok:true } })); }catch{}
 }
 async function safeReadText(res) { try { return await res.text(); } catch { return "(no body)"; } }
 function toggleApiKeyVisibility() { const input = $("apiKey"); input.type = input.type === "password" ? "text" : "password"; }

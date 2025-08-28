@@ -49,6 +49,19 @@ body{
 
 /* (removed) live preview styles */
 
+/* Toast：固定右下角，轻量阴影，不侵入布局 */
+#sx-toast-root{ position: fixed; right: 16px; bottom: 16px; z-index: 2147483000; display:flex; flex-direction: column; gap:8px; }
+.sx-toast{
+  min-width: 200px; max-width: 360px;
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(15,23,42,0.92); color:#f8fafc; border:1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 10px 20px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.06) inset;
+  font-size: 13px; line-height: 1.5;
+}
+.sx-toast.success{ background: rgba(16,185,129,0.95); border-color: rgba(255,255,255,0.18); }
+.sx-toast.error{ background: rgba(185, 28, 28, 0.95); border-color: rgba(255,255,255,0.18); }
+[data-theme="light"] .sx-toast{ background: #0f172a; color: #f8fafc; }
+
 /* (reverted) busy badges removed to avoid layout impact */
 
 /* =========================
