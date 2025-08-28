@@ -451,6 +451,7 @@
         border-left:1px solid var(--border);
         box-shadow:-6px 0 16px rgba(17,24,39,.06);
         color: var(--text);
+        transition: background .28s ease, color .28s ease, border-color .28s ease;
       }
 
       /* —— 可拖拽调宽手柄 —— */
@@ -514,13 +515,17 @@
         line-height:1.7; font-size:15px;
         box-shadow: 0 2px 8px rgba(17,24,39,0.03);
         color: var(--text);
+        transition: background .28s ease, color .28s ease, border-color .28s ease, box-shadow .28s ease, transform .24s ease, opacity .24s ease;
       }
+      .card.revive{ animation: sxFadeInUp .28s ease both; }
+      @keyframes sxFadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       .card.card-head::before{
         content:"";
         position:absolute; left:0; right:0; top:0; height:42px;
         background: linear-gradient(180deg, var(--primary), var(--primary-600));
         border-radius:12px 12px 0 0;
         border-bottom:1px solid var(--primary-600);
+        transition: background .28s ease, border-color .28s ease;
       }
       .card.card-head::after{
         content: attr(data-title);
@@ -616,7 +621,7 @@
         --warn-bg: rgba(255, 240, 175, 0.08);
         --warn-border: rgba(250, 204, 21, 0.35);
       }
-      :host([data-theme="dark"]) .appbar{ background: linear-gradient(180deg,#0f172a,#0c1323); border-bottom:1px solid var(--border); }
+      :host([data-theme="dark"]) .appbar{ background: linear-gradient(180deg,#0f172a,#0c1323); border-bottom:1px solid var(--border); transition: background .28s ease, border-color .28s ease; }
       :host([data-theme="dark"]) .btn{ background:#0f172a; color:var(--text); border-color:var(--border); }
       :host([data-theme="dark"]) .btn:hover{ background:#111a2e; border-color:#2a3a5b; }
       :host([data-theme="dark"]) .container{ color:var(--text); }
@@ -917,6 +922,7 @@
     $s.innerHTML = summary
       ? stripInlineColor(renderMarkdown(summary))
       : `<div class="empty"><div class="icon">📝</div><div class="title">${currentLang === 'zh' ? '暂无摘要' : 'No Summary'}</div></div>`;
+    try{ $s.firstElementChild && $s.firstElementChild.classList && $s.firstElementChild.classList.add('revive'); }catch{}
 
     if (cleaned === null) {
       $c.innerHTML =
@@ -927,6 +933,7 @@
       $c.innerHTML = cleaned
         ? stripInlineColor(renderMarkdown(cleaned))
         : `<div class="empty"><div class="icon">📄</div><div class="title">${currentLang === 'zh' ? '暂无可读正文' : 'No Readable Content'}</div></div>`;
+      try{ $c.firstElementChild && $c.firstElementChild.classList && $c.firstElementChild.classList.add('revive'); }catch{}
     }
   }
 
