@@ -36,6 +36,10 @@
           <span class="chip" title="Summarize Model">s: {{ state.model_summarize || '—' }}</span>
           <span class="chip" title="Output Language">l: {{ (state.output_lang || 'auto') }}</span>
           <span class="chip" title="Extract Mode">m: {{ state.extract_mode || 'fast' }}</span>
+          <span class="chip" title="Theme">t: {{ theme || 'auto' }}</span>
+        </div>
+        <div class="pv-actions">
+          <button class="btn btn-small" @click="copyConfig" :disabled="copying">{{ copying ? 'Copying…' : 'Copy config' }}</button>
         </div>
       </div>
     </section>

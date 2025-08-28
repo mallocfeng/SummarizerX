@@ -56,6 +56,9 @@ body{
 }
 [data-theme="dark"] .chip{ background: rgba(148,163,184,.14); color:#e2e8f0; border-color: rgba(148,163,184,.28); }
 
+.pv-actions{ margin-top:10px; }
+.btn-small{ font-size:12px; padding:6px 10px; }
+
 /* =========================
  * 顶部抬头区 → 玻璃化
  * ========================= */

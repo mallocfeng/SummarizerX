@@ -7,8 +7,20 @@ async function initLivePreview(){
     if (!mountEl || !window.PetiteVue || typeof window.PetiteVue.createApp !== 'function') return;
 
     const state = await getSettings();
+    let theme = 'auto';
 
-    const app = window.PetiteVue.createApp({ state });
+    // 复制配置为简短字符串
+    let copying = false;
+    async function copyConfig(){
+      try{
+        copying = true;
+        const text = `p=${state.aiProvider}, e=${state.model_extract}, s=${state.model_summarize}, l=${state.output_lang||'auto'}, m=${state.extract_mode}, t=${theme}`;
+        await navigator.clipboard.writeText(text);
+        setTimeout(()=>{ copying = false; }, 600);
+      }catch{ copying = false; }
+    }
+
+    const app = window.PetiteVue.createApp({ state, theme, copying, copyConfig });
     app.mount(mountEl);
 
     // Keep in sync with settings changes made on the page
@@ -38,6 +50,10 @@ async function initLivePreview(){
         if (changes.aiProvider || changes.model_extract || changes.model_summarize || changes.output_lang || changes.extract_mode) {
           const latest = await getSettings();
           Object.assign(state, latest);
+        }
+        if (changes.options_theme_override || changes.float_theme_override) {
+          const v = (changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue) ?? theme;
+          if (['auto','light','dark'].includes(v)) theme = v;
         }
       });
     } catch {}
