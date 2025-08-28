@@ -20,8 +20,7 @@ async function initLivePreview(){
       }catch{ copying = false; }
     }
 
-    let uiLang = (await chrome.storage.sync.get({ ui_language: 'zh' }))?.ui_language || 'zh';
-    const app = window.PetiteVue.createApp({ state, theme, copying, copyConfig, uiLang });
+    const app = window.PetiteVue.createApp({ state, theme, copying, copyConfig });
     app.mount(mountEl);
 
     // Keep in sync with settings changes made on the page
@@ -56,9 +55,7 @@ async function initLivePreview(){
           const v = (changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue) ?? theme;
           if (['auto','light','dark'].includes(v)) theme = v;
         }
-        if (changes.ui_language) {
-          uiLang = changes.ui_language.newValue || uiLang;
-        }
+        // ui_language indicator removed from header to avoid layout impact
       });
     } catch {}
   }catch{}

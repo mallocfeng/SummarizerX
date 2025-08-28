@@ -59,13 +59,7 @@ body{
 .pv-actions{ margin-top:10px; }
 .btn-small{ font-size:12px; padding:6px 10px; }
 
-/* Language indicator & busy badges */
-.lang-ind{ margin-left:8px; font-size:12px; opacity:.8; }
-.pv-busy{ margin-left:10px; display:inline-flex; gap:6px; align-items:center; }
-.pv-badge{ font-size:12px; padding:2px 6px; border-radius:999px; background:rgba(2,6,23,.08); color:#0f172a; border:1px solid rgba(2,6,23,.12); }
-.pv-badge.green{ background:rgba(16,185,129,.14); color:#065f46; border-color:rgba(16,185,129,.28); }
-[data-theme="dark"] .pv-badge{ background:rgba(148,163,184,.14); color:#e2e8f0; border-color:rgba(148,163,184,.28); }
-[data-theme="dark"] .pv-badge.green{ background:rgba(16,185,129,.24); color:#bbf7d0; border-color:rgba(16,185,129,.34); }
+/* (reverted) busy badges removed to avoid layout impact */
 
 /* =========================
  * 顶部抬头区 → 玻璃化

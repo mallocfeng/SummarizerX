@@ -667,11 +667,7 @@ if ($openShortcut) {
 }
 
 $("btn-save").addEventListener("click", saveSettings);
-$("btn-test").addEventListener("click", async () => {
-  try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_START')); }catch{}
-  try { await testApiKey(); }
-  finally { try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END')); }catch{} }
-});
+$("btn-test").addEventListener("click", testApiKey);
 $("toggleKey").addEventListener("click", toggleApiKeyVisibility);
 $("system_prompt_preset").addEventListener("change", onPresetChange);
 $("output_lang").addEventListener("change", onOutputLangChange);

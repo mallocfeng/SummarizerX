@@ -19,7 +19,6 @@
         <div class="language-switcher">
           <button id="lang-zh" class="lang-btn active" data-lang="zh">中文</button>
           <button id="lang-en" class="lang-btn" data-lang="en">English</button>
-          <span class="lang-ind" v-scope>· <span title="Current UI language">{{ uiLang || 'auto' }}</span></span>
         </div>
       </div>
       <p class="hero-sub" id="settings-subtitle">配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的"保存全部设置"。</p>
@@ -218,24 +217,11 @@
         </div>
         <button id="btn-test" class="btn">测试 API Key</button>
         <button id="btn-save" class="btn primary">保存全部设置</button>
-        <span v-scope class="pv-busy">
-          <span class="pv-badge" v-show="testing">Testing…</span>
-          <span class="pv-badge green" v-show="saving">Saving…</span>
-        </span>
       </div>
     </div>
   </aside>
 
   <script type="module" src="options.js"></script>
   <script type="module" src="options.pv.js"></script>
-  <script defer>
-    document.addEventListener('DOMContentLoaded', function(){
-      try{ if (window.PetiteVue && typeof window.PetiteVue.createApp==='function') {
-        // 基础挂载，不改变现有 DOM；为后续渐进增强预留
-        const root = document.body;
-        window.PetiteVue.createApp({}).mount(root);
-      }}catch{}
-    });
-  </script>
 </body>
 </html>
