@@ -382,31 +382,8 @@ async function testApiKey() {
 }
 async function safeReadText(res) { try { return await res.text(); } catch { return "(no body)"; } }
 function toggleApiKeyVisibility() { const input = $("apiKey"); input.type = input.type === "password" ? "text" : "password"; }
-// 在页面加载后，根据当前可见性同步 UI 眼睛状态
-document.addEventListener('DOMContentLoaded', () => {
-  try{
-    const input = $("apiKey");
-    const open = (input && input.type === 'text');
-    if (window.SXUI) window.SXUI.eyeOpen = open;
-  }catch{}
-});
-
-// 改写点击逻辑：在原有功能基础上，增加 eyeOpen 状态同步
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('toggleKey');
-  if (btn) {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const input = $("apiKey");
-      if (!input) return;
-      input.type = (input.type === 'password') ? 'text' : 'password';
-      if (window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
-    });
-  }
-  // 初始同步一次（若因 provider 切换被锁定为 trial 时也重置）
-  const input = $("apiKey");
-  if (input && window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
-});
+// 恢复原始点击逻辑（不依赖 SXUI）
+// 注意：按钮的事件绑定已在底部：$("toggleKey").addEventListener("click", toggleApiKeyVisibility);
 
 /* =========================
  * 平台切换 & 自定义检测

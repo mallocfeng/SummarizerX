@@ -5,7 +5,6 @@ if (window.PetiteVue && typeof window.PetiteVue.createApp === 'function') {
     const App = Object.assign(window.SXUI || {}, {
       toasts: [],
       focus: (window.SXUI && window.SXUI.focus) || { aiProvider:false, apiKey:false, baseURL:false, model_extract:false, model_summarize:false, output_lang:false, extract_mode:false },
-      eyeOpen: (window.SXUI && typeof window.SXUI.eyeOpen==='boolean') ? window.SXUI.eyeOpen : false,
       addToast(msg, type = 'info', ms = 1800) {
         const id = Date.now() + Math.random();
         this.toasts.push({ id, msg, type });
