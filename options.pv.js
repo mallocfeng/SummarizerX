@@ -20,7 +20,8 @@ async function initLivePreview(){
       }catch{ copying = false; }
     }
 
-    const app = window.PetiteVue.createApp({ state, theme, copying, copyConfig });
+    let uiLang = (await chrome.storage.sync.get({ ui_language: 'zh' }))?.ui_language || 'zh';
+    const app = window.PetiteVue.createApp({ state, theme, copying, copyConfig, uiLang });
     app.mount(mountEl);
 
     // Keep in sync with settings changes made on the page
@@ -55,11 +56,42 @@ async function initLivePreview(){
           const v = (changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue) ?? theme;
           if (['auto','light','dark'].includes(v)) theme = v;
         }
+        if (changes.ui_language) {
+          uiLang = changes.ui_language.newValue || uiLang;
+        }
       });
     } catch {}
   }catch{}
 }
 
 document.addEventListener('DOMContentLoaded', initLivePreview);
+
+// Global busy indicators wired via custom events from options.js
+try{
+  window.addEventListener('SX_OPT_TEST_START', () => {
+    const host = document.querySelector('.pv-busy');
+    if (!host) return;
+    const scope = host.__vscope;
+    if (scope) scope.testing = true;
+  });
+  window.addEventListener('SX_OPT_TEST_END', () => {
+    const host = document.querySelector('.pv-busy');
+    if (!host) return;
+    const scope = host.__vscope;
+    if (scope) scope.testing = false;
+  });
+  window.addEventListener('SX_OPT_SAVE_START', () => {
+    const host = document.querySelector('.pv-busy');
+    if (!host) return;
+    const scope = host.__vscope;
+    if (scope) scope.saving = true;
+  });
+  window.addEventListener('SX_OPT_SAVE_END', () => {
+    const host = document.querySelector('.pv-busy');
+    if (!host) return;
+    const scope = host.__vscope;
+    if (scope) scope.saving = false;
+  });
+}catch{}
 
 

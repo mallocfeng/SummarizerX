@@ -297,6 +297,7 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  try{ window.dispatchEvent(new CustomEvent('SX_OPT_SAVE_START')); }catch{}
   const aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
 
   // Trial：强制固定值
@@ -338,6 +339,7 @@ async function saveSettings() {
 
   await setStatus("settings.saved");
   await setMeta(payload);
+  try{ window.dispatchEvent(new CustomEvent('SX_OPT_SAVE_END')); }catch{}
 }
 
 /* =========================
@@ -665,7 +667,11 @@ if ($openShortcut) {
 }
 
 $("btn-save").addEventListener("click", saveSettings);
-$("btn-test").addEventListener("click", testApiKey);
+$("btn-test").addEventListener("click", async () => {
+  try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_START')); }catch{}
+  try { await testApiKey(); }
+  finally { try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END')); }catch{} }
+});
 $("toggleKey").addEventListener("click", toggleApiKeyVisibility);
 $("system_prompt_preset").addEventListener("change", onPresetChange);
 $("output_lang").addEventListener("change", onOutputLangChange);
