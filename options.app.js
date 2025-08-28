@@ -11,19 +11,7 @@ if (window.PetiteVue && typeof window.PetiteVue.createApp === 'function') {
       },
       removeToast(id){ this.toasts = this.toasts.filter(t => t.id !== id); }
     };
-    const app = window.PetiteVue.createApp(App);
-    app.mount(root);
-
-    // Render function
-    const render = () => {
-      root.innerHTML = App.toasts.map(t => `<div class="sx-toast ${t.type}">${t.msg}</div>`).join('');
-    };
-    const mo = new MutationObserver(()=>{}); // keep a ref
-    // Simple reactive effect (minimal): patch add/remove to re-render
-    const origAdd = App.addToast.bind(App);
-    App.addToast = (m, ty, ms) => { const r = origAdd(m, ty, ms); requestAnimationFrame(render); return r; };
-    const origRemove = App.removeToast.bind(App);
-    App.removeToast = (id) => { const r = origRemove(id); requestAnimationFrame(render); return r; };
+    window.PetiteVue.createApp(App).mount(root);
 
     // Wire events from options.js
     try{

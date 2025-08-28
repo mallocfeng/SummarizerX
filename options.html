@@ -210,6 +210,8 @@
   <script type="module" src="options.app.js"></script>
 
   <!-- Toast 容器：不改变布局，绝对定位到右下角 -->
-  <div id="sx-toast-root" aria-live="polite" aria-atomic="true"></div>
+  <div id="sx-toast-root" v-scope aria-live="polite" aria-atomic="true">
+    <div class="sx-toast" :class="t.type" v-for="t in toasts" @click="removeToast(t.id)">{{ t.msg }}</div>
+  </div>
 </body>
 </html>
