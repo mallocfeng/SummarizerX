@@ -1,0 +1,49 @@
+import { getSettings } from "./settings.js";
+
+// Live Preview using petite-vue (progressive enhancement)
+async function initLivePreview(){
+  try{
+    const mountEl = document.getElementById('pv-summary');
+    if (!mountEl || !window.PetiteVue || typeof window.PetiteVue.createApp !== 'function') return;
+
+    const state = await getSettings();
+
+    const app = window.PetiteVue.createApp({ state });
+    app.mount(mountEl);
+
+    // Keep in sync with settings changes made on the page
+    const ids = ['aiProvider','model_extract','model_summarize','output_lang','extract_mode'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', () => {
+        state.aiProvider = document.getElementById('aiProvider')?.value || state.aiProvider;
+        state.model_extract = document.getElementById('model_extract')?.value || state.model_extract;
+        state.model_summarize = document.getElementById('model_summarize')?.value || state.model_summarize;
+        state.output_lang = document.getElementById('output_lang')?.value || state.output_lang;
+        state.extract_mode = document.getElementById('extract_mode')?.value || state.extract_mode;
+      });
+      if (el.tagName === 'INPUT') {
+        el.addEventListener('input', () => {
+          state.model_extract = document.getElementById('model_extract')?.value || state.model_extract;
+          state.model_summarize = document.getElementById('model_summarize')?.value || state.model_summarize;
+        });
+      }
+    });
+
+    // Also react to external storage changes
+    try{
+      chrome.storage.onChanged.addListener(async (changes, area) => {
+        if (area !== 'sync') return;
+        if (changes.aiProvider || changes.model_extract || changes.model_summarize || changes.output_lang || changes.extract_mode) {
+          const latest = await getSettings();
+          Object.assign(state, latest);
+        }
+      });
+    } catch {}
+  }catch{}
+}
+
+document.addEventListener('DOMContentLoaded', initLivePreview);
+
+
