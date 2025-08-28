@@ -392,20 +392,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 改写点击逻辑：在原有功能基础上，增加 eyeOpen 状态同步
-(() => {
+document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('toggleKey');
   if (!btn) return;
-  try{
-    btn.addEventListener('click', () => {
-      try{
-        const input = $("apiKey");
-        if (!input) return;
-        input.type = (input.type === 'password') ? 'text' : 'password';
-        if (window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
-      }catch{}
-    }, { capture: true });
-  }catch{}
-})();
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    try{
+      const input = $("apiKey");
+      if (!input) return;
+      input.type = (input.type === 'password') ? 'text' : 'password';
+      if (window.SXUI) window.SXUI.eyeOpen = (input.type === 'text');
+    }catch{}
+  });
+});
 
 /* =========================
  * 平台切换 & 自定义检测
