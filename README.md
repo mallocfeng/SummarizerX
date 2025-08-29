@@ -32,22 +32,25 @@ Current stable: v1.7.4
 ### 🖼 Screenshots
 
 <p align="center">
-  <img src="images/1.png" width="820" alt="Screenshot 1" />
+  <img src="images/1.png" width="620" alt="Screenshot 1" />
 </p>
 <p align="center">
-  <img src="images/2.png" width="820" alt="Screenshot 2" />
+  <img src="images/2.png" width="620" alt="Screenshot 2" />
 </p>
 <p align="center">
-  <img src="images/3.png" width="820" alt="Screenshot 3" />
+  <img src="images/3.png" width="620" alt="Screenshot 3" />
 </p>
 <p align="center">
-  <img src="images/4.png" width="820" alt="Screenshot 4" />
+  <img src="images/4.png" width="620" alt="Screenshot 4" />
 </p>
 <p align="center">
-  <img src="images/8.png" width="820" alt="Screenshot 8" />
+  <img src="images/8.png" width="620" alt="Screenshot 8" />
 </p>
 <p align="center">
-  <img src="images/9.png" width="820" alt="Screenshot 9" />
+  <img src="images/9.png" width="620" alt="Screenshot 9" />
+</p>
+<p align="center">
+  <img src="images/10.png" width="620" alt="Screenshot 10" />
 </p>
 
 ### 🚀 Installation
@@ -118,23 +121,27 @@ All processing happens locally or via your configured AI API key. No data is sen
 ### 🖼 软件截图
 
 <p align="center">
-  <img src="images/1.png" width="820" alt="截图 1" />
+  <img src="images/1.png" width="620" alt="截图 1" />
 </p>
 <p align="center">
-  <img src="images/2.png" width="820" alt="截图 2" />
+  <img src="images/2.png" width="620" alt="截图 2" />
 </p>
 <p align="center">
-  <img src="images/3.png" width="820" alt="截图 3" />
+  <img src="images/3.png" width="620" alt="截图 3" />
 </p>
 <p align="center">
-  <img src="images/4.png" width="820" alt="截图 4" />
+  <img src="images/4.png" width="620" alt="截图 4" />
 </p>
 <p align="center">
-  <img src="images/8.png" width="820" alt="截图 8" />
+  <img src="images/8.png" width="620" alt="截图 8" />
 </p>
 <p align="center">
-  <img src="images/9.png" width="820" alt="截图 9" />
+  <img src="images/9.png" width="620" alt="截图 9" />
 </p>
+<p align="center">
+  <img src="images/10.png" width="620" alt="截图 10" />
+</p>
+
 
 ### 🚀 安装方法
 
