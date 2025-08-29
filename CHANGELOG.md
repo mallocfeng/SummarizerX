@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.7.4
+
+### English
+- ⚡ **Vue.js Integration**: Introduced Petite Vue for modern reactive UI components
+- 🎨 **Enhanced UI/UX**: Improved floating panel and options page with better responsiveness
+- 🔧 **Performance Optimization**: Refactored core components for better performance and maintainability
+- 📱 **Better Responsiveness**: More fluid interactions and smoother animations
+- 🧹 **Code Cleanup**: Streamlined codebase with modern JavaScript practices
+
+### 中文
+- ⚡ **Vue.js 集成**：引入 Petite Vue 实现现代化响应式界面组件
+- 🎨 **界面体验优化**：改进浮动面板和设置页面，提升响应性和用户体验
+- 🔧 **性能优化**：重构核心组件，提升性能和可维护性
+- 📱 **更好的响应性**：更流畅的交互和更平滑的动画效果
+- 🧹 **代码清理**：使用现代 JavaScript 实践优化代码结构
+
+---
+
 ## v1.6.6
 
 ### English
