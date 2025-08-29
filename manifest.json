@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX AI Reader",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
   "background": { "service_worker": "background.js", "type": "module" },
