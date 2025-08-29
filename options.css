@@ -60,9 +60,13 @@ body{
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-top-left-radius: 0;     /* 可选：去掉上圆角让它与顶部齐平 */
+  border-top-right-radius: 0;    /* 可选 */
+  /*border-radius: var(--radius);   如果加了上两行，这行可以删；或保留并单独覆盖上圆角 */
   padding: 20px 0 16px;
-  margin: 12px 0 16px;
+  margin: 0 0 16px;              /* 顶部外边距改为 0 */
+  /* 可选：如果仍然看到顶端有1px缝隙，直接去掉上边框 */
+  /* border-top: none; */
 }
 
 .hero-header{
@@ -83,7 +87,7 @@ body{
 
 .hero-sub{ margin:6px 0 0; color:#6b7280; font-size:13px; }
 .badge{
-  font-size:12px; color:#065f46; background:#d1fae5; border:1px solid #a7f3d0;
+  font-size:12px; color:#3730a3; background:#eef2ff; border:1px solid #c7d2fe;
   padding:3px 8px; border-radius:999px;
 }
 
@@ -107,6 +111,9 @@ body{
   border-radius: var(--radius);
   padding: 16px;
   margin: 16px 0;
+  /* 上浮动效所需的过渡与优化 */
+  transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease, background-color .2s ease;
+  will-change: transform, box-shadow;
 }
 .section-title{ margin:0 0 12px; font-size:16px; font-weight:700; color: var(--text); display:flex; align-items:center; gap:8px; }
 .section-title .dot{ width:8px; height:8px; border-radius:50%; background: var(--primary); display:inline-block; }
@@ -130,14 +137,52 @@ body{
 .ctrl::placeholder{ color:#9aa3b2; }
 .ctrl:hover{ border-color:#cbd5e1; }
 .ctrl:focus{ border-color:#93c5fd; box-shadow: var(--ring); }
+
+/* Light mode — neutral buttons & segmented controls (Indigo primary) */
+html[data-theme="light"] .btn{ background:#fff; border-color:#d7dbe6; color:#0f172a; }
+html[data-theme="light"] .btn:hover{ background:#f4f6fb; border-color:#c9cedb; }
+html[data-theme="light"] .btn:active{ background:#eef1f7; }
+html[data-theme="light"] .btn.primary{ background: var(--primary); border-color: var(--primary); color:#fff; }
+html[data-theme="light"] .btn.primary:hover{ background: var(--primary-600); border-color: var(--primary-600); }
+
+html[data-theme="light"] .save-dock .btn{ background:#fff; border-color:#d7dbe6; color:#0f172a; } /* 确保非主按钮文字为深色 */
+html[data-theme="light"] .save-dock .btn:hover{ background:#f4f6fb; border-color:#c9cedb; }
+html[data-theme="light"] .save-dock .btn.primary{ background: var(--primary); border-color: var(--primary); color:#fff; } /* 主按钮白字 */
+
+html[data-theme="light"] .language-switcher{ background: var(--surface-2); border-color: var(--border); }
+html[data-theme="light"] .language-switcher .lang-btn{ color:#334155; }
+html[data-theme="light"] .language-switcher .lang-btn:hover{ background:#eef1f7; color:#0f172a; }
+html[data-theme="light"] .language-switcher .lang-btn.active{ background: var(--primary); color:#fff; }
+
 .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; line-height:1.6; min-height:160px; }
 
 /* Password eye */
 .eye-wrap{ position: relative; }
 .eye-wrap input.ctrl{ padding-right: 44px; }
+
 .eye-btn{ position:absolute; right:10px; top:50%; transform: translateY(-50%); width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:0; background:transparent; color:#6b7280; cursor:pointer; border-radius:6px; }
 .eye-btn:hover{ background:#edf2f7; color:#1e40af; }
 .eye-btn:focus-visible{ outline:2px solid var(--primary); }
+
+/* Eye state sync — no JS changes needed
+   If you render two icons inside the button: .icon-eye-open and .icon-eye-closed,
+   we will auto toggle by the input type. Also provide a fallback slash if there is only one icon. */
+
+/* Prefer explicit icons if present */
+.eye-wrap:has(input[type="password"]) .eye-btn .icon-eye-open{ display:none !important; }
+.eye-wrap:has(input[type="password"]) .eye-btn .icon-eye-closed{ display:inline !important; }
+.eye-wrap:has(input[type="text"]) .eye-btn .icon-eye-open{ display:inline !important; }
+.eye-wrap:has(input[type="text"]) .eye-btn .icon-eye-closed{ display:none !important; }
+
+/* Fallback: draw a "slash" when hidden (type=password), in case only one icon exists */
+.eye-wrap:has(input[type="password"]) .eye-btn::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  width: 22px; height: 2px; margin:auto; border-radius:2px; opacity:.92;
+  background: currentColor; transform: rotate(-40deg);
+}
+/* Slightly lift visual weight on hover/focus for accessibility */
+.eye-wrap:has(input[type="password"]) .eye-btn:hover::after,
+.eye-wrap:has(input[type="password"]) .eye-btn:focus-visible::after{ opacity:1; }
 
 /* Disabled */
 .ctrl[disabled]{ background:#f3f4f6; color:#9aa3b2; cursor:not-allowed; }
@@ -229,16 +274,16 @@ select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0
  * Dark theme — explicit (html[data-theme="dark"]) flat
  * ========================= */
 html[data-theme="dark"]{
-  --bg:#0b1118;
-  --surface:#141b29;
-  --surface-2:#0f1625;
-  --border:#223047;
-  --text:#e6e9ef;
-  --muted:#a4acb9;
-  --primary:#7b8fa6;
-  --primary-600:#59708e;
-  --accent:#82a390;
-  --link:#9fb8d8;
+  --bg:#0b1220;
+  --surface:#111a2e;
+  --surface-2:#0d1526;
+  --border:#1f2a44;
+  --text:#e7ebf3;
+  --muted:#a3adc2;
+  --primary:#8ea2ff;      /* indigo on dark */
+  --primary-600:#7b8cff;
+  --accent:#7dd3a7;
+  --link:#a7b7ff;
 }
 
 html[data-theme="dark"] .hero,
@@ -301,27 +346,68 @@ html[data-theme="dark"] .btn.primary{
 html[data-theme="dark"] .btn.primary:hover{ background:#4a5f7a; border-color:#4a5f7a; }
 
 /* =========================
- * Light theme — explicit (html[data-theme="light"]) flat
+ * Light theme — Indigo Neutral
  * ========================= */
 html[data-theme="light"]{
-  --bg:#f7f8fb;
+  --bg:#ffffff;
   --surface:#ffffff;
-  --surface-2:#f2f4f8;
-  --border:#e5e7eb;
-  --text:#111827;
-  --muted:#475569;
-  --primary:#2563eb;
-  --primary-600:#1e40af;
-  --accent:#10b981;
-  --link:#2563eb;
+  --surface-2:#f3f5f9;      /* neutral secondary */
+  --border:#e6e9f2;         /* neutral border */
+  --text:#0f172a;           /* deep slate */
+  --muted:#5b667a;          /* secondary text */
+  --primary:#6366f1;        /* indigo 500 */
+  --primary-600:#4f46e5;    /* indigo 600 */
+  --accent:#22c55e;         /* success green */
+  --link:#6366f1;           /* link color */
+  --card-bg:#f5f8ff;        /* subtle pastel blue for cards */
+  --card-br:#dbe7ff;        /* matching soft blue border */
 }
+
+/* Surfaces: hero & dock 使用与卡片一致的淡蓝配色（更和谐） */
 html[data-theme="light"] .hero,
-html[data-theme="light"] .section.card,
-html[data-theme="light"] .save-dock{ background: var(--surface); border-color: var(--border); }
-html[data-theme="light"] .ctrl{ background:#fff; border-color:#d1d5db; color:#111827; }
-html[data-theme="light"] .ctrl:hover{ border-color:#cbd5e1; }
-html[data-theme="light"] .ctrl:focus{ border-color:#93c5fd; box-shadow: var(--ring); }
-html[data-theme="light"] .language-switcher{ background: var(--surface-2); border-color: var(--border); }
-html[data-theme="light"] .language-switcher .lang-btn{ color:#334155; }
-html[data-theme="light"] .language-switcher .lang-btn:hover{ background:#eaeef6; color:#0f172a; }
-html[data-theme="light"] .language-switcher .lang-btn.active{ background:#1f2937; color:#fff; }
+html[data-theme="light"] .save-dock{ background: var(--card-bg); border-color: var(--card-br); }
+html[data-theme="light"] .section.card{ background: var(--card-bg); border-color: var(--card-br); }
+
+/* Card elevation — light theme */
+html[data-theme="light"] .section.card:hover,
+html[data-theme="light"] .section.card:focus-within{
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37,99,235,0.07), 0 2px 6px rgba(16,24,40,0.05);
+  border-color: var(--card-br);
+}
+
+/* Inputs */
+html[data-theme="light"] .ctrl{ background:#fff; border-color:#d7dbe6; color: var(--text); }
+html[data-theme="light"] .ctrl:hover{ border-color:#c9cedb; }
+html[data-theme="light"] .ctrl:focus{ border-color:#aab2ff; box-shadow: 0 0 0 3px rgba(99,102,241,.18); }
+
+/* Headings & accents */
+html[data-theme="light"] .section-title .dot{ background: var(--primary); }
+html[data-theme="light"] .hero-sub{ color:#667085; }
+
+/* Helper blocks */
+html[data-theme="light"] .help{ background:#f3f5f9; border-color:#e6e9f2; color:#364152; }
+html[data-theme="light"] .meta{ background:#f6f7fb; border-color:#e6e9f2; color:#475467; }
+
+/* =========================
+ * Card elevation — dark theme
+ * ========================= */
+html[data-theme="dark"] .section.card:hover,
+html[data-theme="dark"] .section.card:focus-within{
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28);
+  border-color: #2a3f66; /* subtle indigo-leaning border for dark */
+}
+
+/* =========================
+ * Reduced motion
+ * ========================= */
+@media (prefers-reduced-motion: reduce){
+  .section.card{ transition: none; }
+  html[data-theme="light"] .section.card:hover,
+  html[data-theme="light"] .section.card:focus-within,
+  html[data-theme="dark"] .section.card:hover,
+  html[data-theme="dark"] .section.card:focus-within{
+    transform: none; box-shadow: none;
+  }
+}
