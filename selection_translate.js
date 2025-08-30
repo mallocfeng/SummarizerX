@@ -73,6 +73,32 @@
       q.style.color = fg;
     }
   }
+
+  // 将原节点的几何约束（宽度与水平外边距）尽量镜像到译文块上
+  function mirrorBlockGeometryFrom(el, q){
+    try{
+      const cs = getComputedStyle(el);
+      const parent = el.parentElement;
+      const parentCS = parent ? getComputedStyle(parent) : null;
+      const erect = el.getBoundingClientRect();
+
+      // 复制盒模型类型，避免宽度解释差异
+      if (cs.boxSizing) { q.style.boxSizing = cs.boxSizing; }
+
+      // 响应式优先：限制最大宽度，宽度不超过原段落，水平用 auto 实现弹性居中
+      if (erect && erect.width){
+        const widthPx = Math.round(erect.width);
+        q.style.maxWidth = widthPx + 'px';
+        q.style.width = 'min(100%, ' + widthPx + 'px)';
+      }
+
+      // 若父容器为 grid，交由上游 grid 定位与 justifySelf/alignSelf 决定；否则使用居中 auto
+      if (!(parentCS && parentCS.display && parentCS.display.includes('grid'))){
+        q.style.marginLeft = 'auto';
+        q.style.marginRight = 'auto';
+      }
+    }catch{}
+  }
   async function restyleAllInlineTranslations(){
     const theme = await resolveBubbleTheme();
     document.querySelectorAll('blockquote[data-sx-inline-translation="1"]').forEach((q)=>{
@@ -160,7 +186,7 @@
         .bubble{
           max-width: 480px;
           min-width: 260px;
-          background: rgba(17, 24, 39, 0.94);
+          background: rgba(17, 24, 39, 0.72);
           color: #f8fafc;
           border-radius: 12px;
           box-shadow:
@@ -170,9 +196,15 @@
           font: 14px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
           backdrop-filter: blur(8px) saturate(140%);
           -webkit-backdrop-filter: blur(8px) saturate(140%);
+          /* enter/leave base */
+          opacity: 0;
+          transform: translateY(6px) scale(.98);
+          transition: opacity .58s ease, transform .58s cubic-bezier(.2,.7,.3,1), box-shadow .62s ease;
         }
+        .bubble.on{ opacity:1; transform: translateY(0) scale(1); }
+        .bubble.leaving{ opacity:.0; transform: translateY(4px) scale(.985); transition: opacity .50s ease, transform .50s ease; }
         .bubble.light{
-          background: #ffffff;
+          background: rgba(255,255,255,0.72);
           color: #0f172a;
           box-shadow:
             0 10px 24px rgba(2,6,23,.12),
@@ -273,6 +305,11 @@
     closeBtn = shadow.getElementById('sx-close');
     copyBtn  = shadow.getElementById('sx-copy');
 
+    // trigger enter animation on next frame
+    try {
+      requestAnimationFrame(() => { try{ wrap.classList.add('on'); }catch{} });
+    } catch { setTimeout(()=>{ try{ wrap.classList.add('on'); }catch{} }, 0); }
+
     // --- Keep the bubble alive even if other scripts try to remove it (e.g., floatpanel global cleanup)
     function setupKeepAlive(){
       if (keepAliveMO) return;
@@ -357,9 +394,14 @@
       document.removeEventListener('keydown', escToClose, { passive: true });
       document.removeEventListener('mousedown', clickOutsideToClose, true);
     } catch {}
-    host.remove();
-    __sxUserMovedBubble = false;
-    host = wrap = contentEl = closeBtn = spinner = shadowRootEl = copyBtn = null;
+    // play leave animation, then remove
+    try { wrap.classList.remove('on'); wrap.classList.add('leaving'); } catch {}
+    const teardown = () => {
+      try{ host.remove(); }catch{}
+      __sxUserMovedBubble = false;
+      host = wrap = contentEl = closeBtn = spinner = shadowRootEl = copyBtn = null;
+    };
+    try { setTimeout(teardown, 520); } catch { teardown(); }
   }
 
   // 更新UI文本为当前语言
@@ -528,6 +570,11 @@
       st.textContent = `
         @keyframes sx-it-spin { to { transform: rotate(360deg); } }
         .sx-it-spinner{ display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; animation: sx-it-spin .8s linear infinite; opacity:.6; margin-right:6px; vertical-align:-2px; }
+        /* Vue-like enter reveal for inline translation blocks */
+        blockquote[data-sx-inline-translation="1"].sx-it{ opacity: 0; transform: translateY(6px); transition: opacity .42s ease, transform .42s cubic-bezier(.2,.7,.3,1); will-change: opacity, transform; }
+        blockquote[data-sx-inline-translation="1"].sx-it.on{ opacity: 1; transform: translateY(0); }
+        .sx-it-text{ opacity:0; transition: opacity .34s ease; }
+        .sx-it-text.on{ opacity:1; }
       `;
       document.head.appendChild(st);
     }catch{}
@@ -574,6 +621,7 @@
         return resp.result;
       };
 
+      let __sxRevealIndex = 0;
       for (const el of blocks){
         // 若在处理中被“恢复原文”或新翻译覆盖，则中断
         if (myRun !== __sxFullTranslateRunId) return;
@@ -590,6 +638,7 @@
         q.style.whiteSpace = 'pre-wrap';
         q.style.lineHeight = '1.6';
         q.dataset.sxInlineTranslation = '1';
+        q.classList.add('sx-it');
         const sp = document.createElement('span'); sp.className = 'sx-it-spinner';
         const txt = document.createElement('span'); txt.textContent = 'Translating…';
         q.appendChild(sp); q.appendChild(txt);
@@ -608,8 +657,62 @@
           q.style.setProperty('margin-bottom','10px','important');
           el.appendChild(q);
         } else {
+          // 默认紧随原节点之后插入
           el.insertAdjacentElement('afterend', q);
+          // 若父容器是 grid，复制原节点的网格定位，避免被自动放到边缘列
+          try{
+            const parentCS = getComputedStyle(el.parentElement);
+            if (parentCS && parentCS.display && parentCS.display.includes('grid')){
+              const cs = getComputedStyle(el);
+              if (cs){
+                // 优先复制 grid-area；否则复制 start/end（NYTimes 标题多为 grid-column: 2）
+                if (cs.gridArea && cs.gridArea !== 'auto / auto / auto / auto'){
+                  q.style.gridArea = cs.gridArea;
+                } else {
+                  if (cs.gridColumnStart && cs.gridColumnStart !== 'auto') q.style.gridColumnStart = cs.gridColumnStart;
+                  if (cs.gridColumnEnd && cs.gridColumnEnd !== 'auto') q.style.gridColumnEnd = cs.gridColumnEnd;
+                  if (cs.gridColumn && cs.gridColumn !== 'auto') q.style.gridColumn = cs.gridColumn;
+                }
+                // 对齐方式尽量与原元素保持一致
+                if (cs.justifySelf && cs.justifySelf !== 'auto') q.style.justifySelf = cs.justifySelf;
+                if (cs.alignSelf && cs.alignSelf !== 'auto') q.style.alignSelf = cs.alignSelf;
+                // 若原元素通过左右 auto 居中，继承之
+                if (cs.marginLeft === 'auto' || cs.marginRight === 'auto'){
+                  q.style.marginLeft = cs.marginLeft;
+                  q.style.marginRight = cs.marginRight;
+                  // 避免我们上方设置的 margin 覆盖了居中
+                  q.style.setProperty('margin-top','10px','important');
+                  q.style.setProperty('margin-bottom','14px','important');
+                }
+
+                // Fallback：若 grid 属性均为 auto，强制按原元素的可视宽度居中，避免被放到左缘
+                const gridIsAuto = (!cs.gridArea || cs.gridArea === 'auto / auto / auto / auto')
+                  && (!cs.gridColumn || cs.gridColumn === 'auto')
+                  && (!cs.gridColumnStart || cs.gridColumnStart === 'auto')
+                  && (!cs.gridColumnEnd || cs.gridColumnEnd === 'auto');
+                if (gridIsAuto){
+                  const rect = el.getBoundingClientRect();
+                  if (rect && rect.width){
+                    // 以原元素可视宽度为上限，块级+水平居中
+                    q.style.display = 'block';
+                    q.style.maxWidth = Math.round(rect.width) + 'px';
+                    q.style.width = 'min(100%, ' + Math.round(rect.width) + 'px)';
+                    q.style.marginLeft = 'auto';
+                    q.style.marginRight = 'auto';
+                    // 维持我们设置的上下间距
+                    q.style.setProperty('margin-top','10px','important');
+                    q.style.setProperty('margin-bottom','14px','important');
+                  }
+                }
+              }
+            }
+            // 无论是否命中 grid 分支，最终再镜像一次原段落的几何（宽度与左右留白）
+            mirrorBlockGeometryFrom(el, q);
+          }catch{}
         }
+
+        // 占位块入场过渡（不影响最终文本的再次淡入）
+        try { requestAnimationFrame(()=>{ try{ q.classList.add('on'); }catch{} }); } catch { try{ q.classList.add('on'); }catch{} }
 
         // 翻译并替换占位内容
         let translated = '';
@@ -621,7 +724,16 @@
           continue;
         }
         if (myRun !== __sxFullTranslateRunId) { try{ q.remove(); }catch{} return; }
-        q.textContent = translated;
+        // 使用子元素淡入文本，增强可见的“出现”效果
+        q.textContent = '';
+        const textEl = document.createElement('span');
+        textEl.className = 'sx-it-text';
+        textEl.textContent = translated;
+        q.appendChild(textEl);
+        // 阶梯延时，增强瀑布式显现（每块 24ms，最多 240ms）
+        const delay = Math.min(240, __sxRevealIndex * 24);
+        __sxRevealIndex++;
+        setTimeout(()=>{ try{ textEl.classList.add('on'); }catch{} }, delay);
       }
 
       if (myRun === __sxFullTranslateRunId) {
