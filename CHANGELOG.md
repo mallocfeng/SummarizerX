@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.7.6
+
+### English
+- 🌙 **Force Dark Mode**: New toggle in the floating panel footer to force dark mode on any webpage
+- 🎨 **Text Color Optimization**: Automatically converts colored text to readable light colors for better contrast
+- 💾 **Persistent Settings**: Force dark mode preference is saved and restored across sessions
+- 🌐 **Internationalization**: Full support for Chinese and English UI text
+
+### 中文
+- 🌙 **强制深色模式**：浮动面板底部新增开关，可强制任何网页开启深色模式
+- 🎨 **文字颜色优化**：自动将彩色文字转换为可读的亮色，确保对比度
+- 💾 **设置持久化**：强制深色模式偏好会被保存并在会话间恢复
+- 🌐 **国际化支持**：完整支持中英文界面文本
+
+---
+
 ## v1.7.5
 
 ### English

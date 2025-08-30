@@ -388,6 +388,13 @@
           var(--surface);
         color:#334155; }
       .footer-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap; }
+      .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
+      .force-dark-toggle{ display:flex; align-items:center; gap:8px; }
+      .force-dark-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
+      .toggle-btn{ width:28px; height:28px; padding:0; border:none; border-radius:999px; background:transparent; cursor:pointer; color:#334155; display:grid; place-items:center; transition: background .18s, color .18s; }
+      .toggle-btn:hover{ background:rgba(0,0,0,0.06); }
+      .toggle-btn.active{ background:var(--primary); color:#fff; }
+      .toggle-btn svg{ width:16px; height:16px; display:block; stroke:currentColor; }
       .theme-toggle{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
       .theme-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
       .theme-toggle .seg{ display:flex; gap:6px; background: var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:2px; }
@@ -445,6 +452,10 @@
         color:#d8e0ee; border-top-color: var(--border);
       }
       :host([data-theme="dark"]) .empty .hint strong{ background:rgba(142,162,255,.16); }
+      :host([data-theme="dark"]) .force-dark-toggle .label{ color:#d9e2f2; }
+      :host([data-theme="dark"]) .toggle-btn{ color:#d9e2f2; }
+      :host([data-theme="dark"]) .toggle-btn.active{ background:#2a3d5f; color:#e8eef8; }
+      :host([data-theme="dark"]) .theme-toggle .label{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-toggle .seg{ background:#18233a; border-color:#2a3d5f; }
       :host([data-theme="dark"]) .theme-btn{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-btn.active{ background:#2a3d5f; color:#e8eef8; }
@@ -484,37 +495,45 @@
         <div class="footer">
           <div class="footer-row">
             <small id="sx-footer-note">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
-            <div class="theme-toggle" id="sx-theme">
-              <span class="label" id="sx-theme-label">外观</span>
-              <div class="seg" role="tablist" aria-label="外观切换">
-                <button class="theme-btn" data-mode="auto" role="tab" aria-selected="true" aria-label="自动" title="自动">
+            <div class="footer-controls">
+              <div class="force-dark-toggle" id="sx-force-dark">
+                <span class="label" id="sx-force-dark-label">强制深色</span>
+                <button class="toggle-btn" id="sx-force-dark-btn" aria-label="强制深色模式" title="强制深色模式">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="4"></circle>
-                    <line x1="12" y1="2" x2="12" y2="5"></line>
-                    <line x1="12" y1="19" x2="12" y2="22"></line>
-                    <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"></line>
-                    <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"></line>
-                    <path d="M21 12.8a9 9 0 1 1-9.8-9 7 7 0 0 0 9.8 9z"></path>
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
                   </svg>
                 </button>
-                <button class="theme-btn" data-mode="light" role="tab" aria-selected="false" aria-label="浅色" title="浅色">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="4"></circle>
-                    <line x1="12" y1="2" x2="12" y2="5"></line>
-                    <line x1="12" y1="19" x2="12" y2="22"></line>
-                    <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"></line>
-                    <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"></line>
-                    <line x1="2" y1="12" x2="5" y2="12"></line>
-                    <line x1="19" y1="12" x2="22" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"></line>
-                    <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"></line>
-                  </svg>
-                </button>
-                <button class="theme-btn" data-mode="dark" role="tab" aria-selected="false" aria-label="深色" title="深色">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.8a9 9 0 1 1-9.8-9 7 7 0 0 0 9.8 9z"></path>
-                  </svg>
-                </button>
+              </div>
+              <div class="theme-toggle" id="sx-theme">
+                <span class="label" id="sx-theme-label">外观</span>
+                <div class="seg" role="tablist" aria-label="外观切换">
+                  <button class="theme-btn" data-mode="auto" role="tab" aria-selected="true" aria-label="自动" title="自动">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                  </button>
+                  <button class="theme-btn" data-mode="light" role="tab" aria-selected="false" aria-label="浅色" title="浅色">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="4"></circle>
+                      <line x1="12" y1="2" x2="12" y2="5"></line>
+                      <line x1="12" y1="19" x2="12" y2="22"></line>
+                      <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"></line>
+                      <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"></line>
+                      <line x1="2" y1="12" x2="5" y2="12"></line>
+                      <line x1="19" y1="12" x2="22" y2="12"></line>
+                      <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"></line>
+                      <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"></line>
+                    </svg>
+                  </button>
+                  <button class="theme-btn" data-mode="dark" role="tab" aria-selected="false" aria-label="深色" title="深色">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12.8a9 9 0 1 1-9.8-9 7 7 0 0 0 9.8 9z"></path>
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -525,6 +544,7 @@
 
   // ===== 主题覆盖 =====
   let themeOverride='auto';
+  let forceDarkMode = false;
   function computeTheme(){
     try{ const mq=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)'); if (mq && typeof mq.matches==='boolean') return mq.matches?'dark':'light'; }catch{}
     return isDarkBackground()? 'dark': 'light';
@@ -756,6 +776,23 @@
     markThemeButtonsActive(shadow);
   });
 
+  // 强制深色模式切换
+  const forceDarkBtn = shadow.getElementById('sx-force-dark-btn');
+  forceDarkBtn?.addEventListener('click', async ()=>{
+    forceDarkMode = !forceDarkMode;
+    forceDarkBtn.classList.toggle('active', forceDarkMode);
+    
+    // 保存设置
+    try{ 
+      await chrome.storage.sync.set({ force_dark_mode: forceDarkMode }); 
+    }catch(e){ 
+      console.warn('Failed to save force dark mode setting:', e); 
+    }
+    
+    // 应用强制深色模式
+    applyForceDarkMode(forceDarkMode);
+  });
+
   // 拖宽 + 记忆
   (function bindDrag(){
     const drag=shadow.getElementById('sx-drag'); const wrapEl=shadow.getElementById('sx-wrap');
@@ -809,12 +846,14 @@
       const t_run = currentLangCache==='zh'?'提取并摘要':'Extract & Summarize';
       const t_close = currentLangCache==='zh'?'关闭':'Close';
       const t_appear = currentLangCache==='zh'?'外观':'Appearance';
+      const t_force_dark = currentLangCache==='zh'?'强制深色':'Force Dark';
       const t_note = currentLangCache==='zh'?'注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。':'Note: Some pages (like chrome://, extension pages, PDF viewers) do not support injection.';
       shadow.getElementById('sx-app-title').textContent = t_app;
       const runBtn=shadow.getElementById('sx-run'); if(runBtn && !runBtn.disabled) runBtn.textContent=t_run;
       const settingsBtn=shadow.getElementById('sx-settings'); if(settingsBtn){ settingsBtn.textContent=t_set; settingsBtn.title=t_set; }
       const closeBtn=shadow.getElementById('sx-close'); if(closeBtn){ closeBtn.title=t_close; closeBtn.setAttribute('aria-label', t_close); }
       shadow.getElementById('sx-theme-label').textContent=t_appear;
+      shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
       shadow.getElementById('sx-footer-note').textContent=t_note;
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
@@ -951,6 +990,60 @@
     }
   });
 
+  // ===== 强制深色模式 =====
+  function applyForceDarkMode(enabled) {
+    if (enabled) {
+      // 注入强制深色模式CSS
+      const style = document.createElement('style');
+      style.id = 'sx-force-dark-mode';
+      style.textContent = `
+        /* 强制深色模式 - 只处理文字和彩色文字 */
+        html, body, * {
+          background-color: #1a1a1a !important;
+          color: #ffffff !important;
+        }
+        
+        /* 处理彩色文字 - 转换为可读的亮色 */
+        * {
+          color: #ffffff !important;
+        }
+        
+        /* 特殊处理链接 */
+        a, a:visited, a:active, a:hover {
+          color: #4a9eff !important;
+        }
+        
+        /* 处理选择文本 */
+        ::selection {
+          background-color: #4a9eff !important;
+          color: #ffffff !important;
+        }
+      `;
+      document.head.appendChild(style);
+    } else {
+      // 移除强制深色模式CSS
+      const existingStyle = document.getElementById('sx-force-dark-mode');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    }
+  }
+
+  // 初始化强制深色模式状态
+  (async () => {
+    try {
+      const { force_dark_mode } = await chrome.storage.sync.get(['force_dark_mode']);
+      forceDarkMode = !!force_dark_mode;
+      const forceDarkBtn = shadow.getElementById('sx-force-dark-btn');
+      if (forceDarkBtn) {
+        forceDarkBtn.classList.toggle('active', forceDarkMode);
+      }
+      applyForceDarkMode(forceDarkMode);
+    } catch (e) {
+      console.warn('Failed to load force dark mode setting:', e);
+    }
+  })();
+
   // ===== 存储变更 =====
   try{
     chrome.storage.onChanged.addListener((changes, area)=>{
@@ -961,6 +1054,14 @@
         if (['auto','light','dark'].includes(next)){
           themeOverride=next; applyThemeWithOverride(shadow); markThemeButtonsActive(shadow);
         }
+      }
+      if (changes.force_dark_mode) {
+        forceDarkMode = !!changes.force_dark_mode.newValue;
+        const forceDarkBtn = shadow.getElementById('sx-force-dark-btn');
+        if (forceDarkBtn) {
+          forceDarkBtn.classList.toggle('active', forceDarkMode);
+        }
+        applyForceDarkMode(forceDarkMode);
       }
     });
   }catch{}
