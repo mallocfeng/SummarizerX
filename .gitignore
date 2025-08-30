@@ -35,3 +35,6 @@ Desktop.ini
 # Chrome 插件打包文件
 *.crx
 *.pem
+
+# AI 开发配置文件
+.cursorrules
