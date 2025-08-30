@@ -13,7 +13,7 @@
 
 ## English
 
-Current stable: v1.7.4
+Current stable: v1.7.5
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -28,6 +28,7 @@ Current stable: v1.7.4
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
  - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
+- 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 
 ### 🖼 Screenshots
 
@@ -102,7 +103,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 ## 中文简介
 
-当前稳定版：v1.7.4
+当前稳定版：v1.7.5
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 
@@ -117,6 +118,7 @@ All processing happens locally or via your configured AI API key. No data is sen
  - 🧾 全文翻译：将整页可见内容按段落翻译，在原文下方以引用块内联展示；可在右键菜单“全文翻译 / 显示原文”间切换  
  - 🌍 双语界面（中文/English）：设置页可切换语言，界面文案即时更新
  - ⚡ Vue.js 集成：现代化响应式界面，提升性能和用户体验
+ - 🎯 智能布局对齐：全文翻译智能定位，适配复杂网站布局（CSS Grid、响应式设计）
 
 ### 🖼 软件截图
 

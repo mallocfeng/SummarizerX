@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.7.5
+
+### English
+- 🎯 **Smart Layout Alignment**: Improved full-page translation positioning for complex website layouts
+- 🔧 **CSS Grid Support**: Translations now properly respect grid-area, grid-column, and justify-self properties
+- 📱 **Responsive Design**: Auto margins and max-width ensure translations stay centered when browser window is resized
+- 🎨 **Geometry Mirroring**: Translation blocks now copy original element's box constraints for better alignment
+- 🐛 **Layout Fix**: Resolved issue where translated content appeared at page edges instead of matching article layout
+
+### 中文
+- 🎯 **智能布局对齐**：改进全文翻译在复杂网站布局中的定位
+- 🔧 **CSS Grid 支持**：翻译块现在正确遵循 grid-area、grid-column 和 justify-self 属性
+- 📱 **响应式设计**：自动边距和最大宽度确保浏览器窗口调整时翻译内容保持居中
+- 🎨 **几何镜像**：翻译块现在复制原元素的盒模型约束以实现更好的对齐
+- 🐛 **布局修复**：解决翻译内容显示在页面边缘而非文章布局位置的问题
+
+---
+
 ## v1.7.4
 
 ### English
