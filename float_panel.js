@@ -230,6 +230,8 @@
         /* card-specific glass (more opaque for readability) */
         --card-glass: rgba(255,255,255,.82);
         --card-glass-soft: rgba(255,255,255,.68);
+        --card-border: rgba(15,23,42,.08);
+        --card-radius: 14px;
 
         --primary: #3b82f6;       /* indigo/azure */
         --primary-600: #2563eb;   /* darker */
@@ -315,18 +317,23 @@
 
       /* ===== Cards ===== */
       .card{
-        position:relative; 
+        position:relative;
         background:
+          /* fixed-size soft top highlight to avoid scaling with content height */
+          radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
           linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
         -webkit-backdrop-filter: blur(8px) saturate(1.05);
         backdrop-filter: blur(8px) saturate(1.05);
-        border:1px solid var(--border); border-radius: var(--radius);
+        border:1px solid var(--card-border);
+        border-radius: var(--card-radius);
         padding:16px; line-height:1.7; font-size:15px; color: var(--text);
-        box-shadow: var(--shadow-1);
-        transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease;
+        box-shadow:
+          0 1px 1px rgba(16,24,40,.05),
+          0 8px 22px rgba(16,24,40,.08);
+        transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .22s ease, transform .12s ease;
         transform-origin: top center;
       }
-      .card:hover{ transform: translateY(-1px); box-shadow: var(--shadow-1); }
+      .card:hover{ transform: translateY(-2px); box-shadow: 0 2px 3px rgba(16,24,40,.06), 0 12px 28px rgba(16,24,40,.12); }
 
       .card.card-head{ padding-top:52px; }
       .card.card-head::before{
@@ -492,6 +499,7 @@
         --glass-highlight: rgba(255,255,255,.10);
         --card-glass: rgba(17,26,46,.78);
         --card-glass-soft: rgba(17,26,46,.60);
+        --card-border: rgba(255,255,255,.08);
       }
       /* skeleton contrast for dark */
       :host([data-theme="dark"]) .skl{
