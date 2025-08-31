@@ -222,6 +222,15 @@
         --text: #0f172a;          /* primary text */
         --muted: #5b667a;         /* secondary text */
 
+        /* glass tokens */
+        --glass: rgba(255,255,255,.72);        /* slightly less transparent */
+        --glass-soft: rgba(255,255,255,.48);
+        --glass-edge: rgba(15,23,42,.10);
+        --glass-highlight: rgba(255,255,255,.65);
+        /* card-specific glass (more opaque for readability) */
+        --card-glass: rgba(255,255,255,.82);
+        --card-glass-soft: rgba(255,255,255,.68);
+
         --primary: #3b82f6;       /* indigo/azure */
         --primary-600: #2563eb;   /* darker */
         --accent: #22c55e;        /* success */
@@ -244,9 +253,12 @@
       /* ===== Layout ===== */
       .wrap{
         position:relative; height:100vh; display:flex; flex-direction:column;
-        background: var(--bg);
+        /* frosted glass background */
+        background: linear-gradient(135deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(14px) saturate(1.1);
+        backdrop-filter: blur(14px) saturate(1.1);
         border-left:1px solid var(--border);
-        box-shadow:-6px 0 22px rgba(17,24,39,.06);
+        box-shadow:-6px 0 22px rgba(17,24,39,.08);
         color:var(--text);
       }
       .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; }
@@ -257,10 +269,15 @@
       /* ===== Top bar ===== */
       .appbar{
         flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
+        /* raised glass bar */
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
-          var(--surface);
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+        backdrop-filter: blur(10px) saturate(1.05);
         border-bottom:1px solid var(--border);
+        /* raised glass: subtle outer drop shadow */
+        box-shadow: 0 1px 6px rgba(16,24,40,.06);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
@@ -298,7 +315,12 @@
 
       /* ===== Cards ===== */
       .card{
-        position:relative; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+        position:relative; 
+        background:
+          linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+        -webkit-backdrop-filter: blur(8px) saturate(1.05);
+        backdrop-filter: blur(8px) saturate(1.05);
+        border:1px solid var(--border); border-radius: var(--radius);
         padding:16px; line-height:1.7; font-size:15px; color: var(--text);
         box-shadow: var(--shadow-1);
         transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease;
@@ -309,8 +331,15 @@
       .card.card-head{ padding-top:52px; }
       .card.card-head::before{
         content:""; position:absolute; left:0; right:0; top:0; height:44px;
-        background: var(--surface-2);
+        /* raised glass header with gentle color tint */
+        background:
+          linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(8px) saturate(1.05);
+        backdrop-filter: blur(8px) saturate(1.05);
         border-radius:10px 10px 0 0; border-bottom:1px solid var(--border);
+        /* raised glass: subtle outer drop shadow */
+        box-shadow: 0 1px 6px rgba(16,24,40,.06);
       }
       .card.card-head::after{
         content: attr(data-title);
@@ -385,7 +414,11 @@
       .footer{ flex:0 0 auto; font-size:12px; border-top:1px solid var(--border); padding:8px 12px;
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
-          var(--surface);
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+        backdrop-filter: blur(10px) saturate(1.05);
+        /* raised glass: subtle outer drop shadow upwards */
+        box-shadow: 0 -1px 6px rgba(16,24,40,.06);
         color:#334155; }
       .footer-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap; }
       .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
@@ -452,6 +485,13 @@
         --ring: 0 0 0 3px rgba(142,162,255,.22);
         --shadow-1: 0 1px 2px rgba(0,0,0,.32);
         --shadow-2: 0 4px 12px rgba(0,0,0,.35);
+        /* glass tokens for dark */
+        --glass: rgba(17,26,46,.62);
+        --glass-soft: rgba(17,26,46,.44);
+        --glass-edge: rgba(255,255,255,.06);
+        --glass-highlight: rgba(255,255,255,.10);
+        --card-glass: rgba(17,26,46,.78);
+        --card-glass-soft: rgba(17,26,46,.60);
       }
       /* skeleton contrast for dark */
       :host([data-theme="dark"]) .skl{
@@ -462,21 +502,35 @@
       :host([data-theme="dark"]) .appbar{
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(0,0,0,0) 100%),
-          var(--surface);
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+        backdrop-filter: blur(10px) saturate(1.05);
         border-bottom:1px solid var(--border);
+        box-shadow: 0 1px 8px rgba(0,0,0,.28);
       }
       :host([data-theme="dark"]) .logo{ background: var(--primary); box-shadow: 0 0 0 6px rgba(142,162,255,.14); }
       :host([data-theme="dark"]) .btn{ background: var(--surface); color:#dbe3ee; border-color:#27344b; box-shadow: var(--shadow-1); }
       :host([data-theme="dark"]) .btn:hover{ background:#16233b; border-color:#344766; box-shadow: var(--shadow-2); }
       :host([data-theme="dark"]) .btn.primary{ background: var(--primary-600); border-color: var(--primary-600); color:#fff; }
       :host([data-theme="dark"]) .progress .bar{ background: linear-gradient(90deg, rgba(255,255,255,0), rgba(142,162,255,.85), rgba(255,255,255,0)); box-shadow: 0 0 10px rgba(142,162,255,.30); }
-      :host([data-theme="dark"]) .card.card-head::before{ background: #0f1a30; border-bottom-color: #1a2540; }
+      :host([data-theme="dark"]) .card.card-head::before{
+        background:
+          linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(0,0,0,0) 100%),
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(8px) saturate(1.05);
+        backdrop-filter: blur(8px) saturate(1.05);
+        border-bottom-color: #1a2540;
+        box-shadow: 0 1px 8px rgba(0,0,0,.28);
+      }
       :host([data-theme="dark"]) .card.card-head::after{ color: var(--muted); }
       :host([data-theme="dark"]) .footer{
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(0,0,0,0) 100%),
-          var(--surface);
+          linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+        backdrop-filter: blur(10px) saturate(1.05);
         color:#d8e0ee; border-top-color: var(--border);
+        box-shadow: 0 -1px 8px rgba(0,0,0,.28);
       }
       :host([data-theme="dark"]) .empty .illus{ 
         background: linear-gradient(135deg, rgba(142,162,255,.08) 0%, rgba(142,162,255,.04) 100%);
