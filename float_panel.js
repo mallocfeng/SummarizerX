@@ -391,9 +391,36 @@
       .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
       .force-dark-toggle{ display:flex; align-items:center; gap:8px; }
       .force-dark-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
-      .toggle-btn{ width:28px; height:28px; padding:0; border:none; border-radius:999px; background:transparent; cursor:pointer; color:#334155; display:grid; place-items:center; transition: background .18s, color .18s; }
-      .toggle-btn:hover{ background:rgba(0,0,0,0.06); }
-      .toggle-btn.active{ background:var(--primary); color:#fff; }
+      .toggle-btn{ 
+        width:28px; 
+        height:28px; 
+        padding:0; 
+        border:1px solid rgba(0,0,0,0.1); 
+        border-radius:999px; 
+        background:rgba(255,255,255,0.8); 
+        cursor:pointer; 
+        color:#334155; 
+        display:grid; 
+        place-items:center; 
+        transition: all .18s ease; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .toggle-btn:hover{ 
+        background:rgba(255,255,255,0.95); 
+        border-color:rgba(0,0,0,0.15); 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15); 
+        transform: translateY(-1px); 
+      }
+      .toggle-btn:active{ 
+        transform: translateY(0); 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2); 
+      }
+      .toggle-btn.active{ 
+        background:var(--primary); 
+        color:#fff; 
+        border-color:var(--primary); 
+        box-shadow: 0 2px 8px rgba(59,130,246,0.3); 
+      }
       .toggle-btn svg{ width:16px; height:16px; display:block; stroke:currentColor; }
       .theme-toggle{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
       .theme-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
@@ -451,10 +478,35 @@
           var(--surface);
         color:#d8e0ee; border-top-color: var(--border);
       }
+      :host([data-theme="dark"]) .empty .illus{ 
+        background: linear-gradient(135deg, rgba(142,162,255,.08) 0%, rgba(142,162,255,.04) 100%);
+        border-color: rgba(142,162,255,.15);
+        box-shadow: 0 2px 8px rgba(0,0,0,.2);
+      }
       :host([data-theme="dark"]) .empty .hint strong{ background:rgba(142,162,255,.16); }
       :host([data-theme="dark"]) .force-dark-toggle .label{ color:#d9e2f2; }
-      :host([data-theme="dark"]) .toggle-btn{ color:#d9e2f2; }
-      :host([data-theme="dark"]) .toggle-btn.active{ background:#2a3d5f; color:#e8eef8; }
+      :host([data-theme="dark"]) .toggle-btn{ 
+        color:#d9e2f2; 
+        border-color: rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      }
+      :host([data-theme="dark"]) .toggle-btn:hover{ 
+        background: rgba(255,255,255,0.15);
+        border-color: rgba(255,255,255,0.25);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        transform: translateY(-1px);
+      }
+      :host([data-theme="dark"]) .toggle-btn:active{ 
+        transform: translateY(0);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      }
+      :host([data-theme="dark"]) .toggle-btn.active{ 
+        background:#2a3d5f; 
+        color:#e8eef8; 
+        border-color: #2a3d5f;
+        box-shadow: 0 2px 8px rgba(142,162,255,0.3);
+      }
       :host([data-theme="dark"]) .theme-toggle .label{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-toggle .seg{ background:#18233a; border-color:#2a3d5f; }
       :host([data-theme="dark"]) .theme-btn{ color:#d9e2f2; }

@@ -1,5 +1,73 @@
 # Changelog
 
+## v1.7.7
+
+### English
+- 🎨 **Enhanced Button Feedback**: Improved visual feedback for the force dark mode toggle button
+- 🔘 **Better UX**: Added hover effects, shadows, and click animations to make the toggle button more interactive
+- 🎯 **Visual Clarity**: Users can now clearly see that the force dark mode button is clickable
+- 🌙 **Theme Consistency**: Enhanced button styling for both light and dark themes
+- 🎨 **Dark Mode Icon Fix**: Fixed the white gradient background of empty state icons in dark mode
+- 🌙 **Theme Consistency**: Empty state icons now use blue gradient background in dark mode for better visual harmony
+- 🎯 **Visual Improvement**: Removed the abrupt white rounded rectangle around icons in dark theme
+- 🎨 **Enhanced Glass Effect**: Improved glass morphism effect for translation popup with higher transparency
+- 🌟 **Better Visual Clarity**: Enhanced title text and button contrast for better readability in both light and dark modes
+- 🔮 **Advanced Backdrop Filter**: Increased blur and saturation for more pronounced glass effect
+- ✨ **Interactive Feedback**: Added hover animations and transitions for buttons and close button
+- 🔧 **Rounded Corner Transparency Fix**: Fixed issue where rounded corners of translation popup were not transparent
+- 🎨 **Browser Compatibility**: Added `isolation: isolate` and `overflow: hidden` to ensure proper rendering of rounded corners with backdrop-filter
+- 🌟 **Visual Consistency**: Ensured consistent transparency across all rounded corners in both light and dark modes
+- 🎨 **Morandi Blue Header**: Added subtle Morandi blue background to translation popup header in light mode
+- 🌟 **Enhanced Visual Appeal**: Replaced plain white header with elegant blue gradient for better visual interest
+- 🎯 **Color Harmony**: Updated button and close button colors to match the new Morandi blue theme
+- ✨ **Refined Aesthetics**: Improved overall visual consistency and elegance in light mode
+- 🎨 **Enhanced Blue Visibility**: Increased opacity and saturation of Morandi blue in light mode header
+- 🌟 **Better Contrast**: Made the blue background more prominent and visible in translation popup
+- 🎯 **Improved Button Styling**: Enhanced button colors to match the more visible blue theme
+- ✨ **Stronger Visual Impact**: Increased overall blue presence for better visual distinction
+- 🔮 **Enhanced Glass Morphism**: Added stronger glass effect to light mode header with improved backdrop-filter
+- ✨ **Glass Texture**: Enhanced glass texture with inner shadows and gradient overlays
+- 🌟 **Button Glass Effect**: Added glass morphism to buttons with backdrop-filter and shadows
+- 🎨 **Visual Depth**: Improved visual depth with layered shadows and glass reflections
+- 🔮 **Dark Mode Glass Effect**: Enhanced glass morphism for dark mode translation popup header
+- ✨ **Consistent Glass Texture**: Applied same glass effects to dark mode as light mode for visual consistency
+- 🌟 **Enhanced Button Glass**: Improved glass effect for buttons in dark mode with backdrop-filter and shadows
+- 🎨 **Unified Visual Experience**: Both light and dark modes now have consistent glass morphism aesthetics
+
+### 中文
+- 🎨 **增强按钮反馈**：改进强制深色模式切换按钮的视觉反馈
+- 🔘 **更好的用户体验**：添加悬停效果、阴影和点击动画，使切换按钮更具交互性
+- 🎯 **视觉清晰度**：用户可以清楚地看到强制深色模式按钮是可点击的
+- 🌙 **主题一致性**：增强亮色和暗色主题下的按钮样式
+- 🎨 **暗色模式图标修复**：修复暗色模式下空状态图标的白色渐变背景问题
+- 🌙 **主题一致性**：空状态图标在暗色模式下现在使用蓝色渐变背景，视觉更协调
+- 🎯 **视觉改进**：移除暗色主题下图标的突兀白色圆角矩形
+- 🎨 **增强玻璃效果**：改进翻译弹窗的玻璃拟态效果，提高透明度
+- 🌟 **更好的视觉清晰度**：增强标题文字和按钮对比度，在亮色和暗色模式下都有更好的可读性
+- 🔮 **高级背景模糊**：增加模糊和饱和度，使玻璃效果更明显
+- ✨ **交互反馈**：为按钮和关闭按钮添加悬停动画和过渡效果
+- 🔧 **圆角透明度修复**：修复翻译弹窗圆角不透明的问题
+- 🎨 **浏览器兼容性**：添加`isolation: isolate`和`overflow: hidden`确保圆角与背景模糊的正确渲染
+- 🌟 **视觉一致性**：确保亮色和暗色模式下所有圆角都有一致的透明度
+- 🎨 **莫兰迪蓝标题栏**：在亮色模式下为翻译弹窗标题栏添加淡淡的莫兰迪蓝色背景
+- 🌟 **增强视觉吸引力**：用优雅的蓝色渐变替换纯白标题栏，提升视觉趣味性
+- 🎯 **色彩协调**：更新按钮和关闭按钮颜色以匹配新的莫兰迪蓝色主题
+- ✨ **精致美学**：改善亮色模式下的整体视觉一致性和优雅度
+- 🎨 **增强蓝色可见度**：增加亮色模式标题栏中莫兰迪蓝色的透明度和饱和度
+- 🌟 **更好的对比度**：使翻译弹窗中的蓝色背景更加突出和可见
+- 🎯 **改进按钮样式**：增强按钮颜色以匹配更明显的蓝色主题
+- ✨ **更强的视觉冲击**：增加整体蓝色存在感以获得更好的视觉区分
+- 🔮 **增强玻璃拟态**：为亮色模式标题栏添加更强的玻璃效果，改进背景模糊
+- ✨ **玻璃质感**：通过内阴影和渐变叠加增强玻璃质感
+- 🌟 **按钮玻璃效果**：为按钮添加玻璃拟态效果，包括背景模糊和阴影
+- 🎨 **视觉深度**：通过分层阴影和玻璃反射改善视觉深度
+- 🔮 **暗色模式玻璃效果**：增强暗色模式翻译弹窗标题栏的玻璃拟态效果
+- ✨ **一致的玻璃质感**：为暗色模式应用与亮色模式相同的玻璃效果，保持视觉一致性
+- 🌟 **增强按钮玻璃效果**：改进暗色模式按钮的玻璃效果，包括背景模糊和阴影
+- 🎨 **统一的视觉体验**：亮色和暗色模式现在都具有一致的玻璃拟态美学
+
+---
+
 ## v1.7.6
 
 ### English

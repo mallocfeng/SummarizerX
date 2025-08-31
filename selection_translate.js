@@ -186,45 +186,95 @@
         .bubble{
           max-width: 480px;
           min-width: 260px;
-          background: rgba(17, 24, 39, 0.72);
+          background: rgba(17, 24, 39, 0.55);
           color: #f8fafc;
-          border-radius: 12px;
+          border-radius: 16px;
           box-shadow:
-            0 12px 28px rgba(0,0,0,.35),
-            0 0 0 1px rgba(255,255,255,.08) inset;
+            0 20px 40px rgba(0,0,0,.25),
+            0 0 0 1px rgba(255,255,255,.12) inset,
+            0 8px 32px rgba(0,0,0,.15);
           padding: 8px 10px 10px;
           font: 14px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-          backdrop-filter: blur(8px) saturate(140%);
-          -webkit-backdrop-filter: blur(8px) saturate(140%);
+          backdrop-filter: blur(16px) saturate(180%);
+          -webkit-backdrop-filter: blur(16px) saturate(180%);
+          position: relative;
+          /* 修复圆角透明问题 */
+          isolation: isolate;
           /* enter/leave base */
           opacity: 0;
           transform: translateY(6px) scale(.98);
           transition: opacity .58s ease, transform .58s cubic-bezier(.2,.7,.3,1), box-shadow .62s ease;
         }
+        .bubble::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border-radius: 16px;
+          background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, rgba(255,255,255,.05) 50%, rgba(255,255,255,.02) 100%);
+          pointer-events: none;
+          z-index: -1;
+          /* 确保圆角区域完全透明 */
+          overflow: hidden;
+        }
         .bubble.on{ opacity:1; transform: translateY(0) scale(1); }
         .bubble.leaving{ opacity:.0; transform: translateY(4px) scale(.985); transition: opacity .50s ease, transform .50s ease; }
         .bubble.light{
-          background: rgba(255,255,255,0.72);
+          background: rgba(255,255,255,0.55);
           color: #0f172a;
           box-shadow:
-            0 10px 24px rgba(2,6,23,.12),
-            0 0 0 1px rgba(15,23,42,.06) inset;
+            0 20px 40px rgba(2,6,23,.15),
+            0 0 0 1px rgba(15,23,42,.08) inset,
+            0 8px 32px rgba(2,6,23,.08);
+        }
+        .bubble.light::before {
+          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
         }
 
         /* ===== 标题栏（可拖动区域）====== */
         .header{
           display:flex; align-items:center; justify-content:space-between; gap:8px;
-          margin:-2px -2px 8px; padding:6px 8px;
-          border-radius: 8px;
+          margin:-2px -2px 8px; padding:8px 10px;
+          border-radius: 12px;
           user-select: none;
           cursor: grab;
-          /* 深色：低饱和蓝灰玻璃；亮色：柔和浅蓝 */
-          background: linear-gradient(180deg, rgba(82,98,128,.16), rgba(82,98,128,.06));
-          border: 1px solid rgba(255,255,255,.10);
+          /* 深色：增强玻璃质感 */
+          background: linear-gradient(180deg, rgba(82,98,128,.35), rgba(82,98,128,.18));
+          border: 1px solid rgba(255,255,255,.2);
+          backdrop-filter: blur(12px) saturate(150%);
+          -webkit-backdrop-filter: blur(12px) saturate(150%);
+          position: relative;
+          /* 修复圆角透明问题 */
+          isolation: isolate;
+          box-shadow: 0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+        }
+        .header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
+          pointer-events: none;
+          z-index: -1;
+          /* 确保圆角区域完全透明 */
+          overflow: hidden;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.2);
         }
         .bubble.light .header{
-          background: linear-gradient(180deg, rgba(178,196,230,.28), rgba(178,196,230,.12));
-          border: 1px solid rgba(74,102,145,.18);
+          background: linear-gradient(180deg, rgba(100,116,139,.35), rgba(100,116,139,.15));
+          border: 1px solid rgba(100,116,139,.25);
+          backdrop-filter: blur(12px) saturate(150%);
+          -webkit-backdrop-filter: blur(12px) saturate(150%);
+          box-shadow: 0 2px 8px rgba(100,116,139,.15), 0 1px 3px rgba(0,0,0,.1);
+        }
+        .bubble.light .header::before {
+          background: linear-gradient(135deg, rgba(255,255,255,.2) 0%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.05) 100%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.1);
         }
         .dragging .header { cursor: grabbing; }
 
@@ -233,9 +283,13 @@
           font-size: 12px;
           letter-spacing: .25px;
           /* “淡淡的颜色”——暗色偏蓝灰、亮色偏清爽蓝 */
-          color: #86a1c7;
+          color: #e2e8f0;
+          text-shadow: 0 1px 2px rgba(0,0,0,.3);
         }
-        .bubble.light .title{ color:#2a64c9cc; }
+        .bubble.light .title{ 
+          color: #1e293b;
+          text-shadow: 0 1px 2px rgba(255,255,255,.5);
+        }
 
         .toolbar{
           display:flex; align-items:center; gap:6px;
@@ -244,32 +298,58 @@
           all: unset; cursor:pointer;
           min-width: 22px; height: 22px; padding: 0 8px;
           display:inline-flex; align-items:center; justify-content:center;
-          border-radius: 6px;
+          border-radius: 8px;
           font-size: 12px;
-          color: inherit; opacity: .88;
-          border: 1px solid rgba(255,255,255,.12);
-          background: rgba(255,255,255,.08);
+          color: inherit; opacity: .9;
+          border: 1px solid rgba(255,255,255,.2);
+          background: rgba(255,255,255,.15);
+          backdrop-filter: blur(8px) saturate(120%);
+          -webkit-backdrop-filter: blur(8px) saturate(120%);
+          transition: all .2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,.2);
         }
-        .tbtn:hover{ opacity: 1; background: rgba(255,255,255,.15); }
+        .tbtn:hover{ 
+          opacity: 1; 
+          background: rgba(255,255,255,.25);
+          border-color: rgba(255,255,255,.3);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 6px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+        }
         .bubble.light .tbtn{
-          border-color: rgba(2,6,23,.10);
-          background: rgba(2,6,23,.06);
+          border-color: rgba(100,116,139,.3);
+          background: rgba(100,116,139,.15);
+          backdrop-filter: blur(8px) saturate(120%);
+          -webkit-backdrop-filter: blur(8px) saturate(120%);
+          box-shadow: 0 1px 3px rgba(100,116,139,.1);
         }
-        .bubble.light .tbtn:hover{ background: rgba(2,6,23,.10); }
+        .bubble.light .tbtn:hover{ 
+          background: rgba(100,116,139,.25);
+          border-color: rgba(100,116,139,.4);
+          box-shadow: 0 2px 6px rgba(100,116,139,.2), 0 1px 2px rgba(0,0,0,.1);
+          transform: translateY(-1px);
+        }
 
         .close{
           all: unset;
           cursor: pointer;
           width: 22px; height: 22px;
-          border-radius: 6px;
+          border-radius: 8px;
           display:grid; place-items:center;
-          color: inherit; opacity: .80;
+          color: inherit; opacity: .85;
+          transition: all .2s ease;
         }
         .close:hover{
-          background: rgba(255,255,255,.12);
+          background: rgba(255,255,255,.2);
+          transform: scale(1.1);
+          backdrop-filter: blur(6px) saturate(110%);
+          -webkit-backdrop-filter: blur(6px) saturate(110%);
+          box-shadow: 0 1px 3px rgba(0,0,0,.3);
         }
         .bubble.light .close:hover{
-          background: rgba(15,23,42,.06);
+          background: rgba(100,116,139,.25);
+          backdrop-filter: blur(6px) saturate(110%);
+          -webkit-backdrop-filter: blur(6px) saturate(110%);
+          box-shadow: 0 1px 3px rgba(100,116,139,.15);
         }
 
         .content{
