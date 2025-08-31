@@ -309,6 +309,11 @@
           transition: all .2s ease;
           box-shadow: 0 1px 3px rgba(0,0,0,.2);
         }
+        /* Round, smaller variant for A-/A+ */
+        #sx-font-inc, #sx-font-dec{
+          min-width: 20px; width: 20px; height: 20px; padding: 0;
+          border-radius: 999px; font-weight: 800; line-height: 1; font-size: 12px;
+        }
         .tbtn:hover{ 
           opacity: 1; 
           background: rgba(255,255,255,.25);
@@ -398,6 +403,8 @@
         <div class="header" id="sx-drag-handle">
           <div class="title" id="sx-title">SummarizerX · Translate</div>
           <div class="toolbar">
+            <button class="tbtn" id="sx-font-dec" title="A-">−</button>
+            <button class="tbtn" id="sx-font-inc" title="A+">＋</button>
             <button class="tbtn" id="sx-copy" title="Copy result">Copy</button>
             <button class="close" id="sx-close" aria-label="Close">✕</button>
           </div>
@@ -412,6 +419,8 @@
     contentEl = shadow.getElementById('sx-content');
     closeBtn = shadow.getElementById('sx-close');
     copyBtn  = shadow.getElementById('sx-copy');
+    const fontIncBtn = shadow.getElementById('sx-font-inc');
+    const fontDecBtn = shadow.getElementById('sx-font-dec');
     resizeHandle = shadow.getElementById('sx-resize');
 
     // trigger enter animation on next frame
@@ -452,6 +461,30 @@
         setTimeout(()=> (copyBtn.textContent = 'Copy'), 800);
       }
     });
+
+    // 字号调节（持久化）
+    function applyFontPx(px){
+      const n = Math.max(12, Math.min(22, Math.round(px||14)));
+      try{ contentEl.style.fontSize = n + 'px'; }catch{}
+      try{ chrome.storage.sync.set({ sx_translate_font_px: n }); }catch{}
+      return n;
+    }
+    async function initFontPx(){
+      try{
+        const { sx_translate_font_px } = await chrome.storage.sync.get(['sx_translate_font_px']);
+        const v = Number.isFinite(+sx_translate_font_px) ? +sx_translate_font_px : 14;
+        applyFontPx(v);
+      }catch{ applyFontPx(14); }
+    }
+    initFontPx();
+
+    function getCurrentFontPx(){
+      const cs = getComputedStyle(contentEl);
+      const v = parseFloat(cs.fontSize||'14')||14;
+      return Math.round(v);
+    }
+    fontIncBtn?.addEventListener('click', ()=>{ applyFontPx(getCurrentFontPx()+1); });
+    fontDecBtn?.addEventListener('click', ()=>{ applyFontPx(getCurrentFontPx()-1); });
 
     // 延后一帧绑定“外点关闭”，避免打开时被误判
     setTimeout(() => {
@@ -578,6 +611,8 @@
       const title = shadow.getElementById('sx-title');
       const copyBtn = shadow.getElementById('sx-copy');
       const closeBtn = shadow.getElementById('sx-close');
+      const fontIncBtn = shadow.getElementById('sx-font-inc');
+      const fontDecBtn = shadow.getElementById('sx-font-dec');
       
       if (title) {
         const currentLang = await i18n.getCurrentLanguage();
@@ -596,6 +631,13 @@
       if (closeBtn) {
         closeBtn.setAttribute('aria-label', await i18n.t('floatPanel.close'));
       }
+
+      // 字号按钮标题（不改显示字符，仅更新提示）
+      try{
+        const lang = await i18n.getCurrentLanguage();
+        if (fontIncBtn) fontIncBtn.title = lang==='zh' ? '增大字号' : 'Increase font size';
+        if (fontDecBtn) fontDecBtn.title = lang==='zh' ? '减小字号' : 'Decrease font size';
+      }catch{}
     } catch (e) {
       console.warn('Failed to update UI text:', e);
     }
