@@ -240,15 +240,15 @@
           border-radius: 12px;
           user-select: none;
           cursor: grab;
-          /* 深色：增强玻璃质感 */
-          background: linear-gradient(180deg, rgba(82,98,128,.35), rgba(82,98,128,.18));
-          border: 1px solid rgba(255,255,255,.2);
+          /* 深色：内凹玻璃质感 */
+          background: linear-gradient(180deg, rgba(82,98,128,.25), rgba(82,98,128,.12));
+          border: 1px solid rgba(255,255,255,.15);
           backdrop-filter: blur(12px) saturate(150%);
           -webkit-backdrop-filter: blur(12px) saturate(150%);
           position: relative;
           /* 修复圆角透明问题 */
           isolation: isolate;
-          box-shadow: 0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.1), inset 0 -1px 1px rgba(255,255,255,.05);
         }
         .header::before {
           content: '';
@@ -258,23 +258,23 @@
           right: 0;
           bottom: 0;
           border-radius: 12px;
-          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
+          background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, rgba(255,255,255,.05) 50%, rgba(255,255,255,.02) 100%);
           pointer-events: none;
           z-index: -1;
           /* 确保圆角区域完全透明 */
           overflow: hidden;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.2);
+          box-shadow: inset 0 1px 3px rgba(0,0,0,.15), inset 0 -1px 1px rgba(255,255,255,.08);
         }
         .bubble.light .header{
-          background: linear-gradient(180deg, rgba(100,116,139,.35), rgba(100,116,139,.15));
-          border: 1px solid rgba(100,116,139,.25);
+          background: linear-gradient(180deg, rgba(100,116,139,.25), rgba(100,116,139,.12));
+          border: 1px solid rgba(100,116,139,.2);
           backdrop-filter: blur(12px) saturate(150%);
           -webkit-backdrop-filter: blur(12px) saturate(150%);
-          box-shadow: 0 2px 8px rgba(100,116,139,.15), 0 1px 3px rgba(0,0,0,.1);
+          box-shadow: inset 0 1px 2px rgba(100,116,139,.1), inset 0 -1px 1px rgba(255,255,255,.08);
         }
         .bubble.light .header::before {
-          background: linear-gradient(135deg, rgba(255,255,255,.2) 0%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.05) 100%);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.1);
+          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
+          box-shadow: inset 0 1px 3px rgba(100,116,139,.12), inset 0 -1px 1px rgba(255,255,255,.1);
         }
         .dragging .header { cursor: grabbing; }
 
