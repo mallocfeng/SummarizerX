@@ -355,6 +355,7 @@
         .content{
           white-space: pre-wrap; word-break: break-word;
           max-height: 56vh; overflow:auto;
+          padding: 0 14px;
         }
 
         .spinner{
