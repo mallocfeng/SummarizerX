@@ -23,6 +23,12 @@ html, body { height: 100%; }
   --accent: #10b981;      /* success */
   --danger: #dc2626;      /* error */
   --link: #2563eb;
+  --candy-az: rgba(59,130,246,.10);
+  --candy-vi: rgba(99,102,241,.10);
+  --glass: rgba(255,255,255,.72);
+  --glass-soft: rgba(255,255,255,.48);
+  --card-glass: rgba(255,255,255,.82);
+  --card-glass-soft: rgba(255,255,255,.68);
 
   --radius: 12px;
   --ring: 0 0 0 3px rgba(37,99,235,.20);
@@ -58,15 +64,17 @@ body{
  * ========================= */
 .hero{
   position: relative;
-  background: var(--surface);
+  background:
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: blur(12px) saturate(1.05);
   border: 1px solid var(--border);
-  border-top-left-radius: 0;     /* 可选：去掉上圆角让它与顶部齐平 */
-  border-top-right-radius: 0;    /* 可选 */
-  /*border-radius: var(--radius);   如果加了上两行，这行可以删；或保留并单独覆盖上圆角 */
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
   padding: 20px 0 16px;
-  margin: 0 0 16px;              /* 顶部外边距改为 0 */
-  /* 可选：如果仍然看到顶端有1px缝隙，直接去掉上边框 */
-  /* border-top: none; */
+  margin: 0 0 16px;
+  box-shadow: 0 2px 10px rgba(16,24,40,.06);
 }
 
 .hero-header{
@@ -106,14 +114,26 @@ body{
  * ========================= */
 .section.card{
   position: relative;
-  background: var(--surface);
+  background:
+    radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
   margin: 16px 0;
-  /* 上浮动效所需的过渡与优化 */
-  transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease, background-color .2s ease;
+  transition: transform .15s ease, box-shadow .22s ease, border-color .2s ease, background-color .2s ease;
   will-change: transform, box-shadow;
+  box-shadow: 0 1px 1px rgba(16,24,40,.05), 0 8px 22px rgba(16,24,40,.08);
+}
+
+/* Light mode: add a gentle tint so cards aren't pure white */
+html[data-theme="light"] .section.card{
+  background:
+    radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
 }
 .section-title{ margin:0 0 12px; font-size:16px; font-weight:700; color: var(--text); display:flex; align-items:center; gap:8px; }
 .section-title .dot{ width:8px; height:8px; border-radius:50%; background: var(--primary); display:inline-block; }
@@ -216,8 +236,15 @@ html[data-theme="dark"] .shortcut .shortcut-desc{ color:#b6c0cf; }
  * ========================= */
 .save-dock{
   position: fixed; left: 0; right: 0; bottom: 0; min-height: var(--dock-h);
-  padding: 10px 0 12px; background: var(--surface); border-top:1px solid var(--border);
+  padding: 10px 0 12px;
+  background:
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  backdrop-filter: blur(10px) saturate(1.05);
+  border-top:1px solid var(--border);
   display:flex; align-items:center; z-index:50;
+  box-shadow: 0 -1px 8px rgba(16,24,40,.08);
 }
 .dock-inner{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .dock-left{ display:flex; flex-direction:column; gap:6px; min-width: 380px; max-width: 520px; flex-shrink:1; }
@@ -242,6 +269,9 @@ select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0
 .buy-help-inline a{ color: var(--link); text-decoration: underline; text-underline-offset: 2px; margin: 0 2px; }
 .buy-help-inline a:hover{ filter: brightness(0.95); }
 @media (max-width: 800px){ .buy-help-inline{ display:block; margin:6px 0 0; white-space: normal; } }
+
+/* Dark theme: brighten inline purchase helper text for readability */
+html[data-theme="dark"] .buy-help-inline{ color:#cbd5e1; }
 
 /* Utility */
 .hidden { display: none !important; }
@@ -284,17 +314,29 @@ html[data-theme="dark"]{
   --primary-600:#7b8cff;
   --accent:#7dd3a7;
   --link:#a7b7ff;
+  --candy-az: rgba(142,162,255,.14);
+  --candy-vi: rgba(123,140,255,.12);
+  --glass: rgba(17,26,46,.62);
+  --glass-soft: rgba(17,26,46,.44);
+  --card-glass: rgba(17,26,46,.78);
+  --card-glass-soft: rgba(17,26,46,.60);
 }
 
 html[data-theme="dark"] .hero,
 html[data-theme="dark"] .section.card,
 html[data-theme="dark"] .save-dock{
-  background: var(--surface);
+  /* keep glass backgrounds; only ensure border tone */
   border-color: var(--border);
 }
 html[data-theme="dark"] .help{ color:#cfdae8; background: var(--surface-2); border-color: var(--border); }
 html[data-theme="dark"] .meta{ color:#b9c3d3; background: #101826; border-color: var(--border); }
 html[data-theme="dark"] .hint{ color:#9fb0c6; }
+/* Brighten form labels and headings for readability */
+html[data-theme="dark"] .label{ color: var(--text); }
+html[data-theme="dark"] .section-title{ color: var(--text); }
+html[data-theme="dark"] .theme-toggle .label{ color: var(--text); }
+/* Slightly brighter placeholders in dark */
+html[data-theme="dark"] .ctrl::placeholder{ color:#b7c2d8; }
 html[data-theme="dark"] .section-title .dot{ background: var(--primary-600); }
 html[data-theme="dark"] .section.card.note .section-title .dot{ background: var(--accent); }
 html[data-theme="dark"] .ctrl{ background:#0f172a; border-color:#2a3a57; color: var(--text); }
@@ -317,6 +359,13 @@ html[data-theme="dark"] .shortcut{
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px;
+}
+
+/* Dark theme: soften and enlarge the card highlight for a more natural look */
+html[data-theme="dark"] .section.card{
+  background:
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
 }
 
 /* Ensure buttons in save dock and shortcuts also follow dark tone */
@@ -364,9 +413,10 @@ html[data-theme="light"]{
 }
 
 /* Surfaces: hero & dock 使用与卡片一致的淡蓝配色（更和谐） */
+/* Light theme uses glass backgrounds defined above; keep borders if needed */
 html[data-theme="light"] .hero,
-html[data-theme="light"] .save-dock{ background: var(--card-bg); border-color: var(--card-br); }
-html[data-theme="light"] .section.card{ background: var(--card-bg); border-color: var(--card-br); }
+html[data-theme="light"] .save-dock{ border-color: var(--card-br); }
+html[data-theme="light"] .section.card{ border-color: var(--card-br); }
 
 /* Card elevation — light theme */
 html[data-theme="light"] .section.card:hover,

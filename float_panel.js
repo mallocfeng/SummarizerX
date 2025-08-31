@@ -335,6 +335,21 @@
       }
       .card:hover{ transform: translateY(-2px); box-shadow: 0 2px 3px rgba(16,24,40,.06), 0 12px 28px rgba(16,24,40,.12); }
 
+      /* Light theme: add a gentle color tint so cards aren't pure white */
+      :host([data-theme="light"]) .card{
+        background:
+          radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
+          linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+      }
+
+      /* Dark theme: soften and enlarge the top-left highlight for a natural look */
+      :host([data-theme="dark"]) .card{
+        background:
+          radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 80%),
+          linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+      }
+
       .card.card-head{ padding-top:52px; }
       .card.card-head::before{
         content:""; position:absolute; left:0; right:0; top:0; height:44px;
@@ -482,8 +497,8 @@
         --surface:#111a2e;
         --surface-2:#0d1526;
         --border:#1f2a44;
-        --text:#e6edf7;
-        --muted:#a6b7cf;
+        --text:#e8eef9;
+        --muted:#c2cde3;
         --primary:#8ea2ff;
         --primary-600:#7b8cff;
         --candy-az: rgba(142,162,255,.14);
@@ -573,6 +588,31 @@
       :host([data-theme="dark"]) .theme-toggle .seg{ background:#18233a; border-color:#2a3d5f; }
       :host([data-theme="dark"]) .theme-btn{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-btn.active{ background:#2a3d5f; color:#e8eef8; }
+
+      /* Dark markdown readability tweaks */
+      :host([data-theme="dark"]) .md a{ color: var(--primary); }
+      :host([data-theme="dark"]) .md code{
+        background:#121a2d;
+        border:1px solid #243555;
+        color:#eef4ff;
+      }
+      :host([data-theme="dark"]) .md pre{
+        background:#0f1a30;
+        border:1px solid #1a2540;
+        color:#e8eef9;
+      }
+      :host([data-theme="dark"]) .md blockquote{
+        background: rgba(142,162,255,.08);
+        border-left:3px solid #2a3f66;
+        color: var(--text);
+      }
+      :host([data-theme="dark"]) .md thead th{ background:#16233b; color: var(--text); }
+      :host([data-theme="dark"]) .md th, :host([data-theme="dark"]) .md td{ border-color:#2a3f66; }
+      :host([data-theme="dark"]) .md hr{ border-top:1px solid #1a2540; }
+
+      /* Card tool buttons on dark */
+      :host([data-theme="dark"]) .tbtn{ background: var(--surface); color:#e2ebf8; border-color:#27344b; }
+      :host([data-theme="dark"]) .tbtn:hover{ background:#16233b; border-color:#344766; }
 
       /* ===== Accessibility ===== */
       @media (prefers-reduced-motion: reduce){
