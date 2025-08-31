@@ -162,6 +162,7 @@
 
   /* ===================== UI 构建 ===================== */
   let host, wrap, contentEl, closeBtn, spinner, shadowRootEl, copyBtn;
+  let resizeHandle;
 
   function ensureUI() {
     if (host) return;
@@ -353,9 +354,34 @@
         }
 
         .content{
-          white-space: pre-wrap; word-break: break-word;
+          white-space: normal; word-break: break-word;
           max-height: 56vh; overflow:auto;
           padding: 0 14px;
+          line-height: 1.56;
+          min-height: 10px; /* slightly larger default height */
+        }
+        .content .p{ margin:0; }
+        .content .p + .p{ margin-top: 8px; }
+
+        /* ===== Resize handle (bottom-right) ===== */
+        .resize-handle{
+          position:absolute; right:5px; bottom:5px; width:9px; height:9px; cursor: se-resize;
+        }
+        /* Small 45° triangle pointing to top-left, with subtle bevel */
+        .resize-handle::before{
+          content:""; position:absolute; right:0; bottom:0; width:9px; height:9px;
+          background:
+            /* inner edge highlight */
+            linear-gradient(135deg, rgba(255,255,255,.10) 48%, rgba(255,255,255,0) 52%),
+            /* main triangle fill */
+            linear-gradient(135deg, rgba(255,255,255,.28) 0 49%, rgba(255,255,255,0) 50% 100%);
+          filter: drop-shadow(0 0 1px rgba(0,0,0,.10));
+        }
+        .bubble.light .resize-handle::before{
+          background:
+            linear-gradient(135deg, rgba(31,41,55,.18) 48%, rgba(31,41,55,0) 52%),
+            linear-gradient(135deg, rgba(31,41,55,.40) 0 49%, rgba(31,41,55,0) 50% 100%);
+          filter: drop-shadow(0 0 1px rgba(31,41,55,.08));
         }
 
         .spinner{
@@ -377,6 +403,7 @@
           </div>
         </div>
         <div class="content" id="sx-content"></div>
+        <div class="resize-handle" id="sx-resize" title="拖动调整大小" aria-label="调整大小"></div>
       </div>
     `;
 
@@ -385,6 +412,7 @@
     contentEl = shadow.getElementById('sx-content');
     closeBtn = shadow.getElementById('sx-close');
     copyBtn  = shadow.getElementById('sx-copy');
+    resizeHandle = shadow.getElementById('sx-resize');
 
     // trigger enter animation on next frame
     try {
@@ -434,6 +462,7 @@
     // ===== 拖拽：以 header 为手柄 =====
     const handle = shadow.getElementById('sx-drag-handle');
     let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
+    // 拖动不设与选区关联的限制，用户可在视窗任意区域放置
 
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -442,6 +471,7 @@
       const rect = host.getBoundingClientRect();
       dragOffsetX = e.clientX - rect.left;
       dragOffsetY = e.clientY - rect.top;
+      // 不再绑定选区矩形为牵引范围
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -452,6 +482,7 @@
       const bubbleH = br.height || wrap.getBoundingClientRect().height || 120;
       let newX = e.clientX - dragOffsetX;
       let newY = e.clientY - dragOffsetY;
+      // 不设置与选区相关的限制
       newX = Math.min(Math.max(0, newX), vw - bubbleW);
       newY = Math.min(Math.max(0, newY), vh - bubbleH);
       host.style.left = `${Math.round(newX)}px`;
@@ -463,7 +494,60 @@
       if (!dragging) return;
       dragging = false;
       wrap.classList.remove('dragging');
+      // 无牵引范围需要清理
     });
+
+    // ===== 右下角缩放：拖动改变宽高 =====
+    let resizing = false; let startX=0, startY=0; let startW=0, startH=0;
+    const headerEl = shadow.getElementById('sx-drag-handle');
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+    function onResizeMove(e){
+      if (!resizing) return;
+      const clientX = e.touches? e.touches[0]?.clientX : e.clientX;
+      const clientY = e.touches? e.touches[0]?.clientY : e.clientY;
+      if (clientX==null || clientY==null) return;
+      const dx = clientX - startX; const dy = clientY - startY;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const rawW = clamp(startW + dx, 240, Math.max(320, Math.floor(vw * 0.9)));
+      const rawH = clamp(startH + dy, 120, Math.max(160, Math.floor(vh * 0.8)));
+
+      // Apply directly for immediate, predictable resizing (original behavior)
+      wrap.style.maxWidth = 'none';
+      wrap.style.width = Math.round(rawW) + 'px';
+
+      const padTop = 8, padBottom = 10; // as defined in .bubble padding
+      const headerH = headerEl?.getBoundingClientRect()?.height || 28;
+      const contentH = Math.max(80, Math.round(rawH - headerH - padTop - padBottom));
+      contentEl.style.maxHeight = contentH + 'px';
+      contentEl.style.height    = contentH + 'px';
+
+      __sxUserMovedBubble = true;
+      e.preventDefault();
+    }
+    function endResize(){
+      if (!resizing) return;
+      resizing = false;
+      document.removeEventListener('mousemove', onResizeMove, true);
+      document.removeEventListener('mouseup', endResize, true);
+      document.removeEventListener('touchmove', onResizeMove, {capture:true, passive:false});
+      document.removeEventListener('touchend', endResize, {capture:true});
+    }
+    function startResize(e){
+      resizing = true;
+      const br = wrap.getBoundingClientRect();
+      startW = br.width; 
+      startH = br.height;
+      const ptX = e.touches? e.touches[0]?.clientX : e.clientX;
+      const ptY = e.touches? e.touches[0]?.clientY : e.clientY;
+      startX = ptX||0; startY = ptY||0;
+      document.addEventListener('mousemove', onResizeMove, true);
+      document.addEventListener('mouseup', endResize, true);
+      document.addEventListener('touchmove', onResizeMove, {capture:true, passive:false});
+      document.addEventListener('touchend', endResize, {capture:true});
+      e.preventDefault();
+    }
+    resizeHandle?.addEventListener('mousedown', startResize);
+    resizeHandle?.addEventListener('touchstart', startResize, {passive:false});
   }
 
   function removeUI() {
@@ -531,19 +615,20 @@
   /* ===================== 位置计算 ===================== */
   function computePositionFor(rect, desiredW = 320, desiredH = 140) {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const gap = 8;
+    const hGap = 8;   // horizontal spacing from selection
+    const vGap = 12;  // vertical spacing from selection (slightly larger by default)
     // 依次尝试：右上、左上、右下、左下
     const candidates = [
-      { x: rect.right + gap,            y: rect.top    - gap - desiredH }, // TR
-      { x: rect.left  - gap - desiredW, y: rect.top    - gap - desiredH }, // TL
-      { x: rect.right + gap,            y: rect.bottom + gap },            // BR
-      { x: rect.left  - gap - desiredW, y: rect.bottom + gap }             // BL
+      { x: rect.right + hGap,            y: rect.top    - vGap - desiredH }, // TR
+      { x: rect.left  - hGap - desiredW, y: rect.top    - vGap - desiredH }, // TL
+      { x: rect.right + hGap,            y: rect.bottom + vGap },           // BR
+      { x: rect.left  - hGap - desiredW, y: rect.bottom + vGap }            // BL
     ];
     let pos = candidates.find(p => p.x >= 0 && p.y >= 0 && (p.x + desiredW) <= vw && (p.y + desiredH) <= vh);
     if (!pos) {
       pos = {
-        x: Math.min(Math.max(8, rect.right + gap), vw - desiredW - 8),
-        y: Math.min(Math.max(8, rect.top),         vh - desiredH - 8)
+        x: Math.min(Math.max(8, rect.right + hGap), vw - desiredW - 8),
+        y: Math.min(Math.max(8, rect.top),          vh - desiredH - 8)
       };
     }
     return pos;
@@ -620,8 +705,20 @@
       const resp = await chrome.runtime.sendMessage({ type: 'SX_TRANSLATE_REQUEST', text });
       if (!resp?.ok) throw new Error(resp?.error || 'Translate failed');
 
-      // 设置结果内容；不要改动位置
-      contentEl.textContent = resp.result;
+      // 设置结果内容；规范换行并去除空行，避免段落间距过大
+      try{
+        let txt = String(resp.result || '');
+        txt = txt.replace(/\r\n?/g,'\n');           // normalize CRLF
+        txt = txt.replace(/^\s*\n+/,'');            // trim leading blank lines
+        txt = txt.replace(/\n+\s*$/,'');            // trim trailing blank lines
+        // collapse multiple blank lines to a single separator
+        txt = txt.replace(/\n[ \t]*\n+/g,'\n');
+        const lines = txt.split(/\n/).map(s=>s.trim()).filter(Boolean);
+        const esc = (s)=> s.replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m]));
+        contentEl.innerHTML = lines.map(l=>`<div class="p">${esc(l)}</div>`).join('');
+      }catch{
+        contentEl.textContent = resp.result;
+      }
       spinner?.remove(); spinner = null;
 
       // 仅当用户未拖动时，做一次微调（防止气泡溢出视窗）

@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.7.8
+
+### English
+- 🎨 **Enhanced Translation Bubble**: Added resize functionality to translation popup for better user control
+- 🔧 **Improved Text Formatting**: Better paragraph handling and line spacing in translation results
+- 🎯 **Enhanced User Experience**: Removed selection-based positioning constraints for more flexible bubble placement
+- ✨ **Visual Improvements**: Added resize handle with subtle visual design for intuitive interaction
+- 🌟 **Better Responsiveness**: Improved bubble positioning with optimized spacing and gap calculations
+- 🔮 **Glass Morphism System**: Comprehensive glass effect system with CSS variables for consistent UI
+- 🎨 **Card Header Enhancement**: Fixed card title bar colors and inset glass effects for better visual hierarchy
+- 🌙 **Dark Mode Optimization**: Enhanced readability and contrast in dark theme across all components
+- 📱 **Options Page Upgrade**: Applied glass morphism effects to settings page for unified design language
+
+### 中文
+- 🎨 **增强翻译弹窗**: 为翻译弹出框添加调整大小功能，提供更好的用户控制
+- 🔧 **改进文本格式**: 优化翻译结果的段落处理和行间距
+- 🎯 **增强用户体验**: 移除基于选区的定位限制，提供更灵活的弹窗放置
+- ✨ **视觉改进**: 添加调整大小手柄，具有微妙的视觉设计，提供直观的交互
+- 🌟 **更好的响应性**: 改进弹窗定位，优化间距和间隙计算
+- 🔮 **玻璃拟态系统**: 完整的玻璃效果系统，使用CSS变量确保UI一致性
+- 🎨 **卡片标题栏增强**: 修复卡片标题栏颜色和内凹玻璃效果，改善视觉层次
+- 🌙 **暗色模式优化**: 在所有组件中增强暗色主题的可读性和对比度
+- 📱 **设置页面升级**: 为设置页面应用玻璃拟态效果，统一设计语言
+
 ## v1.7.7
 
 ### English
