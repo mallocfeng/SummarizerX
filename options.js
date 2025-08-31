@@ -615,18 +615,32 @@ function bindLanguageEvents() {
   }
 }
 
+let __langSwitching = false;
 async function switchLanguage(lang) {
-  // 保存语言设置
-  await chrome.storage.sync.set({ ui_language: lang });
-  
-  // 更新页面语言属性
-  await updatePageLanguage();
-  
-  // 更新语言切换器状态
-  updateLanguageSwitcher(lang);
-  
-  // 更新界面文本
-  await updateUIText();
+  if (__langSwitching) return; // 避免重复触发
+  __langSwitching = true;
+  const root = document.documentElement; // 使用 html 作为动画根
+  try{
+    // 添加动画类并触发淡出
+    root.classList.add('lang-anim');
+    root.classList.add('lang-out');
+
+    // 等待淡出完成（或超时兜底）
+    await new Promise(res=> setTimeout(res, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 180));
+
+    // 保存语言设置 + 更新文案
+    await chrome.storage.sync.set({ ui_language: lang });
+    await updatePageLanguage();
+    updateLanguageSwitcher(lang);
+    await updateUIText();
+
+  }catch(e){ console.warn('switchLanguage failed:', e); }
+  finally{
+    // 触发淡入
+    root.classList.remove('lang-out');
+    // 稍后移除动画根（保持可重用）
+    setTimeout(()=>{ try{ root.classList.remove('lang-anim'); }catch{} __langSwitching=false; }, 260);
+  }
 }
 
 function toggleBuyHelpInline(provider){
@@ -637,6 +651,24 @@ function toggleBuyHelpInline(provider){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Subtle page enter animation
+  try{
+    const root = document.documentElement;
+    root.classList.add('page-enter');
+    // Stagger sections slightly for layered feel
+    const cards = Array.from(document.querySelectorAll('.section.card'));
+    cards.forEach((el, i)=>{
+      el.classList.add('fx-in');
+      el.style.animationDelay = (80 + i*40) + 'ms';
+    });
+    // Cleanup after a short duration
+    const clear = () => {
+      try{ root.classList.remove('page-enter'); }catch{}
+      try{ cards.forEach(el=>{ el.classList.remove('fx-in'); el.style.animationDelay=''; }); }catch{}
+    };
+    setTimeout(clear, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 900);
+  }catch{}
+
   fitDockPadding();
   window.addEventListener('resize', fitDockPadding);
   const dock = document.querySelector('.save-dock');

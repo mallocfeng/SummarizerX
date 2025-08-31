@@ -365,6 +365,9 @@
           line-height: 1.56;
           min-height: 10px; /* slightly larger default height */
         }
+        /* petite-vue style enter transitions (staggered) */
+        .content .p{ opacity: 0; transform: translateY(4px); transition: opacity .32s ease, transform .32s ease; }
+        .content .p.on{ opacity: 1; transform: translateY(0); }
         .content .p{ margin:0; }
         .content .p + .p{ margin-top: 8px; }
 
@@ -389,14 +392,31 @@
           filter: drop-shadow(0 0 1px rgba(31,41,55,.08));
         }
 
-        .spinner{
-          width:16px; height:16px;
-          border:2px solid currentColor; border-right-color: transparent;
-          border-radius:50%;
-          animation: r .8s linear infinite; opacity:.6;
-          display:inline-block;
-        }
+        /* Simple spinner (legacy) */
+        .spinner{ width:16px; height:16px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; animation: r .8s linear infinite; opacity:.6; display:inline-block; }
         @keyframes r{ to{ transform: rotate(360deg); } }
+
+        /* Equalizer bars loader */
+        .loader-eq{ display:flex; align-items:flex-end; gap:4px; height:40px; padding: 6px 0 10px; }
+        .loader-eq .bar{ width:4px; height: 24px; border-radius: 3px; opacity:.9; transform-origin: center bottom; will-change: transform, opacity; }
+        .loader-eq .bar{ background: rgba(255,255,255,.85); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+        .bubble.light .loader-eq .bar{ background: rgba(15,23,42,.75); box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+        .loader-eq .b1{  animation: eq 900ms ease-in-out -120ms infinite; }
+        .loader-eq .b2{  animation: eq 840ms ease-in-out  -60ms infinite; }
+        .loader-eq .b3{  animation: eq 760ms ease-in-out   -0ms infinite; }
+        .loader-eq .b4{  animation: eq 880ms ease-in-out  -180ms infinite; }
+        .loader-eq .b5{  animation: eq 820ms ease-in-out   -90ms infinite; }
+        .loader-eq .b6{  animation: eq 940ms ease-in-out   -30ms infinite; }
+        .loader-eq .b7{  animation: eq 800ms ease-in-out  -150ms infinite; }
+        .loader-eq .b8{  animation: eq 860ms ease-in-out   -75ms infinite; }
+        .loader-eq .b9{  animation: eq 780ms ease-in-out  -210ms infinite; }
+        .loader-eq .b10{ animation: eq 920ms ease-in-out   -45ms infinite; }
+        @keyframes eq{
+          0%, 100% { transform: scaleY(.35); opacity:.7; }
+          25%      { transform: scaleY(1.00); opacity:1; }
+          50%      { transform: scaleY(.55); opacity:.9; }
+          75%      { transform: scaleY(.85); opacity:.95; }
+        }
       </style>
 
       <div class="bubble" id="sx-bubble" data-theme="dark">
@@ -738,10 +758,24 @@
         startTranslateFlow._bound = true;
       }
 
-      // 加载中
+      // 加载中：均衡器柱条动画（equalizer bars）
       contentEl.textContent = '';
       spinner = document.createElement('div');
-      spinner.className = 'spinner';
+      spinner.className = 'loader-eq';
+      spinner.setAttribute('role','progressbar');
+      spinner.setAttribute('aria-label','Loading');
+      spinner.innerHTML = `
+        <span class="bar b1"></span>
+        <span class="bar b2"></span>
+        <span class="bar b3"></span>
+        <span class="bar b4"></span>
+        <span class="bar b5"></span>
+        <span class="bar b6"></span>
+        <span class="bar b7"></span>
+        <span class="bar b8"></span>
+        <span class="bar b9"></span>
+        <span class="bar b10"></span>
+      `;
       contentEl.appendChild(spinner);
 
       const resp = await chrome.runtime.sendMessage({ type: 'SX_TRANSLATE_REQUEST', text });
@@ -758,6 +792,13 @@
         const lines = txt.split(/\n/).map(s=>s.trim()).filter(Boolean);
         const esc = (s)=> s.replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m]));
         contentEl.innerHTML = lines.map(l=>`<div class="p">${esc(l)}</div>`).join('');
+        // stagger enter reveal
+        try{
+          const ps = Array.from(contentEl.querySelectorAll('.p'));
+          ps.forEach((el, i)=>{
+            setTimeout(()=>{ try{ el.classList.add('on'); }catch{} }, Math.min(320, i*36));
+          });
+        }catch{}
       }catch{
         contentEl.textContent = resp.result;
       }

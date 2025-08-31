@@ -262,6 +262,25 @@
         border-left:1px solid var(--border);
         box-shadow:-6px 0 22px rgba(17,24,39,.08);
         color:var(--text);
+        will-change: transform, opacity, filter;
+      }
+      /* Float panel enter animation */
+      @keyframes sxPanelIn {
+        0%   { opacity: 0; transform: translateX(22px) scale(.98); filter: blur(6px); }
+        60%  { opacity: .96; transform: translateX(0)   scale(1);   filter: blur(1px); }
+        100% { opacity: 1; transform: translateX(0)   scale(1);   filter: blur(0); }
+      }
+      .wrap.fx-enter{ animation: sxPanelIn .58s cubic-bezier(.2,.7,.3,1) both; }
+
+      /* Stagger header/footer for a subtle pop */
+      @keyframes sxBarIn { 0%{ opacity:0; transform: translateY(-6px); } 100%{ opacity:1; transform: translateY(0); } }
+      .wrap.fx-enter .appbar{ animation: sxBarIn .42s ease .08s both; }
+      @keyframes sxFootIn { 0%{ opacity:0; transform: translateY(6px); } 100%{ opacity:1; transform: translateY(0); } }
+      .wrap.fx-enter .footer{ animation: sxFootIn .42s ease .12s both; }
+
+      /* Respect user reduced-motion preference */
+      @media (prefers-reduced-motion: reduce){
+        .wrap.fx-enter, .wrap.fx-enter .appbar, .wrap.fx-enter .footer{ animation: none; }
       }
       .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; }
       .dragbar::after{ content:""; position:absolute; top:0; bottom:0; right:-1px; width:2px; background:linear-gradient(180deg, rgba(102,112,133,.20), rgba(102,112,133,.02)); opacity:0; transition: opacity .15s ease; }
@@ -915,6 +934,17 @@
   // 关闭
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
+
+  // 开启动画：为容器添加入场类，完毕后移除
+  try{
+    const wrapOnce = shadow.getElementById('sx-wrap');
+    if (wrapOnce){
+      wrapOnce.classList.add('fx-enter');
+      const clear = ()=>{ try{ wrapOnce.classList.remove('fx-enter'); wrapOnce.removeEventListener('animationend', clear); }catch{} };
+      wrapOnce.addEventListener('animationend', clear);
+      setTimeout(clear, 900);
+    }
+  }catch{}
 
   // 设置
   shadow.getElementById('sx-settings')?.addEventListener('click', async ()=>{ try{ await chrome.runtime.sendMessage({type:'OPEN_OPTIONS'});}catch{} });
