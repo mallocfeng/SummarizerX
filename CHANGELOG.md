@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.7.9
+
+### English
+- 🎨 **Enhanced UI Improvements**: Comprehensive glass morphism effects across all components
+- 🔧 **Translation Popup Optimization**: Better visual design and user experience
+- 📱 **Options Page Enhancement**: Improved layout and interaction design
+- ✨ **Float Panel Refinement**: Enhanced styling and smooth animations
+- 🌙 **Dark Mode Enhancement**: Better support and accessibility features
+- 📱 **Responsive Design**: Improved mobile compatibility and responsive behavior
+- 🎯 **User Experience**: Overall UI/UX improvements and optimizations
+
+### 中文
+- 🎨 **UI增强改进**: 所有组件采用全面的玻璃拟态效果
+- 🔧 **翻译弹窗优化**: 更好的视觉设计和用户体验
+- 📱 **设置页面增强**: 改进布局和交互设计
+- ✨ **浮动面板优化**: 增强样式和平滑动画
+- 🌙 **暗色模式增强**: 更好的支持和可访问性功能
+- 📱 **响应式设计**: 改进移动端兼容性和响应式行为
+- 🎯 **用户体验**: 整体UI/UX改进和优化
+
 ## v1.7.8
 
 ### English
