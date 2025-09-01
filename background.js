@@ -27,13 +27,15 @@ async function setState(tabId, state) {
 }
 
 /* ------------------------------------------------------------------ */
+// 兜底注入：大多数页面已通过 manifest.content_scripts 常驻注入
+// 但为防在个别时序/站点下收不到消息，这里保留一次动态注入兜底（仅注入本地文件，合规）。
 async function injectIfNeeded(tabId) {
   try {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "PING_EXTRACTOR" });
     if (ping?.ok) return;
   } catch {}
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] });
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  try { await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] }); } catch {}
+  try { await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }); } catch {}
 }
 
 async function getPageRawByTabId(tabId) {
@@ -42,9 +44,13 @@ async function getPageRawByTabId(tabId) {
   if (!/^https?:|^file:|^ftp:/i.test(url)) {
     throw new Error("此页面协议不支持抓取（如 chrome://、edge://、扩展页、Web Store、PDF 查看器等）。");
   }
-  await injectIfNeeded(tabId);
+  // 常驻注入为主，这里兜底确保存在监听端
   const res = await chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_RAW" }).catch(e => ({ ok:false, error: e?.message || String(e) }));
   if (!res?.ok) {
+    // 再尝试一次兜底注入后重发
+    await injectIfNeeded(tabId);
+    const res2 = await chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_RAW" }).catch(e => ({ ok:false, error: e?.message || String(e) }));
+    if (res2?.ok) return res2.payload;
     if (/Cannot access contents|receiving end/i.test(res?.error || "")) {
       throw new Error("无法访问当前页内容。请先点击扩展图标在本页打开浮动面板后再尝试。");
     }

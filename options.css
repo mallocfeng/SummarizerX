@@ -361,7 +361,13 @@ html[data-theme="dark"] .buy-help-inline{ color:#cbd5e1; }
 .theme-toggle .label{ display:flex; align-items:center; justify-content:center; height:42px; line-height:42px; font-size:12px; font-weight:700; color:#475569; margin-right:2px; }
 .theme-toggle .seg{ display:flex; align-items:center; gap:6px; background:#f4f6fb; border:1px solid #d9e4f5; border-radius: 999px; padding:4px; }
 .theme-toggle .seg button, .theme-btn{ width:34px; height:34px; display:grid; place-items:center; border:none; border-radius:999px; cursor:pointer; background:transparent; color:#5b6b7f; padding:0; }
-.theme-toggle .seg button.active, .theme-toggle .seg button[aria-selected="true"], .theme-btn.active, .theme-btn[aria-selected="true"]{ background: #1f2937; color:#fff; }
+.theme-toggle .seg button.active,
+.theme-toggle .seg button[aria-selected="true"],
+.theme-btn.active,
+.theme-btn[aria-selected="true"]{
+  background: var(--primary);
+  color:#fff;
+}
 .theme-toggle .seg button svg, .theme-btn svg{ width:18px; height:18px; pointer-events:none; stroke: currentColor; fill:none; opacity:.95; }
 
 /* =========================

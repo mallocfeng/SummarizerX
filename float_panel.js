@@ -1181,15 +1181,31 @@
       const style = document.createElement('style');
       style.id = 'sx-force-dark-mode';
       style.textContent = `
-        /* 强制深色模式 - 只处理文字和彩色文字 */
-        html, body, * {
-          background-color: #1a1a1a !important;
-          color: #ffffff !important;
-        }
-        
-        /* 处理彩色文字 - 转换为可读的亮色 */
-        * {
-          color: #ffffff !important;
+        /* 强制深色模式（更温和）：
+           - 仅为页面容器提供深色底色
+           - 文本颜色统一为浅色
+           - 不影响媒体元素（video/img/canvas/svg/iframe 等）的底色，避免遮挡视频 */
+        html, body { background-color: #121212 !important; color: #eaeef5 !important; }
+        /* 文本与图标（svg 也使用 currentColor 时仍能跟随）*/
+        *, *::before, *::after { color: #eaeef5 !important; }
+        /* 不为媒体元素强制设置背景色，避免视频/画布被黑色覆盖 */
+        img, video, canvas, svg, iframe, embed, object, picture { background-color: transparent !important; }
+
+        /* YouTube 站点常见容器背景（不影响视频区域）*/
+        ytd-app,
+        ytd-masthead,
+        ytd-page-manager,
+        ytd-browse,
+        ytd-two-column-browse-results-renderer,
+        ytd-rich-grid-renderer,
+        ytd-watch-flexy,
+        ytd-watch-flexy #columns,
+        ytd-watch-flexy #primary,
+        ytd-watch-flexy #secondary,
+        #content,
+        #page-manager,
+        #container {
+          background-color: #121212 !important;
         }
         
         /* 特殊处理链接 */
