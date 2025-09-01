@@ -303,7 +303,26 @@ async function loadSettings() {
 
 async function saveSettings() {
   try{ window.dispatchEvent(new CustomEvent('SX_OPT_SAVE_START')); }catch{}
-  const aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
+  // 读取当前选择
+  let aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
+
+  // 若在 Trial 模式且未勾选同意，则自动切换到 OpenAI 模式再保存
+  if (aiProvider === 'trial') {
+    const consent = !!($("trial_consent")?.checked);
+    if (!consent) {
+      // 弹窗确认后再切换；取消则终止保存
+      const promptText = await t('settings.trialConsentPrompt');
+      const ok = confirm(promptText);
+      if (!ok) { try { await setStatus('settings.saveCancelled'); } catch {} return; }
+      try { await setStatus('settings.trialAutoSwitch'); } catch {}
+      const sel = $("aiProvider");
+      if (sel) {
+        sel.value = 'openai';
+        try { await onProviderChange(); } catch {}
+      }
+      aiProvider = 'openai';
+    }
+  }
 
   // Trial：强制固定值
   if (aiProvider === "trial") {
@@ -561,6 +580,7 @@ async function updateUIText() {
   updateElementText('link-buy-openai', await t('settings.openaiGuide'));
   updateElementText('link-buy-deepseek', await t('settings.deepseekGuide'));
   updateElementText('platform-hint', await t('settings.hint'));
+  updateElementText('trial-consent-text', await t('settings.trialConsentText'));
   
   // 更新表单标签
   updateElementText('api-key-label', await t('settings.apiKey'));

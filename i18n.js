@@ -53,6 +53,10 @@ const I18N = {
       testFailed: "❌ 测试失败：",
       noApiKey: "请先输入 API Key",
       trialLocked: "试用模式下此项已锁定。如需自定义，请切换到 OpenAI/DeepSeek/自定义。",
+      trialConsentText: "我已阅读并同意：试用模式会通过代理服务器传输页面内容，用于生成摘要/清洗正文。",
+      trialAutoSwitch: "未同意试用条款，已自动切换为 OpenAI 模式。",
+      trialConsentPrompt: "当前未勾选试用模式同意。是否切换为 OpenAI 模式并继续保存？",
+      saveCancelled: "已取消保存。",
       confirmOverride: "自定义提示词已有内容，是否覆盖？",
       confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？"
     },
@@ -138,6 +142,10 @@ const I18N = {
       testFailed: "❌ Test failed:",
       noApiKey: "Please enter API Key first",
       trialLocked: "This item is locked in trial mode. To customize, please switch to OpenAI/DeepSeek/Custom.",
+      trialConsentText: "I have read and agree: Trial mode sends page content via a proxy server to generate summaries/cleaned body.",
+      trialAutoSwitch: "Trial consent not given; switched to OpenAI mode automatically.",
+      trialConsentPrompt: "Trial consent is not checked. Switch to OpenAI mode and continue saving?",
+      saveCancelled: "Save cancelled.",
       confirmOverride: "Custom prompt has content, override?",
       confirmLangOverride: "Custom prompt has content, override based on new language?"
     },
