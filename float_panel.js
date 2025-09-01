@@ -243,6 +243,8 @@
 
         --ring: 0 0 0 3px rgba(59,130,246,.22);
         --radius: 12px;
+        /* approximate Chrome desktop surface corner; may be adjusted per-platform */
+        --chrome-radius: 12px;
         --btn-min-h: 36px;
         --shadow-1: 0 1px 2px rgba(16,24,40,.06);
         --shadow-2: 0 4px 12px rgba(16,24,40,.10);
@@ -255,6 +257,7 @@
       /* ===== Layout ===== */
       .wrap{
         position:relative; height:100vh; display:flex; flex-direction:column;
+        border-radius: var(--chrome-radius); overflow:hidden;
         /* frosted glass background */
         background: linear-gradient(135deg, var(--glass) 0%, var(--glass-soft) 100%);
         -webkit-backdrop-filter: blur(14px) saturate(1.1);
@@ -299,6 +302,7 @@
         border-bottom:1px solid var(--border);
         /* raised glass: subtle outer drop shadow */
         box-shadow: 0 1px 6px rgba(16,24,40,.06);
+        border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
@@ -336,11 +340,13 @@
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:12px; overflow:auto; transition: height .6s cubic-bezier(.2,.7,.3,1); }
-      /* Empty state: hide cards; keep frosted background only between bars and compress middle to 100px */
+      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; transition: height .6s cubic-bezier(.2,.7,.3,1); }
+      .container .section:last-child{ margin-bottom:8px; }
+      .container .section:first-child{ margin-top:4px; }
+      /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
       .wrap.is-empty #sx-summary,
       .wrap.is-empty #sx-cleaned{ display:none !important; }
-      .wrap.is-empty .container{ flex:0 0 auto; height:100px; overflow:hidden; padding-top:0; padding-bottom:0; }
+      .wrap.is-empty .container{ flex:0 0 auto; height:66px; overflow:hidden; padding-top:0; padding-bottom:0; }
       .wrap.is-empty .section{ margin:0 !important; }
       /* While expanding, allow the middle to grow smoothly */
       .wrap.is-empty.expanding .container{ height: var(--sx-target, 2000px); }
@@ -355,6 +361,23 @@
         border-bottom: 1px solid var(--border);
         position: relative;
       }
+      /* Center illus (down arrow) shown only in folded state */
+      .empty-illus{ display:none; position:absolute; left:50%; top:50%; transform: translate(-50%, -50%);
+        width:28px; height:28px; border-radius:8px; opacity:.96; color: var(--primary);
+        background: transparent; border:none; box-shadow:none;
+        transition: opacity .25s ease, transform .25s ease; animation: bounceY 2.2s ease-in-out infinite; }
+      :host([data-theme="dark"]) .empty-illus{ color: var(--primary-600); }
+      .empty-illus::before{
+        content:""; display:block; width:100%; height:100%;
+        background: currentColor;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
+      }
+      .empty-illus::after{ content:""; display:none; }
+      .wrap.is-empty .empty-illus{ display:grid; place-items:center; }
+      .wrap.is-empty.expanding .empty-illus{ opacity:0; transform: translate(-50%, -60%); }
+      @keyframes bounceY{ 0%,100%{ transform: translate(-50%, -50%); } 50%{ transform: translate(-50%, calc(-50% + 6px)); } }
+      @media (prefers-reduced-motion: reduce){ .empty-illus{ animation: none; } }
       /* Only show the left divider within the middle container; hide global one */
       .wrap.is-empty{ border-left:none !important; box-shadow:none !important; }
       .wrap.is-empty .container::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:1px; background: var(--border); }
@@ -365,6 +388,11 @@
       /* Folded: keep same color scheme but reduce transparency via tokens */
       .wrap.is-empty{ --glass: rgba(255,255,255,.88); --glass-soft: rgba(255,255,255,.80); }
       :host([data-theme="dark"]) .wrap.is-empty{ --glass: rgba(16,22,32,.88); --glass-soft: rgba(16,22,32,.80); }
+      /* In folded default state, make appbar/footer more solid; keep middle area more transparent */
+      .wrap.is-empty .appbar,
+      .wrap.is-empty .footer{ --glass: rgba(255,255,255,.97); --glass-soft: rgba(255,255,255,.92); }
+      :host([data-theme="dark"]) .wrap.is-empty .appbar,
+      :host([data-theme="dark"]) .wrap.is-empty .footer{ --glass: rgba(16,22,32,.92); --glass-soft: rgba(16,22,32,.86); }
       /* Folded: add a subtle bottom shadow to footer to enhance depth */
       .wrap.is-empty .footer{
         box-shadow: 0 -1px 6px rgba(16,24,40,.10), 0 4px 12px rgba(16,24,40,.12) !important;
@@ -519,7 +547,7 @@
         backdrop-filter: blur(10px) saturate(1.05);
         /* raised glass: subtle outer drop shadow upwards */
         box-shadow: 0 -1px 6px rgba(16,24,40,.06);
-        color:#334155; }
+        color:#334155; border-bottom-left-radius: var(--chrome-radius); border-bottom-right-radius: var(--chrome-radius); }
       .footer-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap; }
       .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
       .force-dark-toggle{ display:flex; align-items:center; gap:8px; }
@@ -717,6 +745,7 @@
         </div>
         <div id="sx-progress" class="progress hidden"><div class="bar"></div></div>
         <div class="container" id="sx-container">
+          <div class="empty-illus" aria-hidden="true"></div>
           <section class="section">
             <div id="sx-summary" class="card card-head" data-title="摘要"></div>
           </section>
@@ -981,6 +1010,19 @@
   // ===== 启动 =====
   const host = ensurePanel();
   const shadow = host.shadowRoot;
+
+  // Align corner radius to platform look
+  (function applyPlatformRadius(){
+    try{
+      const ua = navigator.userAgent || '';
+      // Defaults to 12px (Chrome desktop surfaces)
+      let px = 12;
+      if (/Windows/i.test(ua)) px = 8;               // Windows 11 look leans 8px
+      else if (/Macintosh|Mac OS X/i.test(ua)) px = 12; // macOS rounded surfaces ~12px
+      else px = 12;
+      shadow.host.style.setProperty('--chrome-radius', px + 'px');
+    }catch{}
+  })();
 
   // ripple
   shadow.addEventListener('click',(ev)=>{

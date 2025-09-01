@@ -124,6 +124,17 @@ async function runForTab(tabId) {
   const isTrial = (cfg.aiProvider === "trial");
   if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
 
+  // Trial 模式需要显式同意：否则禁止将页面内容发送至代理
+  if (isTrial) {
+    try {
+      const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+      if (!trial_consent) {
+        try { await chrome.runtime.openOptionsPage(); } catch {}
+        throw new Error("试用模式需先同意通过代理传输页面内容。请在设置页勾选同意，或切换到其他平台。");
+      }
+    } catch {}
+  }
+
   await setState(tabId, { status: "running" });
 
   const { title, text, url, pageLang } = await getPageRawByTabId(tabId);

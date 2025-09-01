@@ -5,13 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI 摘要阅读器 - 设置</title>
   <link rel="stylesheet" href="options.css" />
-  <script>
-    // 提前定义 SXUI，确保 petite-vue 初始化 v-scope 时可用
-    window.SXUI = window.SXUI || {
-      eyeOpen: false,
-      focus: { aiProvider:false, apiKey:false, baseURL:false, model_extract:false, model_summarize:false, output_lang:false, extract_mode:false }
-    };
-  </script>
+  <!-- 提前定义 SXUI（移除内联脚本，改为外链以符合 MV3 CSP） -->
+  <script src="options.preload.js" defer></script>
   <script src="vendor/petite-vue.iife.js" defer></script>
 </head>
 <body>
@@ -65,6 +60,15 @@
           <span id="buy-help-sep"> · </span>
           <a id="link-buy-deepseek" href="#" target="_blank" rel="noopener">DeepSeek 指南</a>
         </span>
+        <!-- Trial consent (only visible in trial mode) -->
+        <div class="field" id="trial-consent-wrap" style="display:none; margin-top:8px;">
+          <div class="help" id="trial-consent-help">
+            <label style="display:flex; align-items:center; gap:8px;">
+              <input id="trial_consent" type="checkbox" />
+              <span id="trial-consent-text">我已阅读并同意：试用模式会通过代理服务器传输页面内容，用于生成摘要/清洗正文。</span>
+            </label>
+          </div>
+        </div>
         <p class="hint" id="platform-hint">切换平台将自动填写 Base URL 和模型；若手动修改任意字段，将自动切到「自定义」。</p>
       </div>
 

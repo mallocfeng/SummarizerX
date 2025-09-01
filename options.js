@@ -259,6 +259,7 @@ function applyPresetToTextarea(force = false) {
  * ========================= */
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
+  const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -275,6 +276,10 @@ async function loadSettings() {
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
 
   if (aiProvider === "trial") await setTrialLock(true); else await setTrialLock(false);
+  // 显示试用模式同意复选框
+  reflectTrialConsentVisibility(aiProvider);
+  const consentEl = $("trial_consent");
+  if (consentEl) consentEl.checked = !!trial_consent;
 
   $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
   if (d.system_prompt_custom && d.system_prompt_custom.trim()) {
@@ -319,7 +324,8 @@ async function saveSettings() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value,
     system_prompt_preset: $("system_prompt_preset").value,
-    system_prompt_custom: $("system_prompt_custom").value.trim()
+    system_prompt_custom: $("system_prompt_custom").value.trim(),
+    trial_consent: !!($("trial_consent")?.checked)
   };
 
   // 同步保存平台专用 key（便于切换回填）
@@ -432,6 +438,7 @@ async function onProviderChange() {
     }
     await setTrialLock(false);
   }
+  reflectTrialConsentVisibility(provider);
 
   await setMeta({
     aiProvider: provider,
@@ -457,6 +464,12 @@ function markCustomIfManualChange() {
     isProgrammaticProviderChange = false;
     onProviderChange();
   }
+}
+
+function reflectTrialConsentVisibility(provider){
+  const wrap = document.getElementById('trial-consent-wrap');
+  if (!wrap) return;
+  wrap.style.display = (provider === 'trial') ? '' : 'none';
 }
 
 async function onPresetChange() {
