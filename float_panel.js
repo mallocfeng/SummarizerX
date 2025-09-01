@@ -112,6 +112,10 @@
       </div>`;
       html = html.replace(`__ALERT_TOKEN_${i}__`, n);
     });
+    // 强化一次 alert 前后 <br> 的清理，防止出现过大空隙
+    html = html
+      .replace(/(?:\s*<br\s*\/?>\s*)+(?=<div class=\"alert\"\b)/gi, '')
+      .replace(/(<div class=\"alert\"[^>]*>.*?<\/div>)(?:\s*<br\s*\/?>\s*)+/gis, '$1');
     return html;
   }
 
@@ -430,12 +434,12 @@
       .empty .hint{ margin-top:6px; color:var(--muted); font-size:12px; }
       .empty .hint strong{ background:rgba(59,130,246,.10); padding:0 6px; border-radius:6px; }
 
-      .alert{ border-radius:12px; border:1px solid #f3e9c5; background:#fff9e6; padding:10px 40px 10px 12px; margin:2px 0; font-size:13px; line-height:1.65; position:relative; }
+      .alert{ border-radius:12px; border:1px solid #f3e9c5; background:#fff9e6; padding:10px 40px 10px 12px; margin:2px 0 10px; font-size:13px; line-height:1.65; position:relative; }
       .alert .alert-close{ position:absolute; top:6px; right:6px; border:none; background:transparent; font-size:16px; cursor:pointer; line-height:1; opacity:.8; }
       .alert .alert-close:hover{ opacity:1; }
 
       /* tighten spacing after alert */
-      .md .alert + *{ margin-top:4px !important; }
+      .md .alert + *{ margin-top:10px !important; }
       .md .alert + h1,
       .md .alert + h2,
       .md .alert + h3,
@@ -1013,7 +1017,7 @@
     const box=btn.closest('.alert'); if(!box) return;
     const rm=(start,dir='nextSibling')=>{ let n=start[dir]; while(n && n.nodeType===1 && n.tagName==='BR'){ const d=n; n=n[dir]; d.remove(); } };
     rm(box,'previousSibling'); rm(box,'nextSibling');
-    const md=box.closest('.md'); box.remove(); if(md){ const first=md.firstElementChild; first && (first.style.marginTop='0px'); }
+    const md=box.closest('.md'); box.remove(); if(md){ const first=md.firstElementChild; first && (first.style.marginTop='6px'); }
   });
 
   // 文案/标题 i18n（更新 host.lang → 驱动中英文按钮换行策略）
