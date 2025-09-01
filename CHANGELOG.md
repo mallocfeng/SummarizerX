@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.8.0
+
+### English
+- 🔧 **Chrome Web Store Compliance**: Fixed ESM remote dependencies to comply with 'Blue Argon' requirements
+- 🚫 **Removed External Dependencies**: Eliminated vendor/petite-vue.es.js that contained external link fragments
+- ⚡ **MV3 Manifest Compliance**: Ensured all resources are local and properly packaged
+- 🎯 **Maintained Functionality**: Preserved all features with vanilla DOM rendering fallback
+- 🛡️ **Security Enhancement**: Removed potential security risks from external dependencies
+
+### 中文
+- 🔧 **Chrome扩展商店合规性**: 修复ESM远程依赖以符合'Blue Argon'要求
+- 🚫 **移除外部依赖**: 删除包含外部链接片段的vendor/petite-vue.es.js文件
+- ⚡ **MV3清单合规性**: 确保所有资源都是本地且正确打包的
+- 🎯 **保持功能完整**: 通过vanilla DOM渲染降级保留所有功能
+- 🛡️ **安全性增强**: 移除外部依赖带来的潜在安全风险
+
 ## v1.7.9
 
 ### English
