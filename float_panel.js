@@ -11,15 +11,11 @@
     } catch (e) { console.warn('Failed to load i18n module:', e); return null; }
   }
 
-  // ===== petite-vue（ESM优先，失败降级）=====
+  // ===== petite-vue（禁用 ESM 远程依赖，确保 MV3 合规）=====
+  // 为符合“Blue Argon”要求，不从 vendor/petite-vue.es.js 动态 import（其文件含外链片段）。
+  // 面板默认使用 vanilla 渲染路径；若后续需要，也可改为加载本地 IIFE 版本（非必须）。
   let PV = null;
-  async function tryLoadPetiteVue() {
-    try {
-      const url = chrome.runtime.getURL('vendor/petite-vue.es.js');
-      const mod = await import(url);
-      if (mod && typeof mod.createApp === 'function') PV = mod;
-    } catch (e) { console.info('petite-vue.es.js not found; fallback to vanilla.', e); }
-  }
+  async function tryLoadPetiteVue() { PV = null; }
 
   const PANEL_ID = 'sx-float-panel';
   const MARK = '__SX_FLOAT_PANEL_READY__';
