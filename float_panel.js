@@ -1208,10 +1208,9 @@
           background-color: #121212 !important;
         }
         
-        /* 特殊处理链接 */
-        a, a:visited, a:active, a:hover {
-          color: #4a9eff !important;
-        }
+        /* 链接：改为带灰度的浅色，避免突兀的蓝色 */
+        a, a:visited, a:active { color: #d6dbe5 !important; }
+        a:hover { color: #eef2f7 !important; }
         
         /* 处理选择文本 */
         ::selection {
