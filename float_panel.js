@@ -1207,10 +1207,35 @@
         #container {
           background-color: #121212 !important;
         }
+
+        /* GitHub 常见容器与变量覆盖（仅在 GitHub 选择器命中时生效）*/
+        :root[data-color-mode],
+        body[data-color-mode] {
+          --color-canvas-default: #0f1624 !important;
+          --color-canvas-subtle: #0d1422 !important;
+          --color-border-default: #2a3a57 !important;
+          --color-fg-default: #e6ebf2 !important;
+          --color-accent-fg: #d6dbe5 !important;
+        }
+        .application-main,
+        .markdown-body,
+        .Layout,
+        .Layout-main,
+        .container-lg,
+        .container-xl,
+        .Box,
+        .Box-body,
+        .gollum-markdown-content,
+        .blob-wrapper {
+          background-color: #0f1624 !important;
+          color: #e6ebf2 !important;
+        }
         
         /* 链接：改为带灰度的浅色，避免突兀的蓝色 */
         a, a:visited, a:active { color: #d6dbe5 !important; }
         a:hover { color: #eef2f7 !important; }
+
+        /* 移除一刀切背景覆盖，避免覆盖视频或交互控件；统一文字亮色的规则已在上方保留 */
         
         /* 处理选择文本 */
         ::selection {
@@ -1219,12 +1244,97 @@
         }
       `;
       document.head.appendChild(style);
+
+      // 智能本地加深：仅为明显浅底的容器加暗色基底（避免一刀切破坏）
+      try{
+        const MEDIA = new Set(['IMG','VIDEO','CANVAS','SVG','IFRAME','EMBED','OBJECT','PICTURE']);
+        const hasBgImage = (cs)=>{
+          const bi = cs.backgroundImage || '';
+          return bi && bi !== 'none' && !/linear-gradient/i.test(bi);
+        };
+        const markNode = (el)=>{
+          if (!el || el.nodeType!==1) return;
+          // 距离视频区域很近的容器直接跳过，避免遮挡
+          try{
+            const nearVideo = el.closest('video, [class*="ytp-" i], [class*="video" i], [class*="player" i], [id*="video" i], [id*="player" i]');
+            if (nearVideo) return;
+          }catch{}
+          if (MEDIA.has(el.tagName)) return;
+          // 不处理极小元素，降低抖动（但放宽阈值，避免小徽标未处理）
+          const rect = el.getBoundingClientRect?.();
+          if (rect && (rect.width*rect.height) < 150) return;
+          const cs = getComputedStyle(el);
+          if (!cs) return;
+          if (hasBgImage(cs)) return;
+          const hasGlass = (cs.backdropFilter && cs.backdropFilter !== 'none') || (cs.webkitBackdropFilter && cs.webkitBackdropFilter !== 'none');
+          const hasGradient = /linear-gradient/i.test(cs.backgroundImage || '');
+          const bg = parseColorToRGB(cs.backgroundColor);
+          if (!bg || bg.a < 0.05) return; // 近透明跳过
+          const lum = relLuminance(bg);
+          // 若是玻璃毛化容器，且背景为浅色/半透明/或有渐变，替换为暗色半透明玻璃
+          if (hasGlass && (hasGradient || !bg || bg.a < 0.95) && (lum > 0.65)){
+            el.classList.add('sx-dark-glass');
+            return;
+          }
+          if (lum > 0.78) el.classList.add('sx-dark-bg');
+          const bc = parseColorToRGB(cs.borderTopColor);
+          if (bc && relLuminance(bc) > 0.7) el.classList.add('sx-dark-border');
+        };
+        const scanBatch = (root)=>{
+          const all = (root||document).querySelectorAll('*');
+          const MAX = 2000;
+          const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+          let seen = 0;
+          for (let i=0; i<all.length && seen<MAX; i++){
+            const el = all[i];
+            const rect = el.getBoundingClientRect?.();
+            if (rect && (rect.bottom < -20 || rect.top > vh*1.8)) continue; // 只处理视口附近
+            markNode(el);
+            seen++;
+          }
+        };
+        // 注入辅助样式（与主样式同 <style> 中）
+        style.textContent += `\n`
+          + `.sx-dark-bg{ background-color:#121826 !important; color:#e6ebf2 !important; }\n`
+          + `.sx-dark-bg a, .sx-dark-bg a:visited, .sx-dark-bg a:active{ color:#d6dbe5 !important; }\n`
+          + `.sx-dark-border{ border-color:#2a3a57 !important; }\n`
+          + `.sx-dark-glass{ background-color: rgba(18,24,38,.45) !important; color:#e6ebf2 !important; border-color: rgba(42,58,87,.6) !important; backdrop-filter: saturate(1) blur(6px) !important; -webkit-backdrop-filter: saturate(1) blur(6px) !important; }\n`;
+        // 初次扫描
+        scanBatch(document);
+        // 监听增量变化（仅 childList，避免属性循环），并使用 rAF 合批
+        window.__sxForceDarkObserver && window.__sxForceDarkObserver.disconnect();
+        window.__sxForceDarkObserver = new MutationObserver((muts)=>{
+          if (window.__sxFDDebounce) return;
+          window.__sxFDDebounce = true;
+          requestAnimationFrame(()=>{
+            window.__sxFDDebounce = false;
+            const batch=[];
+            for (const m of muts){
+              if (m.type==='childList'){
+                m.addedNodes && m.addedNodes.forEach(n=>{
+                  if (n && n.nodeType===1){
+                    batch.push(n);
+                    try{ n.querySelectorAll && n.querySelectorAll('*').forEach(x=>batch.push(x)); }catch{}
+                  }
+                });
+              }
+            }
+            let processed=0;
+            for (const el of batch){ if (processed>600) break; markNode(el); processed++; }
+          });
+        });
+        window.__sxForceDarkObserver.observe(document.documentElement, { childList:true, subtree:true });
+      }catch{}
     } else {
       // 移除强制深色模式CSS
       const existingStyle = document.getElementById('sx-force-dark-mode');
       if (existingStyle) {
         existingStyle.remove();
       }
+      // 清理智能标记与观察器
+      try{ document.querySelectorAll('.sx-dark-bg').forEach(el=>el.classList.remove('sx-dark-bg')); }catch{}
+      try{ document.querySelectorAll('.sx-dark-border').forEach(el=>el.classList.remove('sx-dark-border')); }catch{}
+      try{ window.__sxForceDarkObserver && window.__sxForceDarkObserver.disconnect(); window.__sxForceDarkObserver=null; }catch{}
     }
   }
 
