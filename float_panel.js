@@ -325,16 +325,53 @@
       .btn[disabled]{ opacity:.6; cursor:not-allowed; }
 
       /* ===== Progress ===== */
-      .progress{ height:3px; background:transparent; position:relative; overflow:hidden; }
+      .progress{ height:3px; position:relative; overflow:hidden;
+        /* Match appbar surface to avoid transparent flash on show */
+        background: linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(8px) saturate(1.05);
+        backdrop-filter: blur(8px) saturate(1.05);
+      }
       .progress .bar{ position:absolute; left:-20%; width:18%; min-width:140px; max-width:280px; top:0; bottom:0; background: linear-gradient(90deg, rgba(59,130,246,0), rgba(59,130,246,.85), rgba(59,130,246,0)); border-radius:999px; animation: slide 1.15s linear infinite; box-shadow:0 0 10px rgba(59,130,246,.35); }
       @keyframes slide { 0%{left:-20%;} 100%{left:110%;} }
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:12px; overflow:auto; }
-      /* Empty state: hide cards; keep frosted background only */
+      .container{ flex:1 1 auto; padding:12px; overflow:auto; transition: height .6s cubic-bezier(.2,.7,.3,1); }
+      /* Empty state: hide cards; keep frosted background only between bars and compress middle to 100px */
       .wrap.is-empty #sx-summary,
       .wrap.is-empty #sx-cleaned{ display:none !important; }
+      .wrap.is-empty .container{ flex:0 0 auto; height:100px; overflow:hidden; padding-top:0; padding-bottom:0; }
+      .wrap.is-empty .section{ margin:0 !important; }
+      /* While expanding, allow the middle to grow smoothly */
+      .wrap.is-empty.expanding .container{ height: var(--sx-target, 2000px); }
+      /* In folded state, keep the panel fully transparent outside the middle container */
+      .wrap.fx-intro.is-empty,
+      .wrap.is-empty{ background: transparent !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+      .wrap.is-empty .container{
+        background: linear-gradient(135deg, var(--glass) 0%, var(--glass-soft) 100%);
+        -webkit-backdrop-filter: blur(14px) saturate(1.05);
+        backdrop-filter: blur(14px) saturate(1.05);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+      }
+      /* Only show the left divider within the middle container; hide global one */
+      .wrap.is-empty{ border-left:none !important; box-shadow:none !important; }
+      .wrap.is-empty .container::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:1px; background: var(--border); }
+      .wrap.is-empty .dragbar::after{ opacity:0 !important; width:0 !important; }
+      :host([data-theme="dark"]) .wrap.is-empty .container{
+        background: linear-gradient(135deg, var(--glass) 0%, var(--glass-soft) 100%);
+      }
+      /* Folded: keep same color scheme but reduce transparency via tokens */
+      .wrap.is-empty{ --glass: rgba(255,255,255,.88); --glass-soft: rgba(255,255,255,.80); }
+      :host([data-theme="dark"]) .wrap.is-empty{ --glass: rgba(16,22,32,.88); --glass-soft: rgba(16,22,32,.80); }
+      /* Folded: add a subtle bottom shadow to footer to enhance depth */
+      .wrap.is-empty .footer{
+        box-shadow: 0 -1px 6px rgba(16,24,40,.10), 0 4px 12px rgba(16,24,40,.12) !important;
+      }
+      :host([data-theme="dark"]) .wrap.is-empty .footer{
+        box-shadow: 0 -1px 8px rgba(0,0,0,.28), 0 4px 12px rgba(0,0,0,.22) !important;
+      }
       /* Intro state: high-transparency frosted look, no center block */
       .wrap.fx-intro{
         background: linear-gradient(135deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.10) 100%);
@@ -420,6 +457,7 @@
         60%{ opacity:.96; transform: translateY(-2px); clip-path: inset(0 0 8% 0 round 12px); }
         100%{ opacity:1; transform: translateY(0); clip-path: inset(0 0 0 0 round 12px); }
       }
+      /* (removed clip-path unroll to avoid flicker); rely on height transition for smoothness */
 
       /* ===== Markdown ===== */
       .md{ font-size:15px; line-height:1.78; color: var(--text); word-break:break-word; overflow-wrap:anywhere; }
@@ -1110,8 +1148,6 @@
     try{ const wrap=shadow.getElementById('sx-wrap'); wrap?.classList?.add('fx-intro'); wrap?.classList?.add('is-empty'); }catch{}
   }
   async function renderCards(summaryMarkdown, cleanedMarkdown){
-    // Leaving empty state once content starts rendering
-    try{ shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); }catch{}
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
     if (vmSummary) vmSummary.html = sumHTML; else shadow.getElementById('sx-summary').innerHTML = sumHTML;
     if (cleanedMarkdown===null){
@@ -1126,22 +1162,68 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
-      // remove intro mask and play pull-down animation for cards
+      // Handle folded (empty) state: expand middle first, then reveal cards
+      const wrapEl = shadow.getElementById('sx-wrap');
+      const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
       try{
-        const wrapEl = shadow.getElementById('sx-wrap');
-        wrapEl?.classList?.remove('fx-intro');
-        wrapEl?.classList?.remove('is-empty');
-        const sCard = shadow.getElementById('sx-summary');
-        const cCard = shadow.getElementById('sx-cleaned');
-        sCard?.classList?.add('pull-in');
-        cCard?.classList?.add('pull-in');
-        setTimeout(()=>{ try{ sCard?.classList?.remove('pull-in'); cCard?.classList?.remove('pull-in'); }catch{} }, 700);
+        if (wasEmpty){
+          wrapEl.classList.remove('fx-intro');
+          wrapEl.classList.add('expanding');
+        }else{
+          wrapEl?.classList?.remove('fx-intro');
+        }
       }catch{}
+
       setLoading(shadow,true);
-      skeleton(shadow);
+      if (!wasEmpty) skeleton(shadow);
+
       const tabId=await getActiveTabId(); if(!tabId) throw new Error('未找到活动标签页');
       const resp=await chrome.runtime.sendMessage({type:'PANEL_RUN_FOR_TAB', tabId});
       if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+
+      // After expansion, reveal cards and play pull-in animation
+      if (wasEmpty){
+        try{
+          const container = shadow.getElementById('sx-container');
+          // compute target height: wrap height minus appbar + footer heights
+          const wrapRect = wrapEl.getBoundingClientRect();
+          const appbar = shadow.querySelector('.appbar');
+          const footer = shadow.querySelector('.footer');
+          const appH = appbar ? appbar.getBoundingClientRect().height : 0;
+          const footH = footer ? footer.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH));
+          // prepare container for smooth transition
+          container.style.willChange = 'height';
+          container.style.contain = 'layout style';
+          container?.style.setProperty('--sx-target', target + 'px');
+
+          let done = false; const finish = ()=>{
+            if (done) return; done = true;
+            try{
+              wrapEl.classList.remove('is-empty');
+              wrapEl.classList.remove('expanding');
+              skeleton(shadow);
+              const sCard = shadow.getElementById('sx-summary');
+              const cCard = shadow.getElementById('sx-cleaned');
+              sCard?.classList?.add('pull-in');
+              cCard?.classList?.add('pull-in');
+              setTimeout(()=>{ try{ sCard?.classList?.remove('pull-in'); cCard?.classList?.remove('pull-in'); }catch{} }, 700);
+            }catch{}
+          };
+          // Use transitionend for smooth sync with the unroll
+          container?.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          // Fallback timeout in case transitionend is missed
+          setTimeout(finish, 900);
+        }catch{}
+      } else {
+        try{
+          const sCard = shadow.getElementById('sx-summary');
+          const cCard = shadow.getElementById('sx-cleaned');
+          sCard?.classList?.add('pull-in');
+          cCard?.classList?.add('pull-in');
+          setTimeout(()=>{ try{ sCard?.classList?.remove('pull-in'); cCard?.classList?.remove('pull-in'); }catch{} }, 700);
+        }catch{}
+      }
 
       try{
         const st=await getState(tabId);
@@ -1175,9 +1257,21 @@
       const tabId=await getActiveTabId();
       if (!tabId){ await setEmpty(shadow); return; }
       const st=await getState(tabId);
-      if (st.status==='running'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
-      else if (st.status==='partial'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
-      else if (st.status==='done'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
+      if (st.status==='running'){
+        const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+        if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
+      }
+      else if (st.status==='partial'){
+        const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+        if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
+      }
+      else if (st.status==='done'){
+        const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+        if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+      }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
   })();
@@ -1189,9 +1283,21 @@
       const curId=await getActiveTabId(); if (msg.tabId!==curId) return;
       try{
         const st=await getState(curId);
-        if (st.status==='running'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); skeleton(shadow); }
-        else if (st.status==='partial'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); await renderCards(st.summary, null); }
-        else if (st.status==='done'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
+        if (st.status==='running'){
+          const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+          if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+          setLoading(shadow,true); skeleton(shadow);
+        }
+        else if (st.status==='partial'){
+          const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+          if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+          setLoading(shadow,true); await renderCards(st.summary, null);
+        }
+        else if (st.status==='done'){
+          const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
+          if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+          setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+        }
         else if (st.status==='error'){
           setLoading(shadow,false);
           shadow.getElementById('sx-summary').innerHTML =
