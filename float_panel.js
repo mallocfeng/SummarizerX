@@ -282,7 +282,7 @@
       @media (prefers-reduced-motion: reduce){
         .wrap.fx-enter, .wrap.fx-enter .appbar, .wrap.fx-enter .footer{ animation: none; }
       }
-      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; }
+      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; z-index:10; }
       .dragbar::after{ content:""; position:absolute; top:0; bottom:0; right:-1px; width:2px; background:linear-gradient(180deg, rgba(102,112,133,.20), rgba(102,112,133,.02)); opacity:0; transition: opacity .15s ease; }
       .dragbar:hover::after, .wrap.dragging .dragbar::after{ opacity:.9; }
       .wrap.dragging{ cursor:col-resize; }
@@ -332,6 +332,20 @@
 
       /* ===== Body ===== */
       .container{ flex:1 1 auto; padding:12px; overflow:auto; }
+      /* Empty state: hide cards; keep frosted background only */
+      .wrap.is-empty #sx-summary,
+      .wrap.is-empty #sx-cleaned{ display:none !important; }
+      /* Intro state: high-transparency frosted look, no center block */
+      .wrap.fx-intro{
+        background: linear-gradient(135deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.10) 100%);
+        -webkit-backdrop-filter: blur(16px) saturate(1.05);
+        backdrop-filter: blur(16px) saturate(1.05);
+      }
+      .wrap.fx-intro .container{ position:relative; }
+      .wrap.fx-intro .container::after{ content:""; display:none; }
+      :host([data-theme="dark"]) .wrap.fx-intro{
+        background: linear-gradient(135deg, rgba(16,22,32,.34) 0%, rgba(16,22,32,.20) 100%);
+      }
       .section{ margin:10px 0 16px; }
 
       /* ===== Cards ===== */
@@ -399,6 +413,13 @@
 
       .card.revive{ animation: sxPop .26s cubic-bezier(.2,.7,.3,1) both; }
       @keyframes sxPop { 0%{ opacity:0; transform: translateY(6px) scale(.995);} 100%{ opacity:1; transform: translateY(0) scale(1);} }
+      /* Pull-down intro animation for cards */
+      .card.pull-in{ animation: sxPull .42s cubic-bezier(.2,.7,.3,1) both; }
+      @keyframes sxPull {
+        0%{ opacity:0; transform: translateY(-12px); clip-path: inset(0 0 100% 0 round 12px); }
+        60%{ opacity:.96; transform: translateY(-2px); clip-path: inset(0 0 8% 0 round 12px); }
+        100%{ opacity:1; transform: translateY(0); clip-path: inset(0 0 0 0 round 12px); }
+      }
 
       /* ===== Markdown ===== */
       .md{ font-size:15px; line-height:1.78; color: var(--text); word-break:break-word; overflow-wrap:anywhere; }
@@ -1077,21 +1098,20 @@
     }
   }
   async function setEmpty(shadow){
-    const i18n = await loadI18n(); const lang = i18n? await i18n.getCurrentLanguage():'zh';
-    const em1 = `<div class="empty is-summary">
-      <div class="illus"><div class="icon">📝</div></div>
-      <div class="title">${lang==='zh'?'暂无摘要':'No Summary'}</div>
-      <div class="hint">${lang==='zh'?'点击上方<strong>提取并摘要</strong>开始处理当前页面':'Click <strong>Extract & Summarize</strong> above to process this page'}</div>
-    </div>`;
-    const em2 = `<div class="empty is-cleaned">
-      <div class="illus"><div class="icon">📄</div></div>
-      <div class="title">${lang==='zh'?'暂无可读正文':'No Readable Content'}</div>
-      <div class="hint">${lang==='zh'?'点击上方<strong>提取并摘要</strong>生成可读正文':'Use <strong>Extract & Summarize</strong> to generate cleaned content'}</div>
-    </div>`;
-    if (vmSummary && vmCleaned){ vmSummary.html = em1; vmCleaned.html = em2; }
-    else { await vanillaEmpty(shadow); }
+    // Do not render empty cards; keep background only
+    try{
+      if (vmSummary && vmCleaned){ vmSummary.html = ''; vmCleaned.html = ''; }
+      else {
+        shadow.getElementById('sx-summary').innerHTML = '';
+        shadow.getElementById('sx-cleaned').innerHTML = '';
+      }
+    }catch{}
+    // Mark intro + empty for high-transparency frosted backdrop and no resize
+    try{ const wrap=shadow.getElementById('sx-wrap'); wrap?.classList?.add('fx-intro'); wrap?.classList?.add('is-empty'); }catch{}
   }
   async function renderCards(summaryMarkdown, cleanedMarkdown){
+    // Leaving empty state once content starts rendering
+    try{ shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); }catch{}
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
     if (vmSummary) vmSummary.html = sumHTML; else shadow.getElementById('sx-summary').innerHTML = sumHTML;
     if (cleanedMarkdown===null){
@@ -1106,6 +1126,17 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      // remove intro mask and play pull-down animation for cards
+      try{
+        const wrapEl = shadow.getElementById('sx-wrap');
+        wrapEl?.classList?.remove('fx-intro');
+        wrapEl?.classList?.remove('is-empty');
+        const sCard = shadow.getElementById('sx-summary');
+        const cCard = shadow.getElementById('sx-cleaned');
+        sCard?.classList?.add('pull-in');
+        cCard?.classList?.add('pull-in');
+        setTimeout(()=>{ try{ sCard?.classList?.remove('pull-in'); cCard?.classList?.remove('pull-in'); }catch{} }, 700);
+      }catch{}
       setLoading(shadow,true);
       skeleton(shadow);
       const tabId=await getActiveTabId(); if(!tabId) throw new Error('未找到活动标签页');
@@ -1144,9 +1175,9 @@
       const tabId=await getActiveTabId();
       if (!tabId){ await setEmpty(shadow); return; }
       const st=await getState(tabId);
-      if (st.status==='running'){ setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
-      else if (st.status==='partial'){ setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
-      else if (st.status==='done'){ setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
+      if (st.status==='running'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
+      else if (st.status==='partial'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c)); }
+      else if (st.status==='done'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
   })();
@@ -1158,9 +1189,9 @@
       const curId=await getActiveTabId(); if (msg.tabId!==curId) return;
       try{
         const st=await getState(curId);
-        if (st.status==='running'){ setLoading(shadow,true); skeleton(shadow); }
-        else if (st.status==='partial'){ setLoading(shadow,true); await renderCards(st.summary, null); }
-        else if (st.status==='done'){ setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
+        if (st.status==='running'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); skeleton(shadow); }
+        else if (st.status==='partial'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,true); await renderCards(st.summary, null); }
+        else if (st.status==='done'){ shadow.getElementById('sx-wrap')?.classList?.remove('fx-intro'); shadow.getElementById('sx-wrap')?.classList?.remove('is-empty'); setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling(); }
         else if (st.status==='error'){
           setLoading(shadow,false);
           shadow.getElementById('sx-summary').innerHTML =
