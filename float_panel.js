@@ -246,6 +246,7 @@
         /* approximate Chrome desktop surface corner; may be adjusted per-platform */
         --chrome-radius: 12px;
         --btn-min-h: 36px;
+        --arrow-nudge: 8px; /* move empty arrow slightly upward */
         --shadow-1: 0 1px 2px rgba(16,24,40,.06);
         --shadow-2: 0 4px 12px rgba(16,24,40,.10);
 
@@ -362,9 +363,9 @@
         position: relative;
       }
       /* Center illus (down arrow) shown only in folded state */
-      .empty-illus{ display:none; position:absolute; left:50%; top:50%; transform: translate(-50%, -50%);
+      .empty-illus{ display:none; position:absolute; left:50%; top:50%; transform: translate(-50%, calc(-50% - var(--arrow-nudge)));
         width:28px; height:28px; border-radius:8px; opacity:.96; color: var(--primary);
-        background: transparent; border:none; box-shadow:none;
+        background: transparent; border:none; box-shadow:none; pointer-events:none;
         transition: opacity .25s ease, transform .25s ease; animation: bounceY 2.2s ease-in-out infinite; }
       :host([data-theme="dark"]) .empty-illus{ color: var(--primary-600); }
       .empty-illus::before{
@@ -372,11 +373,13 @@
         background: currentColor;
         -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
         mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
+        transform: rotate(180deg);
       }
       .empty-illus::after{ content:""; display:none; }
       .wrap.is-empty .empty-illus{ display:grid; place-items:center; }
       .wrap.is-empty.expanding .empty-illus{ opacity:0; transform: translate(-50%, -60%); }
-      @keyframes bounceY{ 0%,100%{ transform: translate(-50%, -50%); } 50%{ transform: translate(-50%, calc(-50% + 6px)); } }
+      .wrap.dragging .empty-illus{ animation: none; }
+      @keyframes bounceY{ 0%,100%{ transform: translate(-50%, calc(-50% - var(--arrow-nudge))); } 50%{ transform: translate(-50%, calc(-50% - var(--arrow-nudge) + 4px)); } }
       @media (prefers-reduced-motion: reduce){ .empty-illus{ animation: none; } }
       /* Only show the left divider within the middle container; hide global one */
       .wrap.is-empty{ border-left:none !important; box-shadow:none !important; }
@@ -745,7 +748,7 @@
         </div>
         <div id="sx-progress" class="progress hidden"><div class="bar"></div></div>
         <div class="container" id="sx-container">
-          <div class="empty-illus" aria-hidden="true"></div>
+          <div class="empty-illus" id="sx-empty-arrow" aria-hidden="true"></div>
           <section class="section">
             <div id="sx-summary" class="card card-head" data-title="摘要"></div>
           </section>
@@ -956,9 +959,11 @@
         btn.textContent = lang==='zh' ? '提取并摘要' : 'Extract & Summarize';
         btn.title = lang==='zh' ? '点击提取正文并生成摘要' : 'Click to extract content and generate summary';
       }
+      try{ updateEmptyArrowPosition(); }catch{}
     }).catch(()=>{
       btn.textContent = '提取并摘要';
       btn.title = '点击提取正文并生成摘要';
+      try{ updateEmptyArrowPosition(); }catch{}
     });
   }
 
@@ -1011,6 +1016,39 @@
   const host = ensurePanel();
   const shadow = host.shadowRoot;
 
+  // 动态定位折叠箭头到“提取并摘要”按钮正下方
+  function updateEmptyArrowPosition(){
+    try{
+      const wrap = shadow.getElementById('sx-wrap');
+      if (!wrap || !wrap.classList.contains('is-empty')) return;
+      const btn = shadow.getElementById('sx-run');
+      const container = shadow.getElementById('sx-container');
+      const arrow = shadow.getElementById('sx-empty-arrow');
+      if (!btn || !container || !arrow) return;
+      const br = btn.getBoundingClientRect();
+      const cr = container.getBoundingClientRect();
+      if (!br.width || !cr.width) return;
+      const centerX = br.left + br.width/2;
+      const leftInContainer = Math.max(0, Math.min(cr.width, centerX - cr.left));
+      arrow.style.left = Math.round(leftInContainer) + 'px';
+      // keep vertical center via top:50% in CSS
+    }catch{}
+  }
+
+  // 监听容器与按钮尺寸变化，实时校准箭头（避免第一次变化时跳动）
+  let __arrowRO = null;
+  function bindArrowResizeObservers(){
+    try{
+      if (!('ResizeObserver' in window)) return;
+      if (__arrowRO) { try{ __arrowRO.disconnect(); }catch{} }
+      __arrowRO = new ResizeObserver(()=>{ try{ updateEmptyArrowPosition(); }catch{} });
+      const c = shadow.getElementById('sx-container');
+      const b = shadow.getElementById('sx-run');
+      c && __arrowRO.observe(c);
+      b && __arrowRO.observe(b);
+    }catch{}
+  }
+
   // Align corner radius to platform look
   (function applyPlatformRadius(){
     try{
@@ -1036,13 +1074,18 @@
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
 
+  // 保持折叠箭头在窗口尺寸变化时也对齐
+  try{ window.addEventListener('resize', ()=>{ try{ updateEmptyArrowPosition(); }catch{} }, { passive:true }); }catch{}
+
   // 开启动画：为容器添加入场类，完毕后移除
   try{
     const wrapOnce = shadow.getElementById('sx-wrap');
     if (wrapOnce){
       wrapOnce.classList.add('fx-enter');
-      const clear = ()=>{ try{ wrapOnce.classList.remove('fx-enter'); wrapOnce.removeEventListener('animationend', clear); }catch{} };
+      const clear = ()=>{ try{ wrapOnce.classList.remove('fx-enter'); wrapOnce.removeEventListener('animationend', clear); updateEmptyArrowPosition(); }catch{} };
       wrapOnce.addEventListener('animationend', clear);
+      // 帧后与兜底时机各执行一次定位，避免入场动画位置差异
+      requestAnimationFrame(()=>{ try{ updateEmptyArrowPosition(); }catch{} });
       setTimeout(clear, 900);
     }
   }catch{}
@@ -1092,11 +1135,11 @@
       host.style.width = `${w}px`; try{ chrome.storage.sync.set({ float_panel_width: w }); }catch{}
     }
     let dragging=false;
-    function start(){ dragging=true; wrapEl?.classList.add('dragging'); document.documentElement.style.userSelect='none'; }
+    function start(){ dragging=true; wrapEl?.classList.add('dragging'); document.documentElement.style.userSelect='none'; try{ updateEmptyArrowPosition(); }catch{} }
     function end(){ dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect=''; window.removeEventListener('mousemove', mm, true); window.removeEventListener('mouseup', mu, true); window.removeEventListener('touchmove', tm, {capture:true, passive:false}); window.removeEventListener('touchend', te, {capture:true}); }
-    const mm=(ev)=>{ if(!dragging) return; ev.preventDefault(); setW(ev.clientX); };
+    const mm=(ev)=>{ if(!dragging) return; ev.preventDefault(); setW(ev.clientX); updateEmptyArrowPosition(); };
     const mu=()=>{ if(!dragging) return; end(); };
-    const tm=(ev)=>{ if(!dragging) return; if(ev.touches && ev.touches[0]) setW(ev.touches[0].clientX); ev.preventDefault(); };
+    const tm=(ev)=>{ if(!dragging) return; if(ev.touches && ev.touches[0]) setW(ev.touches[0].clientX); updateEmptyArrowPosition(); ev.preventDefault(); };
     const te=()=>{ if(!dragging) return; end(); };
     drag?.addEventListener('mousedown',(e)=>{ start(); e.preventDefault(); window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
     drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
@@ -1105,7 +1148,7 @@
       const target=cur<520? 560: 380;
       const w=clamp(target); host.style.width=`${w}px`; try{ chrome.storage.sync.set({ float_panel_width:w }); }catch{}
     });
-    try{ chrome.storage.sync.get(['float_panel_width']).then(({float_panel_width})=>{ if(Number.isFinite(+float_panel_width)) host.style.width = `${clamp(+float_panel_width)}px`; }); }catch{}
+    try{ chrome.storage.sync.get(['float_panel_width']).then(({float_panel_width})=>{ if(Number.isFinite(+float_panel_width)) host.style.width = `${clamp(+float_panel_width)}px`; updateEmptyArrowPosition(); }); }catch{}
   })();
 
   // 关闭 notice 清理
@@ -1143,6 +1186,7 @@
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
     }catch(e){ console.warn('Failed to update UI text:', e); }
+    try{ updateEmptyArrowPosition(); }catch{}
   }
 
   function setLoading(shadow,loading){
@@ -1188,6 +1232,8 @@
     }catch{}
     // Mark intro + empty for high-transparency frosted backdrop and no resize
     try{ const wrap=shadow.getElementById('sx-wrap'); wrap?.classList?.add('fx-intro'); wrap?.classList?.add('is-empty'); }catch{}
+    // Observe changes & update arrow position under the run button center
+    try{ bindArrowResizeObservers(); updateEmptyArrowPosition(); }catch{}
   }
   async function renderCards(summaryMarkdown, cleanedMarkdown){
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
@@ -1266,6 +1312,7 @@
           setTimeout(()=>{ try{ sCard?.classList?.remove('pull-in'); cCard?.classList?.remove('pull-in'); }catch{} }, 700);
         }catch{}
       }
+      try{ if (wasEmpty) updateEmptyArrowPosition(); }catch{}
 
       try{
         const st=await getState(tabId);
