@@ -651,5 +651,10 @@ html[data-theme="dark"] #trial-consent-wrap.consent-ok .help{
   box-shadow: none !important;
 }
 #trial-consent-wrap.consent-ok input[type="checkbox"]{ accent-color: #22c55e; } /* green */
+#trial-consent-wrap.consent-ok input[type="checkbox"]:focus,
+#trial-consent-wrap.consent-ok input[type="checkbox"]:focus-visible{
+  outline: none !important;
+  box-shadow: none !important; /* use container green ring instead */
+}
 #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 3px rgba(34,197,94,.16) !important; }
 html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }

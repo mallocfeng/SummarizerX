@@ -524,6 +524,9 @@ function initTrialConsentUI(){
     // 未勾选时重新触发一次闪烁提示
     if (!cb.checked) {
       try { flashTrialConsentAttention(); } catch {}
+    } else {
+      // 勾选后确保出现绿色焦点环
+      try { setTimeout(()=> cb.focus({ preventScroll: true }), 0); } catch {}
     }
   });
 }
@@ -761,6 +764,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const ro = new ResizeObserver(() => fitDockPadding());
     ro.observe(dock);
   }
+
+  // 监听存储变化：当前台触发 need_trial_consent_focus 时，若本页已打开，则重置未保存的“同意”选中状态
+  try{
+    chrome.storage.onChanged.addListener(async (changes, area) => {
+      if (area !== 'sync') return;
+      if (changes.need_trial_consent_focus && changes.need_trial_consent_focus.newValue) {
+        try {
+          const sel = document.getElementById('aiProvider');
+          const provider = sel ? sel.value : (await chrome.storage.sync.get({ aiProvider: DEFAULTS.aiProvider })).aiProvider;
+          const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+          if (provider === 'trial' && !trial_consent) {
+            const cb = document.getElementById('trial_consent');
+            if (cb) cb.checked = false; // 强制与存储一致，避免“看起来已同意但未生效”的错觉
+            updateTrialConsentVisual(false);
+            try { await flashTrialConsentAttention(); } catch {}
+          }
+        } catch {}
+      }
+    });
+  }catch{}
+
+  // 当页面重新可见时，若存在“需要聚焦同意”的标记且仍未保存同意，则重置复选框并高亮
+  try{
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState !== 'visible') return;
+      try{
+        const { need_trial_consent_focus = false, trial_consent = false, aiProvider = DEFAULTS.aiProvider } = await chrome.storage.sync.get({ need_trial_consent_focus:false, trial_consent:false, aiProvider: DEFAULTS.aiProvider });
+        if (need_trial_consent_focus && aiProvider === 'trial' && !trial_consent) {
+          const cb = document.getElementById('trial_consent');
+          if (cb) cb.checked = false;
+          updateTrialConsentVisual(false);
+          try { await flashTrialConsentAttention(); } catch {}
+        }
+      }catch{}
+    });
+  }catch{}
 });
 
 // (function(){
