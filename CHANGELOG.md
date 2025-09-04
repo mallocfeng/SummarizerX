@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.9.1
+
+### English
+- Trial Mode UX: Improved consent flow with better user guidance and visual feedback
+- Settings Integration: Enhanced trial consent checkbox with attention-grabbing animations when needed
+- Panel Feedback: Clear error messages in floating panel when trial consent is required
+- User Flow: Streamlined experience - users can now save settings without auto-switching to OpenAI when trial consent is missing
+- Visual Cues: Added flashing animation to draw attention to trial consent checkbox when accessed from panel
+
+### 中文
+- 试用模式体验：改进同意流程，提供更好的用户引导和视觉反馈
+- 设置页集成：增强试用同意复选框，在需要时提供醒目的动画提醒
+- 面板反馈：在浮动面板中提供清晰的错误信息，当需要试用同意时
+- 用户流程：简化体验 - 用户现在可以在缺少试用同意的情况下保存设置，而不会自动切换到 OpenAI
+- 视觉提示：添加闪烁动画，在从面板访问时吸引用户注意试用同意复选框
+
 ## v1.9.0
 
 ### English

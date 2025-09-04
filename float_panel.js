@@ -1250,6 +1250,25 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      // 若为试用模式但尚未同意条款：直接跳转设置页并中止，不进入运行态
+      try {
+        const { aiProvider = 'trial', trial_consent = false } = await chrome.storage.sync.get({ aiProvider: 'trial', trial_consent: false });
+        if ((aiProvider === 'trial') && !trial_consent) {
+          // 在面板顶部显示一条提示，说明需要先在设置页勾选同意
+          try {
+            const hintZh = '试用模式需先同意通过代理传输页面内容。请在设置页勾选“我已阅读并同意”，保存后再试。';
+            const hintEn = 'Trial mode requires consent to send page content via proxy. Open Settings, check consent, save, then retry.';
+            const msg = (currentLangCache==='en') ? hintEn : hintZh;
+            const box = shadow.getElementById('sx-summary');
+            if (box) {
+              box.innerHTML = `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${escapeHtml(msg)}</p></div></div>`;
+            }
+          } catch {}
+          try { await chrome.storage.sync.set({ need_trial_consent_focus: true }); } catch {}
+          try { await chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' }); } catch { try { await chrome.runtime.openOptionsPage(); } catch {} }
+          return;
+        }
+      } catch {}
       // Handle folded (empty) state: expand middle first, then reveal cards
       const wrapEl = shadow.getElementById('sx-wrap');
       const wasEmpty = !!wrapEl?.classList?.contains('is-empty');

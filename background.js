@@ -129,6 +129,8 @@ async function runForTab(tabId) {
     try {
       const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
       if (!trial_consent) {
+        // 标记设置页需要高亮试用同意
+        try { await chrome.storage.sync.set({ need_trial_consent_focus: true }); } catch {}
         try { await chrome.runtime.openOptionsPage(); } catch {}
         throw new Error("试用模式需先同意通过代理传输页面内容。请在设置页勾选同意，或切换到其他平台。");
       }

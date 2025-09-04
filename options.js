@@ -259,7 +259,7 @@ function applyPresetToTextarea(force = false) {
  * ========================= */
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
-  const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+  const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -280,6 +280,14 @@ async function loadSettings() {
   reflectTrialConsentVisibility(aiProvider);
   const consentEl = $("trial_consent");
   if (consentEl) consentEl.checked = !!trial_consent;
+  // 若来自前台引导需要强调试用同意，进行闪烁提醒并滚动到视图内
+  if (aiProvider === 'trial' && !trial_consent && need_trial_consent_focus) {
+    try { await flashTrialConsentAttention(); } catch {}
+    // 清一次标记，避免反复闪烁
+    try { await chrome.storage.sync.set({ need_trial_consent_focus: false }); } catch {}
+  }
+  // 初始化同意区视觉状态与事件
+  try { initTrialConsentUI(); } catch {}
 
   $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
   if (d.system_prompt_custom && d.system_prompt_custom.trim()) {
@@ -306,23 +314,7 @@ async function saveSettings() {
   // 读取当前选择
   let aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
 
-  // 若在 Trial 模式且未勾选同意，则自动切换到 OpenAI 模式再保存
-  if (aiProvider === 'trial') {
-    const consent = !!($("trial_consent")?.checked);
-    if (!consent) {
-      // 弹窗确认后再切换；取消则终止保存
-      const promptText = await t('settings.trialConsentPrompt');
-      const ok = confirm(promptText);
-      if (!ok) { try { await setStatus('settings.saveCancelled'); } catch {} return; }
-      try { await setStatus('settings.trialAutoSwitch'); } catch {}
-      const sel = $("aiProvider");
-      if (sel) {
-        sel.value = 'openai';
-        try { await onProviderChange(); } catch {}
-      }
-      aiProvider = 'openai';
-    }
-  }
+  // Trial 模式：允许在未同意的情况下保存（面板端拦截试用），不自动切换到 OpenAI
 
   // Trial：强制固定值
   if (aiProvider === "trial") {
@@ -458,6 +450,18 @@ async function onProviderChange() {
     await setTrialLock(false);
   }
   reflectTrialConsentVisibility(provider);
+  // 进入试用模式时，若尚未同意，进行高亮提醒
+  if (provider === 'trial') {
+    try {
+      const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+      updateTrialConsentVisual(!!trial_consent);
+      if (!trial_consent) { try { await flashTrialConsentAttention(); } catch {} }
+    } catch {}
+  }
+  else {
+    // 非试用模式清理视觉标记
+    try { updateTrialConsentVisual(null); } catch {}
+  }
 
   await setMeta({
     aiProvider: provider,
@@ -489,6 +493,54 @@ function reflectTrialConsentVisibility(provider){
   const wrap = document.getElementById('trial-consent-wrap');
   if (!wrap) return;
   wrap.style.display = (provider === 'trial') ? '' : 'none';
+}
+
+// 试用同意的闪烁/高亮提醒，并滚动到视图内
+async function flashTrialConsentAttention() {
+  const wrap = document.getElementById('trial-consent-wrap');
+  const cb = document.getElementById('trial_consent');
+  if (!wrap) return;
+  try {
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch {}
+  wrap.classList.remove('consent-attn');
+  // 触发重绘以便重复添加动画类生效
+  void wrap.offsetWidth;
+  wrap.classList.add('consent-attn');
+  // 聚焦复选框以显示系统焦点样式，提高可达性
+  try { cb && cb.focus({ preventScroll: true }); } catch {}
+}
+
+// 初始化并绑定“我已阅读并同意”区域的视觉状态与交互
+function initTrialConsentUI(){
+  const cb = document.getElementById('trial_consent');
+  const sel = document.getElementById('aiProvider');
+  if (!cb) return;
+  // 初始应用一次视觉
+  updateTrialConsentVisual(!!cb.checked);
+  // 变更时即时反馈视觉（不写入存储，仅 UI）
+  cb.addEventListener('change', () => {
+    updateTrialConsentVisual(!!cb.checked);
+    // 未勾选时重新触发一次闪烁提示
+    if (!cb.checked) {
+      try { flashTrialConsentAttention(); } catch {}
+    }
+  });
+}
+
+// 根据勾选状态应用视觉：true => 绿色勾选 + 温和背景；false => 恢复跳动提示
+function updateTrialConsentVisual(checked){
+  const wrap = document.getElementById('trial-consent-wrap');
+  if (!wrap) return;
+  if (checked === null) { wrap.classList.remove('consent-ok'); wrap.classList.remove('consent-attn'); return; }
+  if (checked) {
+    wrap.classList.add('consent-ok');
+    wrap.classList.remove('consent-attn');
+  } else {
+    wrap.classList.remove('consent-ok');
+    // 重新触发 attention 脉冲
+    wrap.classList.remove('consent-attn'); void wrap.offsetWidth; wrap.classList.add('consent-attn');
+  }
 }
 
 async function onPresetChange() {

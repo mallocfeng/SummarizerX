@@ -301,6 +301,50 @@ html[data-theme="light"] .language-switcher .lang-btn.active{ background: var(--
     inset 1px 0 0 rgba(245,200,120,.12),
     inset -1px 0 0 rgba(255,255,255,.40);
 }
+.consent-attn .help{
+  /* Light theme: pale yellow background + red frame pulse */
+  border-color: #ef4444; /* red-500 (frame + border emphasis) */
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, .92) 0%, rgba(254, 243, 199, .98) 100%),
+    #fffbeb; /* pale yellow */
+  animation: consentPulse 1.2s ease-in-out 3;
+}
+/* Dark theme variant: stronger contrast with deep tints */
+html[data-theme="dark"] .consent-attn .help{
+  border-color: #fb7185; /* rose-400 */
+  background:
+    linear-gradient(180deg, rgba(127, 29, 29, .42) 0%, rgba(69, 10, 10, .62) 100%),
+    #1b0f10; /* deep, slightly reddish base */
+  color: #fde2e2; /* light rose text */
+  animation: consentPulseDark 1.2s ease-in-out 3;
+}
+/* Emphasize the checkbox color while drawing attention */
+.consent-attn input[type="checkbox"]{ accent-color: #ef4444; } /* red for light theme */
+html[data-theme="dark"] .consent-attn input[type="checkbox"]{ accent-color: #fb7185; }
+/* Replace default blue focus ring on the checkbox with a soft ring on the container */
+.consent-attn input[type="checkbox"]:focus,
+.consent-attn input[type="checkbox"]:focus-visible{
+  outline: none !important;
+  box-shadow: none !important;
+}
+.consent-attn .help{ position: relative; }
+.consent-attn .help:focus-within{
+  /* red focus ring in light */
+  box-shadow: 0 0 0 3px rgba(239,68,68,.28);
+}
+html[data-theme="dark"] .consent-attn .help:focus-within{
+  box-shadow: 0 0 0 4px rgba(251,113,133,.28);
+}
+@keyframes consentPulse{
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); }
+  50%{ box-shadow: 0 0 0 6px rgba(239,68,68,.18); }
+  100%{ box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+@keyframes consentPulseDark{
+  0% { box-shadow: 0 0 0 0 rgba(251,113,133,.55); }
+  50%{ box-shadow: 0 0 0 8px rgba(251,113,133,.22); }
+  100%{ box-shadow: 0 0 0 0 rgba(251,113,133,0); }
+}
 .meta{ margin-top:8px; font-size:12px; color:#475467; border:1px dashed var(--border); background: #f7f8fb; padding:8px; border-radius:8px; }
 .hint{ font-size:12px; color:#6b7280; }
 
@@ -572,3 +616,40 @@ html[data-theme="dark"] .section.card:focus-within{
     transform: none; box-shadow: none;
   }
 }
+
+/* =====================================================
+ * Consent-attention overrides (placed AFTER theme rules)
+ * Ensure pale yellow background in LIGHT theme even if
+ * global light .help styles set gray backgrounds.
+ * ===================================================== */
+html[data-theme="light"] #trial-consent-wrap.consent-attn .help{
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, .92) 0%, rgba(254, 243, 199, .98) 100%),
+    #fffbeb !important; /* pale yellow */
+  border-color: #ef4444 !important; /* red frame */
+}
+html[data-theme="light"] #trial-consent-wrap.consent-attn .help:focus-within{
+  box-shadow: 0 0 0 3px rgba(239,68,68,.28) !important;
+}
+html[data-theme="light"] #trial-consent-wrap.consent-attn input[type="checkbox"]{
+  accent-color: #ef4444;
+}
+
+/* Consent OK — soften visuals and turn checkbox green */
+#trial-consent-wrap.consent-ok .help{
+  animation: none !important;
+}
+html[data-theme="light"] #trial-consent-wrap.consent-ok .help{
+  background: #f3f4f6 !important;  /* light gray */
+  border-color: #e5e7eb !important; /* neutral border */
+  box-shadow: none !important;
+}
+html[data-theme="dark"] #trial-consent-wrap.consent-ok .help{
+  background: #142037 !important;  /* slightly lighter than dark bg */
+  border-color: #27344b !important;
+  color: #dbe3ee !important;
+  box-shadow: none !important;
+}
+#trial-consent-wrap.consent-ok input[type="checkbox"]{ accent-color: #22c55e; } /* green */
+#trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 3px rgba(34,197,94,.16) !important; }
+html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }
