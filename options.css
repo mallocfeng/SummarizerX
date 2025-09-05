@@ -646,8 +646,8 @@ html[data-theme="light"] #trial-consent-wrap.consent-attn input[type="checkbox"]
 }
 html[data-theme="light"] #trial-consent-wrap.consent-ok .help{
   background: #f3f4f6 !important;  /* light gray */
-  border-color: #e5e7eb !important; /* neutral border */
-  box-shadow: none !important;
+  border-color: #e5e7eb !important; /* neutral border by default */
+  box-shadow: none !important; /* no persistent ring */
 }
 html[data-theme="dark"] #trial-consent-wrap.consent-ok .help{
   background: #142037 !important;  /* slightly lighter than dark bg */
@@ -661,5 +661,12 @@ html[data-theme="dark"] #trial-consent-wrap.consent-ok .help{
   outline: none !important;
   box-shadow: none !important; /* use container green ring instead */
 }
-#trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 3px rgba(34,197,94,.16) !important; }
+#trial-consent-wrap.consent-ok .help:focus-within{
+  box-shadow: 0 0 0 4px rgba(34,197,94,.28) !important;
+  border-color: #22c55e !important;
+}
+html[data-theme="light"] #trial-consent-wrap.consent-ok .help:focus-within{
+  outline: 2px solid rgba(34,197,94,.55);
+  outline-offset: 2px;
+}
 html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }
