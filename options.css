@@ -309,6 +309,10 @@ html[data-theme="light"] .language-switcher .lang-btn.active{ background: var(--
     #fffbeb; /* pale yellow */
   animation: consentPulse 1.2s ease-in-out 3;
 }
+/* Ensure same specificity as dark variant so light mode always animates */
+html[data-theme="light"] .consent-attn .help{
+  animation: consentPulse 1.2s ease-in-out 3;
+}
 /* Dark theme variant: stronger contrast with deep tints */
 html[data-theme="dark"] .consent-attn .help{
   border-color: #fb7185; /* rose-400 */
@@ -629,7 +633,8 @@ html[data-theme="light"] #trial-consent-wrap.consent-attn .help{
   border-color: #ef4444 !important; /* red frame */
 }
 html[data-theme="light"] #trial-consent-wrap.consent-attn .help:focus-within{
-  box-shadow: 0 0 0 3px rgba(239,68,68,.28) !important;
+  /* Keep a light focus hint, but do not override the animated box-shadow */
+  box-shadow: 0 0 0 3px rgba(239,68,68,.28);
 }
 html[data-theme="light"] #trial-consent-wrap.consent-attn input[type="checkbox"]{
   accent-color: #ef4444;

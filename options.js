@@ -534,6 +534,7 @@ function initTrialConsentUI(){
 // 根据勾选状态应用视觉：true => 绿色勾选 + 温和背景；false => 恢复跳动提示
 function updateTrialConsentVisual(checked){
   const wrap = document.getElementById('trial-consent-wrap');
+  const help = document.getElementById('trial-consent-help');
   if (!wrap) return;
   if (checked === null) { wrap.classList.remove('consent-ok'); wrap.classList.remove('consent-attn'); return; }
   if (checked) {
@@ -543,6 +544,15 @@ function updateTrialConsentVisual(checked){
     wrap.classList.remove('consent-ok');
     // 重新触发 attention 脉冲
     wrap.classList.remove('consent-attn'); void wrap.offsetWidth; wrap.classList.add('consent-attn');
+    // 进一步确保动画在所有浏览器/主题下可靠重启（特别是浅色模式）
+    try {
+      if (help && help.style) {
+        help.style.animation = 'none';
+        // 强制重绘后清空，恢复到样式表定义的动画
+        void help.offsetWidth;
+        help.style.animation = '';
+      }
+    } catch {}
   }
 }
 

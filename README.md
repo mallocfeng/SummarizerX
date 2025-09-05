@@ -31,6 +31,7 @@ Current beta: v1.9.1 (dev/next branch)
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
+ - ✅ Consistent Consent Pulse: Trial consent attention “breathing” animation now behaves the same in light and dark themes
 
 ### 🖼 Screenshots
 
@@ -123,6 +124,7 @@ All processing happens locally or via your configured AI API key. No data is sen
  - ⚡ Vue.js 集成：现代化响应式界面，提升性能和用户体验
  - 🎯 智能布局对齐：全文翻译智能定位，适配复杂网站布局（CSS Grid、响应式设计）
 - 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性
+ - ✅ 试用同意提示一致：需要同意时的“呼吸”动画在明亮/暗黑主题下表现一致
 
 ### 🖼 软件截图
 

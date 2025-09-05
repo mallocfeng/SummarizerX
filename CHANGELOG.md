@@ -8,6 +8,7 @@
 - Panel Feedback: Clear error messages in floating panel when trial consent is required
 - User Flow: Streamlined experience - users can now save settings without auto-switching to OpenAI when trial consent is missing
 - Visual Cues: Added flashing animation to draw attention to trial consent checkbox when accessed from panel
+- Fix: In light theme, the consent “breathing” pulse did not replay after unchecking; aligned CSS specificity with dark theme and force-restarted the animation in JS to ensure consistent behavior.
 
 ### 中文
 - 试用模式体验：改进同意流程，提供更好的用户引导和视觉反馈
@@ -15,6 +16,7 @@
 - 面板反馈：在浮动面板中提供清晰的错误信息，当需要试用同意时
 - 用户流程：简化体验 - 用户现在可以在缺少试用同意的情况下保存设置，而不会自动切换到 OpenAI
 - 视觉提示：添加闪烁动画，在从面板访问时吸引用户注意试用同意复选框
+- 修复：亮色模式下在取消勾选后不会重新出现“同意提示”呼吸动画；通过提升与暗色模式一致的 CSS 选择器优先级并在 JS 中强制重启动画，确保两种主题表现一致。
 
 ## v1.9.0
 
