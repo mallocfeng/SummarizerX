@@ -125,36 +125,193 @@
       if (!summaryCard) throw new Error('no summary card');
       const md = summaryCard.querySelector('.md');
       if (!md) throw new Error('no summary content');
-      const plain = md.innerText || '';
-      const title = document.title || '';
-      const origin = location.host || '';
-      const now = new Date();
-      const dateStr = now.toLocaleString(currentLangCache==='en'?'en-US':'zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
       const brand = currentLangCache==='en' ? 'SummarizerX AI Reader' : '麦乐可 AI 摘要阅读器';
-      const headerText = currentLangCache==='en' ? 'AI Summary' : 'AI 摘要';
+      const headerTitle = currentLangCache==='en' ? 'Summary' : '摘要';
+      const mainDomain = getMainDomain(location.hostname||'');
 
-      const W = 1200, H = 1600; // tall card for better readability
-      const P = 80; // padding
+      // Match current card width but make it slightly narrower/taller
+      const cardRect = summaryCard.getBoundingClientRect();
+      const baseW = Math.max(360, Math.round(cardRect.width));
+      const widthFactor = 0.78; // slightly narrower and taller look
+      const scale = 2; // export scale (visual)
+      const cardW = Math.round(baseW * widthFactor * scale);
+      const outerP = Math.round(16 * scale); // outer padding
+      const innerP = Math.round(18 * scale); // base inner padding (left)
+      const extraRight = Math.round(24 * scale); // add more breathing room on the right
+      const W = cardW + outerP * 2;
+
+      // prepare for measurement pass
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
       const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d');
+      
+      // Typography (match .md roughly)
+      const baseFont = Math.round(15 * scale); // .md { font-size: 15px }
+      const lineH = Math.round(baseFont * 1.7);
+      const h1Font = Math.round(baseFont * 1.28);
+      const h2Font = Math.round(baseFont * 1.2);
+      const h3Font = Math.round(baseFont * 1.12);
+      const hdrH = Math.round(baseFont * 2.7); // taller header for better breathing room
 
-      // Background gradient
-      const bg = ctx.createLinearGradient(0, 0, W, H);
+      let blocks = parseMdBlocks(md);
+      // Targeted fix: if a heading like “结论/结论或建议/关键词(关键字)” exists but其后无内容块，
+      // 直接从 DOM 收集该标题之后到下一个标题之间的 runs 作为段落补齐。
+      try{
+        const labels = [/^(结论或建议)$/i, /^(结论)$/i, /^(建议)$/i, /^(关键词)$/i, /^(关键字)$/i, /^(keywords?)$/i];
+        const heads = Array.from(md.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+        const fixed=[];
+        for (let i=0;i<blocks.length;i++){
+          const b = blocks[i];
+          fixed.push(b);
+          if (b.kind==='h'){
+            const txt = (b.runs||[]).map(r=>r.text||'').join('').trim();
+            if (labels.some(re=> re.test(txt))){
+              const next = blocks[i+1];
+              if (!next || next.kind==='h'){
+                // find matching heading element by text
+                const el = heads.find(h=> (h.innerText||'').trim().startsWith(txt));
+                if (el){
+                  const runs = collectRunsBetween(el, heads[heads.indexOf(el)+1] || null);
+                  const contentTxt = runs.map(r=>r.text||'').join('').trim();
+                  if (contentTxt){ fixed.push({ kind:'p', runs }); }
+                }
+              }
+            }
+          }
+        }
+        if (fixed.length) blocks = fixed;
+      }catch{}
+
+      // Flatten keywords: after label "关键词/关键字/Keywords" (heading or bold paragraph),
+      // merge following items into one paragraph separated by spaces.
+      try{
+        const textFromRuns = (runs=[])=> runs.map(r=> r?.text||'').join('');
+        const isKwTitle = (blk)=>{
+          const s = (blk.text!==undefined? blk.text : textFromRuns(blk.runs||[])).trim();
+          return /^(关键词|关键字|keywords?)\s*[:：]?\s*$/i.test(s);
+        };
+        const startsWithKw = (blk)=>{
+          const s = (blk.text!==undefined? blk.text : textFromRuns(blk.runs||[])).trim();
+          return /^(关键词|关键字|keywords?)\s*[:：]?\s*/i.test(s) ? s.replace(/^(关键词|关键字|keywords?)\s*[:：]?\s*/i,'').trim() : null;
+        };
+        for (let i=0; i<blocks.length; i++){
+          const b = blocks[i];
+          if ((b.kind==='h' && isKwTitle(b)) || (b.kind==='p' && startsWithKw(b)!==null)){
+            let acc=[];
+            // include rest of current paragraph after the label, if any
+            if (b.kind==='p'){
+              const rest = startsWithKw(b);
+              if (rest) acc.push(rest);
+            }
+            // aggregate until next heading-like label or heading block
+            let j=i+1;
+            while (j<blocks.length){
+              const nb = blocks[j];
+              const nbTxt = (nb.text!==undefined? nb.text : textFromRuns(nb.runs||[]));
+              if (nb.kind==='h') break;
+              // stop if遇到下一个粗体“标签：”段落（防止吞并“结论/建议”）
+              const maybeLabel = /^(主要要点|结论或建议|结论|建议|关键词|关键字|keywords?)\s*[:：]?\s*$/i.test(nbTxt.trim());
+              if (maybeLabel) break;
+              if (nbTxt && nbTxt.trim()) acc.push(nbTxt.trim());
+              j++;
+            }
+            if (acc.length){
+              const flat = acc.join(' ').replace(/•/g,' ').replace(/\s+/g,' ').trim();
+              const insert = { kind:'p', runs: [{ text: flat, weight: 400, italic: false, code: false }] };
+              // if original block是段落且只包含标签，则在其后插入；否则保留原 block（作为标题）再插入合并段
+              if (b.kind==='p'){
+                // 替换当前段为纯“关键词”标题（可选：也可以直接保留原样）
+                blocks.splice(i, 1, { kind:'h', runs: [{ text: '关键词', weight:700, italic:false, code:false }], level:3 }, insert);
+                // 删除已经被合并的后续块
+                blocks.splice(i+2, j-(i+1));
+              } else {
+                blocks.splice(i+1, j-(i+1), insert);
+              }
+              i++; // skip merged paragraph
+            }
+          }
+        }
+      }catch{}
+      // Robust fallback: if key labels exist in raw text but missing after parse, or parsed text is far shorter, use inline-runs from DOM
+      try{
+        const raw = (md.innerText||'').trim();
+        const textFromRuns = (runs=[])=> runs.map(r=> r?.text||'').join('');
+        const joined = blocks.map(b=> (b.text!==undefined? b.text : textFromRuns(b.runs))).join('\n');
+        const hasKeyLabels = /(关键词|关键字|结论|建议)/.test(raw);
+        const lostKeyLabels = hasKeyLabels && !/(关键词|关键字|结论|建议)/.test(joined);
+        const muchShorter = joined.length < Math.floor(raw.length * 0.5);
+        if (lostKeyLabels || muchShorter){
+          const runs = collectRunsSimple(md);
+          blocks = [{ kind:'p', runs }];
+        }
+      }catch{}
+
+      // measure content height
+      const cardX = outerP, cardY = outerP;
+      const cw = cardW - innerP - (innerP + extraRight);
+      const headerSpacer = Math.round(16 * scale);
+      let y = cardY + innerP + hdrH + headerSpacer;
+      const blockGap = Math.round(8 * scale);
+      const headTopGapDefault = Math.round(14 * scale);
+      const headBottomGapDefault = Math.round(6 * scale);
+      const headBottomGapTight = Math.round(4 * scale); // tighter gap below specific headings
+      const afterTightTitleTopGap = Math.round(2 * scale); // much smaller gap for the first paragraph after tight titles
+      const textFromRunsLocal = (runs=[])=> (runs||[]).map(r=>r?.text||'').join('');
+      const getHeadMetrics = (blk)=>{
+        if (blk?.kind!=='h') return { top: blockGap, bottom: blockGap, isTight:false };
+        const s=(blk.text!==undefined? blk.text : textFromRunsLocal(blk.runs||[])).trim();
+        const isTight = /^(结论或建议|结论|建议|关键词|关键字|keywords?)$/i.test(s);
+        return { top: headTopGapDefault, bottom: isTight? headBottomGapTight: headBottomGapDefault, isTight };
+      };
+      let prevWasTightTitle = false;
+      for (const b of blocks){
+        const m = getHeadMetrics(b);
+        const topApplied = prevWasTightTitle ? afterTightTitleTopGap : m.top;
+        y += topApplied;
+        if (b.kind==='blockquote'){
+          ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
+          const used = drawWrappedRich(ctx, b.runs, 0, 0, cw - Math.round(14*scale), lineH, 0, { draw:false, fontSize: baseFont });
+          y += used + Math.round(12*scale);
+        } else if (b.kind==='h'){
+          const size = b.level<=1? h1Font : b.level===2? h2Font : h3Font;
+          ctx.font = fontFor({ size, weight: 800, italic:false, code:false });
+          y += drawWrappedRich(ctx, b.runs, 0, 0, cw, Math.round(size*1.45), 0, { draw:false, fontSize: size });
+        } else if (b.kind==='li'){
+          ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
+          y += drawWrappedRich(ctx, b.runs, 0, 0, cw, lineH, 0, { draw:false, bullet: b.bullet||'•', indent: Math.round(22*scale), fontSize: baseFont });
+        } else {
+          ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
+          y += drawWrappedRich(ctx, b.runs, 0, 0, cw, lineH, 0, { draw:false, fontSize: baseFont });
+        }
+        y += m.bottom;
+        prevWasTightTitle = !!m.isTight;
+      }
+      // brand/footer
+      const brandH = Math.round(baseFont * 1.6);
+      const cardH = (y - blockGap) + innerP + brandH;
+      const H = cardH + outerP * 2;
+
+      // finalize canvas size and scale
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.scale(dpr, dpr);
+
+      // Background
       if (!isDark){
-        bg.addColorStop(0, '#eef2ff');
-        bg.addColorStop(0.5, '#e0f2fe');
-        bg.addColorStop(1, '#f0fdf4');
+        // Pure white background to match float panel light theme
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,W,H);
       } else {
+        // Dark theme keeps subtle gradient
+        const bg = ctx.createLinearGradient(0, 0, W, H);
         bg.addColorStop(0, '#0f172a');
         bg.addColorStop(0.5, '#0b1222');
         bg.addColorStop(1, '#0a1b14');
+        ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
       }
-      ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
 
       // Card container
-      const cardX = P, cardY = P, cardW = W - P*2, cardH = H - P*2;
-      const r = 36;
+      const r = Math.max(12, Math.round(24 * scale));
       const path = new Path2D();
       path.moveTo(cardX+r, cardY);
       path.arcTo(cardX+cardW, cardY, cardX+cardW, cardY+cardH, r);
@@ -162,50 +319,88 @@
       path.arcTo(cardX, cardY+cardH, cardX, cardY, r);
       path.arcTo(cardX, cardY, cardX+cardW, cardY, r);
       ctx.save();
-      ctx.shadowColor = isDark? 'rgba(0,0,0,0.35)' : 'rgba(16,24,40,0.16)';
-      ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
-      ctx.fillStyle = isDark? 'rgba(20,30,54,0.90)' : 'rgba(255,255,255,0.92)';
+      ctx.shadowColor = isDark? 'rgba(0,0,0,0.38)' : 'rgba(16,24,40,0.18)';
+      ctx.shadowBlur = 28; ctx.shadowOffsetY = 10;
+      // Morandi-inspired soft card surface (light) instead of pure white
+      ctx.fillStyle = isDark? 'rgba(20,30,54,0.90)' : '#F4F3EF';
       ctx.fill(path);
+      // crisp border around card
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = Math.max(1, Math.round(1 * scale));
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.10)' : '#e6eaf2';
+      ctx.stroke(path);
       ctx.restore();
-
-      // Header bar
-      const hdrH = 96;
-      const hdrGrad = ctx.createLinearGradient(cardX, cardY, cardX+cardW, cardY+hdrH);
-      if (!isDark){ hdrGrad.addColorStop(0,'rgba(99,102,241,0.16)'); hdrGrad.addColorStop(1,'rgba(59,130,246,0.14)'); }
-      else { hdrGrad.addColorStop(0,'rgba(99,102,241,0.28)'); hdrGrad.addColorStop(1,'rgba(59,130,246,0.22)'); }
-      ctx.fillStyle = hdrGrad;
+      // Header bar with left title and right domain
+      // Morandi palette — solid header color (no gradient)
+      const hdrColor = !isDark ? '#C8CCD6' /* muted blue‑grey */ : '#505A68';
+      // clip header to rounded card path to avoid square corners showing
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = hdrColor;
       ctx.fillRect(cardX, cardY, cardW, hdrH);
-
-      // Header text + badge
-      ctx.font = 'bold 36px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
+      // bottom divider shadow for aesthetics
+      const lineY = cardY + hdrH;
+      const divGrad = ctx.createLinearGradient(0, lineY, 0, lineY + Math.round(6*scale));
+      if (!isDark){ divGrad.addColorStop(0,'rgba(15,23,42,0.08)'); divGrad.addColorStop(1,'rgba(15,23,42,0.0)'); }
+      else { divGrad.addColorStop(0,'rgba(0,0,0,0.22)'); divGrad.addColorStop(1,'rgba(0,0,0,0.0)'); }
+      ctx.fillStyle = divGrad; ctx.fillRect(cardX, lineY, cardW, Math.round(6*scale));
+      ctx.restore();
+      const hdrPadX = innerP;
+      const hdrPadRight = innerP + extraRight + Math.round(20*scale); // extra right padding for domain text
+      const hdrBaseline = cardY + Math.round(hdrH*0.68);
+      ctx.font = `800 ${Math.round(baseFont*1.05)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
       ctx.fillStyle = isDark? '#e6eefc' : '#0f172a';
-      ctx.fillText(headerText, cardX+28, cardY+60);
-      // badge dot
-      ctx.beginPath(); ctx.arc(cardX+16, cardY+46, 6, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+      ctx.fillText(headerTitle, cardX + hdrPadX, hdrBaseline);
+      ctx.font = `600 ${Math.round(baseFont*0.95)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
+      ctx.fillStyle = isDark? '#b8c2d8' : '#475569';
+      const domainW = ctx.measureText(mainDomain).width;
+      ctx.fillText(mainDomain, cardX + cardW - hdrPadRight - domainW, hdrBaseline);
+      // Summary body (styled by block)
+      let drawY = cardY + innerP + hdrH + headerSpacer;
+      prevWasTightTitle = false;
+      for (const b of blocks){
+        const m = getHeadMetrics(b);
+        const topApplied = prevWasTightTitle ? afterTightTitleTopGap : m.top;
+        drawY += topApplied;
+        if (b.kind==='blockquote'){
+          const bx = cardX + innerP + Math.round(8*scale);
+          const bw = cw - Math.round(14*scale);
+          // bar
+          ctx.fillStyle = isDark? 'rgba(59,130,246,.35)' : 'rgba(59,130,246,.28)';
+          ctx.fillRect(bx, drawY + 4, Math.round(4*scale), Math.round( Math.max(lineH, 10*scale) ));
+          ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
+          ctx.fillStyle = isDark? '#dbe3ee' : '#334155';
+          const used = drawWrappedRich(ctx, b.runs, bx + Math.round(12*scale), drawY, bw - Math.round(12*scale), lineH, 0, { draw:true, fontSize: baseFont });
+          drawY += used + Math.round(12*scale);
+        } else if (b.kind==='h'){
+          const size = b.level<=1? h1Font : b.level===2? h2Font : h3Font;
+          ctx.font = fontFor({ size, weight: 800, italic:false, code:false });
+          ctx.fillStyle = isDark? '#e6eefc' : '#0f172a';
+          drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, Math.round(size*1.45), 0, { draw:true, fontSize: size });
+        } else {
+          ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
+          ctx.fillStyle = isDark? '#e5e7eb' : '#111827';
+          if (b.kind==='li'){
+            drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, lineH, 0, { draw:true, bullet: b.bullet||'•', indent: Math.round(22*scale), fontSize: baseFont });
+          } else {
+            drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, lineH, 0, { draw:true, fontSize: baseFont });
+          }
+        }
+        drawY += m.bottom;
+        prevWasTightTitle = !!m.isTight;
+      }
+      drawY -= (blocks.length? getHeadMetrics(blocks[blocks.length-1]).bottom : 0); // remove last gap
 
-      // Meta: page title + host + date
-      ctx.font = '600 28px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
-      ctx.fillStyle = isDark? '#cbd5e1' : '#334155';
-      const meta = `${title? title: origin}${origin? ' · '+origin: ''} · ${dateStr}`;
-      const metaY = cardY + hdrH + 40;
-      drawWrappedText(ctx, meta, cardX+32, metaY, cardW-64, 34, 2);
-
-      // Summary body
-      const bodyY = metaY + 46;
-      ctx.font = '400 30px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
-      ctx.fillStyle = isDark? '#e5e7eb' : '#111827';
-      drawWrappedText(ctx, collapseBlankLines(plain).trim(), cardX+32, bodyY, cardW-64, 42, 22, {
-        paragraphSpacing: 18
-      });
-
-      // Footer brand
+      // Footer brand — refined palette per theme
       const footer = brand;
-      ctx.font = '700 28px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
-      ctx.fillStyle = '#3b82f6';
+      ctx.font = `700 ${Math.round(baseFont*0.95)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
+      const brandText = isDark ? '#BFD1FF' : '#3F5B94';   // soft indigo (dark) / muted indigo (light)
+      const brandDot  = isDark ? '#8FB0FF' : '#6C8BD9';   // companion tone
+      ctx.fillStyle = brandText;
       const textW = ctx.measureText(footer).width;
-      ctx.fillText(footer, cardX + cardW - textW - 28, cardY + cardH - 28);
+      ctx.fillText(footer, cardX + cardW - textW - (innerP + extraRight), cardY + cardH - Math.round(12*scale));
       // brand dot
-      ctx.beginPath(); ctx.arc(cardX + cardW - textW - 44, cardY + cardH - 36, 6, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+      ctx.beginPath(); ctx.arc(cardX + cardW - textW - (innerP + extraRight) - Math.round(14*scale), cardY + cardH - Math.round(18*scale), Math.round(5*scale), 0, Math.PI*2); ctx.fillStyle = brandDot; ctx.fill();
 
       // Export to clipboard
       const blob = await new Promise(res=> canvas.toBlob(res, 'image/png', 0.95));
@@ -217,27 +412,265 @@
   }
 
   function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines, opts={}){
-    const { paragraphSpacing = 12 } = opts;
-    const paragraphs = String(text||'').split(/\n+/).filter(Boolean);
+    const { paragraphSpacing = 12, draw = true } = opts;
+    const paragraphs = String(text||'').split(/\n+/).filter(p=>p.length>0);
     let cursorY = y; let linesUsed = 0;
+    const ellipsis = '…';
+    const drawLine = (lineStr)=>{ if (draw) ctx.fillText(lineStr, x, cursorY); cursorY += lineHeight; linesUsed++; };
+    const overLimit = ()=> maxLines && linesUsed >= maxLines;
     for (let pi=0; pi<paragraphs.length; pi++){
-      const words = paragraphs[pi].split(/\s+/);
+      const para = paragraphs[pi];
+      // Tokenize: single CJK chars as tokens; keep latin runs and punctuation as chunks; keep spaces separately
+      const tokens = para.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]|\s+|[^\s\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]+/g) || [para];
       let line = '';
-      for (let i=0; i<words.length; i++){
-        const test = line ? (line + ' ' + words[i]) : words[i];
-        const w = ctx.measureText(test).width;
+      for (let i=0; i<tokens.length; i++){
+        let tok = tokens[i];
+        // normalize whitespace: collapse to single space when joining latin, but skip at line start or around CJK
+        if (/^\s+$/.test(tok)){
+          // Only add a single space if current line not empty and next token is non-space
+          const next = tokens[i+1] || '';
+          if (line && next && !/^\s+$/.test(next)) tok = ' ';
+          else continue;
+        }
+        const candidate = line ? (line + tok) : tok.trimStart();
+        const w = ctx.measureText(candidate).width;
         if (w > maxWidth && line){
-          ctx.fillText(line, x, cursorY);
-          cursorY += lineHeight; linesUsed++;
-          if (maxLines && linesUsed >= maxLines){ ctx.fillText('…', x + maxWidth - ctx.measureText('…').width, cursorY); return; }
-          line = words[i];
-        }else{
-          line = test;
+          // line is full; draw it
+          drawLine(line.trimEnd());
+          if (overLimit()) { if (draw) ctx.fillText(ellipsis, x + maxWidth - ctx.measureText(ellipsis).width, cursorY); return cursorY - y; }
+          // start new line with token (trim leading space)
+          line = tok.trimStart();
+          // if even single token exceeds width (e.g., long unbroken URL), force-break by slicing
+          if (ctx.measureText(line).width > maxWidth){
+            let acc = '';
+            for (const ch of line){
+              const t = acc + ch;
+              if (ctx.measureText(t).width > maxWidth){
+                drawLine(acc);
+                if (overLimit()) { if (draw) ctx.fillText(ellipsis, x + maxWidth - ctx.measureText(ellipsis).width, cursorY); return cursorY - y; }
+                acc = ch;
+              } else acc = t;
+            }
+            line = acc;
+          }
+        } else {
+          line = candidate;
         }
       }
-      if (line){ ctx.fillText(line, x, cursorY); cursorY += lineHeight; linesUsed++; if (maxLines && linesUsed >= maxLines) return; }
+      if (line){ drawLine(line.trimEnd()); if (overLimit()) return cursorY - y; }
       if (pi < paragraphs.length-1){ cursorY += paragraphSpacing; }
     }
+    return cursorY - y;
+  }
+
+  function fontFor({ size, weight=400, italic=false, code=false }){
+    const fam = code ? 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
+                     : 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif';
+    const wt = (typeof weight==='number') ? weight : (/bold|700|800/.test(weight)? 700: 400);
+    return `${italic? 'italic ': ''}${wt} ${size}px ${fam}`;
+  }
+
+  // Draw rich runs with inline bold/italic/code and proper wrapping. Returns height used.
+  function drawWrappedRich(ctx, runs, x, y, maxWidth, lineHeight, maxLines, opts={}){
+    const { draw=true, bullet=null, indent=0, fontSize=null } = opts;
+    const startX = x + (bullet ? indent : 0);
+    let cx = startX, cy = y, lines = 0, hasAny = false, lineHasContent = false;
+    const over = ()=> maxLines && lines >= maxLines;
+
+    // draw bullet on first line
+    if (bullet && draw){
+      const saveFont = ctx.font, saveFill = ctx.fillStyle;
+      const fs = fontSize || Math.max(12, Math.round(lineHeight*0.72));
+      ctx.font = fontFor({ size: Math.max(12, Math.round(fs*0.9)), weight:700, italic:false, code:false });
+      ctx.fillStyle = '#475569';
+      ctx.fillText(String(bullet), x, cy);
+      ctx.font = saveFont; ctx.fillStyle = saveFill;
+    }
+
+    const pushLine = ()=>{
+      if (lineHasContent){ lines++; cy += lineHeight; }
+      cx = startX; lineHasContent = false;
+    };
+    const tokensFrom = (text)=>{
+      // split by newline and token regex; preserve newline tokens
+      const arr=[]; const parts=String(text||'').split('\n');
+      for (let i=0;i<parts.length;i++){
+        const p=parts[i];
+        if (p.length){
+          const toks = p.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]|\s+|[^\s\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]+/g) || [p];
+          arr.push(...toks);
+        }
+        if (i<parts.length-1) arr.push('\n');
+      }
+      return arr;
+    };
+
+    for (const run of runs||[]){
+      const { text='', weight=400, italic=false, code=false } = run||{};
+      const fs = fontSize || Math.max(12, Math.round(lineHeight*0.72));
+      const effSize = code ? Math.max(10, Math.round(fs*0.92)) : fs;
+      ctx.font = fontFor({ size: effSize, weight, italic, code });
+      const toks = tokensFrom(text);
+      for (let i=0;i<toks.length;i++){
+        let tok = toks[i];
+        if (tok==='\n'){
+          // ignore leading or consecutive newlines
+          if (!lineHasContent && cx===startX) continue;
+          pushLine(); if (over()) return cy - y; continue;
+        }
+        if (/^\s+$/.test(tok)){
+          // collapse spaces
+          const next = toks[i+1]||''; if (!next || /^\s+$/.test(next) || cx===startX) continue; tok=' ';
+        }
+        const w = ctx.measureText(tok).width;
+        if (cx - startX + w > maxWidth && cx>startX){ pushLine(); if (over()) return cy - y; }
+        if (draw) ctx.fillText(tok, cx, cy);
+        hasAny = true; lineHasContent = true;
+        cx += w;
+      }
+    }
+    if (lineHasContent){ lines++; cy += lineHeight; }
+    return cy - y;
+  }
+
+  // Minimal DOM → runs collector for fallback
+  function collectRunsSimple(root){
+    const out=[];
+    const walk=(node, style={weight:400, italic:false, code:false})=>{
+      if (!node) return;
+      if (node.nodeType===3){ out.push({ text: node.nodeValue||'', weight:style.weight, italic:style.italic, code:style.code }); return; }
+      if (node.nodeType!==1) return;
+      const tag=(node.tagName||'').toUpperCase();
+      if (tag==='BR'){ out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code }); return; }
+      // Basic list and block handling to preserve bullets in fallback
+      if (tag==='UL' || tag==='OL'){
+        Array.from(node.children||[]).forEach(li=> walk(li, style));
+        out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code });
+        return;
+      }
+      if (tag==='LI'){
+        out.push({ text:'• ', weight:700, italic:false, code:false });
+        Array.from(node.childNodes||[]).forEach(ch=> walk(ch, style));
+        out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code });
+        return;
+      }
+      const next={ weight:style.weight, italic:style.italic, code:style.code };
+      if (tag==='STRONG'||tag==='B') next.weight=700;
+      if (tag==='EM'||tag==='I') next.italic=true;
+      if (tag==='CODE'||tag==='KBD'||tag==='SAMP') next.code=true;
+      Array.from(node.childNodes||[]).forEach(ch=> walk(ch, next));
+    };
+    Array.from(root.childNodes||[]).forEach(ch=> walk(ch));
+    return out;
+  }
+
+  // Collect runs from after `startEl` until `endEl` (exclusive). If `endEl` is null, until end of container.
+  function collectRunsBetween(startEl, endEl){
+    const out=[]; if (!startEl) return out;
+    let n = startEl.nextSibling;
+    const walk = (node, style={weight:400, italic:false, code:false})=>{
+      if (!node) return;
+      if (node.nodeType===3){ out.push({ text: node.nodeValue||'', weight:style.weight, italic:style.italic, code:style.code }); return; }
+      if (node.nodeType!==1) return;
+      const tag=(node.tagName||'').toUpperCase();
+      if (tag==='BR'){ out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code }); return; }
+      if (tag==='UL' || tag==='OL'){
+        Array.from(node.children||[]).forEach(li=>{
+          out.push({ text:'• ', weight:700, italic:false, code:false });
+          Array.from(li.childNodes||[]).forEach(ch=> walk(ch, style));
+          out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code });
+        });
+        return;
+      }
+      const next={ weight:style.weight, italic:style.italic, code:style.code };
+      if (tag==='STRONG'||tag==='B') next.weight=700;
+      if (tag==='EM'||tag==='I') next.italic=true;
+      if (tag==='CODE'||tag==='KBD'||tag==='SAMP') next.code=true;
+      Array.from(node.childNodes||[]).forEach(ch=> walk(ch, next));
+    };
+    while(n && n!==endEl){
+      walk(n);
+      // separate block siblings by newline
+      out.push({ text:'\n', weight:400, italic:false, code:false });
+      n = n.nextSibling;
+    }
+    return out;
+  }
+
+  function parseMdBlocks(mdEl){
+    const blocks = [];
+    const pushRuns = (kind, runs, extra={})=>{
+      const txt = (runs||[]).map(r=>r?.text||'').join('').trim();
+      if (txt) blocks.push(Object.assign({ kind, runs }, extra));
+    };
+    const splitLabel = (txt)=>{
+      if (!txt) return null;
+      const m = txt.match(/^(.*?)[\:：﹕︰]\s*(.+)$/);
+      if (m) return { label: m[1].trim(), rest: m[2].trim() };
+      return null;
+    };
+    const blockTags = new Set(['P','UL','OL','DL','BLOCKQUOTE','PRE','H1','H2','H3','H4','H5','H6']);
+    const hasBlockChild = (el)=>{
+      try{ return Array.from(el.children||[]).some(c=> blockTags.has((c.tagName||'').toUpperCase())); }catch{ return false; }
+    };
+    const collectRuns = (node, style={weight:400, italic:false, code:false})=>{
+      const out=[]; if (!node) return out;
+      if (node.nodeType===3){ out.push({ text: node.nodeValue || '', weight: style.weight, italic: style.italic, code: style.code }); return out; }
+      if (node.nodeType!==1) return out;
+      const tag = (node.tagName||'').toUpperCase();
+      if (tag==='BR'){ out.push({ text:'\n', weight:style.weight, italic:style.italic, code:style.code }); return out; }
+      const next = { weight: style.weight, italic: style.italic, code: style.code };
+      if (tag==='STRONG'||tag==='B') next.weight = 700;
+      if (tag==='EM'||tag==='I') next.italic = true;
+      if (tag==='CODE'||tag==='KBD'||tag==='SAMP') next.code = true;
+      Array.from(node.childNodes||[]).forEach(ch=> out.push(...collectRuns(ch, next)));
+      return out;
+    };
+    const visit = (el)=>{
+      const tag = (el.tagName||'').toUpperCase();
+      if (tag==='H1') pushRuns('h', collectRuns(el), { level:1 });
+      else if (tag==='H2') pushRuns('h', collectRuns(el), { level:2 });
+      else if (tag==='H3' || tag==='H4' || tag==='H5' || tag==='H6') pushRuns('h', collectRuns(el), { level:3 });
+      else if (tag==='P'){
+        pushRuns('p', collectRuns(el));
+      }
+      else if (tag==='BLOCKQUOTE') pushRuns('blockquote', collectRuns(el));
+      else if (tag==='UL'){
+        Array.from(el.querySelectorAll(':scope > li')).forEach(li=> pushRuns('li', collectRuns(li), { bullet: '•' }));
+      } else if (tag==='OL'){
+        Array.from(el.querySelectorAll(':scope > li')).forEach((li, idx)=> pushRuns('li', collectRuns(li), { bullet: `${idx+1}.` }));
+      } else if (tag==='DL'){
+        const dts = Array.from(el.querySelectorAll(':scope > dt'));
+        const dds = Array.from(el.querySelectorAll(':scope > dd'));
+        dts.forEach((dt,i)=>{ const tRuns=collectRuns(dt); const t=(dt.innerText||'').trim(); if (t) pushRuns('h', tRuns, { level:3 }); const d=dds[i]; if (d){ const vRuns=collectRuns(d); pushRuns('p', vRuns); } });
+      } else if (tag==='PRE'){
+        pushRuns('p', collectRuns(el));
+      } else if (tag==='DIV' || tag==='SECTION' || tag==='ARTICLE' || tag==='SPAN'){
+        if (!hasBlockChild(el)){ const runs=collectRuns(el); pushRuns('p', runs); }
+        else { Array.from(el.children||[]).forEach(visit); }
+      } else {
+        Array.from(el.children||[]).forEach(visit);
+      }
+    };
+    Array.from(mdEl.children||[]).forEach(visit);
+    return blocks.length? blocks: [{ kind:'p', text: mdEl.innerText||'' }];
+  }
+
+  function getMainDomain(host){
+    try{
+      host = String(host||'').toLowerCase();
+      if (!host) return '';
+      const parts = host.split('.').filter(Boolean);
+      if (parts.length <= 2) return host;
+      // naive eTLD+1 heuristic; handles most cases except complex ccTLDs
+      const ccTLDs = new Set(['co','com','net','org','edu','gov']);
+      const last = parts[parts.length-1];
+      const second = parts[parts.length-2];
+      if (second.length<=3 && ccTLDs.has(second)){
+        return parts.slice(-3).join('.');
+      }
+      return parts.slice(-2).join('.');
+    }catch{ return host||''; }
   }
 
   // ===== 主题侦测 =====
@@ -597,6 +1030,17 @@
 
       .card-tools{ position:absolute; right:10px; top:8px; display:flex; align-items:center; gap:6px; }
       .tbtn{ border:1px solid var(--border); padding:6px 8px; border-radius:8px; cursor:pointer; background: var(--surface); color:#334155; }
+      /* Emphasized share button */
+      .tbtn-share{ 
+        background: #eef5ff; 
+        border-color: #c7dbff; 
+        color: #1e3a8a; 
+        font-weight: 800;
+      }
+      .tbtn .icon{ width:16px; height:16px; display:inline-block; }
+      .tbtn .icon-share{ stroke: currentColor; fill: none; stroke-width: 2; }
+      .tbtn-share:hover{ background:#dbeafe; border-color:#b7d0ff; color:#1e40af; box-shadow: 0 2px 10px rgba(37,99,235,.18); }
+      .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(37,99,235,.32); }
       .tbtn:hover{ background:#fbfdff; border-color:#d9e6ff; }
       .tbtn:active{ transform: translateY(1px); }
       .tbtn[aria-pressed="true"]{ background:#eef5ff; border-color:#cadeff; }
@@ -847,6 +1291,9 @@
       /* Card tool buttons on dark */
       :host([data-theme="dark"]) .tbtn{ background: var(--surface); color:#e2ebf8; border-color:#27344b; }
       :host([data-theme="dark"]) .tbtn:hover{ background:#16233b; border-color:#344766; }
+      :host([data-theme="dark"]) .tbtn-share{ background:#1b2a4b; border-color:#2a3f66; color:#cfe0ff; font-weight:800; }
+      :host([data-theme="dark"]) .tbtn-share:hover{ background:#23365e; border-color:#3a5588; box-shadow: 0 2px 12px rgba(142,162,255,.22); }
+      :host([data-theme="dark"]) .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(142,162,255,.35); }
 
       /* ===== Accessibility ===== */
       @media (prefers-reduced-motion: reduce){
@@ -965,7 +1412,13 @@
         <div class="card card-head" :data-title="title" ref="card">
           <div class="read-progress" aria-hidden="true"><span :style="\`width:\${progress}%\`"></span></div>
           <div class="card-tools" role="toolbar" aria-label="card tools">
-            <button class="tbtn" @click="share" :title="tt.share">{{ tt.share }}</button>
+            <button class="tbtn tbtn-share" @click="share" :title="tt.share" aria-label="{{ tt.share }}">
+              <svg class="icon icon-share" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/>
+                <path d="M12 16V4"/>
+                <path d="M8 8l4-4 4 4"/>
+              </svg>
+            </button>
             <button class="tbtn" @click="copy" :title="tt.copy">{{ tt.copy }}</button>
             <button class="tbtn" @click="toggle" :aria-pressed="collapsed? 'true':'false'" :title="collapsed? tt.expand: tt.collapse">
               {{ collapsed? tt.expand: tt.collapse }}
@@ -1039,9 +1492,19 @@
           try{
             const card=this.$refs.card;
             const hint=document.createElement('div');
-            hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px'; hint.style.background='rgba(34,197,94,.12)'; hint.style.border='1px solid rgba(34,197,94,.35)'; hint.style.color='#166534';
+            hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px';
+            const isDark = shadow?.host?.getAttribute('data-theme')==='dark';
+            if (isDark){
+              hint.style.background='rgba(59,130,246,.22)';
+              hint.style.border='1px solid rgba(142,162,255,.55)';
+              hint.style.color='#e6efff';
+            } else {
+              hint.style.background='rgba(34,197,94,.12)';
+              hint.style.border='1px solid rgba(34,197,94,.35)';
+              hint.style.color='#166534';
+            }
             hint.textContent = currentLangCache==='en' ? 'Summary card copied. Paste anywhere.' : '已生成摘要卡片到剪贴板，可在任意处粘贴';
-            card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1200);
+            card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1400);
           }catch{}
         }
       },
@@ -1403,7 +1866,8 @@
       if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; card.appendChild(tools); }
       let btn = tools.querySelector('.tbtn-share');
       const label = currentLangCache==='en' ? 'Share' : '分享';
-      if (!btn){ btn = document.createElement('button'); btn.className='tbtn tbtn-share'; btn.type='button'; btn.textContent = label; tools.insertBefore(btn, tools.firstChild || null);
+      const svg = `<svg class="icon icon-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/></svg>`;
+      if (!btn){ btn = document.createElement('button'); btn.className='tbtn tbtn-share'; btn.type='button'; btn.innerHTML = svg; btn.title = label; btn.setAttribute('aria-label', label); tools.insertBefore(btn, tools.firstChild || null);
         btn.addEventListener('click', async ()=>{
           const ok = await generateShareImageFromSummary(shadow);
           try{ btn.setAttribute('aria-pressed','true'); setTimeout(()=>btn.setAttribute('aria-pressed','false'), 900); }catch{}
@@ -1416,14 +1880,24 @@
           } else {
             try{
               const hint=document.createElement('div');
-              hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px'; hint.style.background='rgba(34,197,94,.12)'; hint.style.border='1px solid rgba(34,197,94,.35)'; hint.style.color='#166534';
+              hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px';
+              const isDark = shadow?.host?.getAttribute('data-theme')==='dark';
+              if (isDark){
+                hint.style.background='rgba(59,130,246,.22)';
+                hint.style.border='1px solid rgba(142,162,255,.55)';
+                hint.style.color='#e6efff';
+              } else {
+                hint.style.background='rgba(34,197,94,.12)';
+                hint.style.border='1px solid rgba(34,197,94,.35)';
+                hint.style.color='#166534';
+              }
               hint.textContent = currentLangCache==='en' ? 'Summary card copied. Paste anywhere.' : '已生成摘要卡片到剪贴板，可在任意处粘贴';
-              card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1200);
+              card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1400);
             }catch{}
           }
         });
       } else {
-        btn.textContent = label;
+        btn.innerHTML = svg; btn.title = label; btn.setAttribute('aria-label', label);
       }
     }catch{}
   }
