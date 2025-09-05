@@ -115,6 +115,131 @@
     return html;
   }
 
+  // ===== Share Card (canvas to clipboard) =====
+  async function generateShareImageFromSummary(shadow){
+    try{
+      const host = shadow.host;
+      const theme = host.getAttribute('data-theme') || 'light';
+      const isDark = theme === 'dark';
+      const summaryCard = shadow.getElementById('sx-summary');
+      if (!summaryCard) throw new Error('no summary card');
+      const md = summaryCard.querySelector('.md');
+      if (!md) throw new Error('no summary content');
+      const plain = md.innerText || '';
+      const title = document.title || '';
+      const origin = location.host || '';
+      const now = new Date();
+      const dateStr = now.toLocaleString(currentLangCache==='en'?'en-US':'zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const brand = currentLangCache==='en' ? 'SummarizerX AI Reader' : '麦乐可 AI 摘要阅读器';
+      const headerText = currentLangCache==='en' ? 'AI Summary' : 'AI 摘要';
+
+      const W = 1200, H = 1600; // tall card for better readability
+      const P = 80; // padding
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // Background gradient
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      if (!isDark){
+        bg.addColorStop(0, '#eef2ff');
+        bg.addColorStop(0.5, '#e0f2fe');
+        bg.addColorStop(1, '#f0fdf4');
+      } else {
+        bg.addColorStop(0, '#0f172a');
+        bg.addColorStop(0.5, '#0b1222');
+        bg.addColorStop(1, '#0a1b14');
+      }
+      ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+
+      // Card container
+      const cardX = P, cardY = P, cardW = W - P*2, cardH = H - P*2;
+      const r = 36;
+      const path = new Path2D();
+      path.moveTo(cardX+r, cardY);
+      path.arcTo(cardX+cardW, cardY, cardX+cardW, cardY+cardH, r);
+      path.arcTo(cardX+cardW, cardY+cardH, cardX, cardY+cardH, r);
+      path.arcTo(cardX, cardY+cardH, cardX, cardY, r);
+      path.arcTo(cardX, cardY, cardX+cardW, cardY, r);
+      ctx.save();
+      ctx.shadowColor = isDark? 'rgba(0,0,0,0.35)' : 'rgba(16,24,40,0.16)';
+      ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+      ctx.fillStyle = isDark? 'rgba(20,30,54,0.90)' : 'rgba(255,255,255,0.92)';
+      ctx.fill(path);
+      ctx.restore();
+
+      // Header bar
+      const hdrH = 96;
+      const hdrGrad = ctx.createLinearGradient(cardX, cardY, cardX+cardW, cardY+hdrH);
+      if (!isDark){ hdrGrad.addColorStop(0,'rgba(99,102,241,0.16)'); hdrGrad.addColorStop(1,'rgba(59,130,246,0.14)'); }
+      else { hdrGrad.addColorStop(0,'rgba(99,102,241,0.28)'); hdrGrad.addColorStop(1,'rgba(59,130,246,0.22)'); }
+      ctx.fillStyle = hdrGrad;
+      ctx.fillRect(cardX, cardY, cardW, hdrH);
+
+      // Header text + badge
+      ctx.font = 'bold 36px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
+      ctx.fillStyle = isDark? '#e6eefc' : '#0f172a';
+      ctx.fillText(headerText, cardX+28, cardY+60);
+      // badge dot
+      ctx.beginPath(); ctx.arc(cardX+16, cardY+46, 6, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+
+      // Meta: page title + host + date
+      ctx.font = '600 28px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
+      ctx.fillStyle = isDark? '#cbd5e1' : '#334155';
+      const meta = `${title? title: origin}${origin? ' · '+origin: ''} · ${dateStr}`;
+      const metaY = cardY + hdrH + 40;
+      drawWrappedText(ctx, meta, cardX+32, metaY, cardW-64, 34, 2);
+
+      // Summary body
+      const bodyY = metaY + 46;
+      ctx.font = '400 30px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
+      ctx.fillStyle = isDark? '#e5e7eb' : '#111827';
+      drawWrappedText(ctx, collapseBlankLines(plain).trim(), cardX+32, bodyY, cardW-64, 42, 22, {
+        paragraphSpacing: 18
+      });
+
+      // Footer brand
+      const footer = brand;
+      ctx.font = '700 28px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif';
+      ctx.fillStyle = '#3b82f6';
+      const textW = ctx.measureText(footer).width;
+      ctx.fillText(footer, cardX + cardW - textW - 28, cardY + cardH - 28);
+      // brand dot
+      ctx.beginPath(); ctx.arc(cardX + cardW - textW - 44, cardY + cardH - 36, 6, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+
+      // Export to clipboard
+      const blob = await new Promise(res=> canvas.toBlob(res, 'image/png', 0.95));
+      if (!blob) throw new Error('toBlob failed');
+      const item = new ClipboardItem({ 'image/png': blob });
+      await navigator.clipboard.write([item]);
+      return true;
+    }catch(e){ console.warn('share image failed', e); return false; }
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines, opts={}){
+    const { paragraphSpacing = 12 } = opts;
+    const paragraphs = String(text||'').split(/\n+/).filter(Boolean);
+    let cursorY = y; let linesUsed = 0;
+    for (let pi=0; pi<paragraphs.length; pi++){
+      const words = paragraphs[pi].split(/\s+/);
+      let line = '';
+      for (let i=0; i<words.length; i++){
+        const test = line ? (line + ' ' + words[i]) : words[i];
+        const w = ctx.measureText(test).width;
+        if (w > maxWidth && line){
+          ctx.fillText(line, x, cursorY);
+          cursorY += lineHeight; linesUsed++;
+          if (maxLines && linesUsed >= maxLines){ ctx.fillText('…', x + maxWidth - ctx.measureText('…').width, cursorY); return; }
+          line = words[i];
+        }else{
+          line = test;
+        }
+      }
+      if (line){ ctx.fillText(line, x, cursorY); cursorY += lineHeight; linesUsed++; if (maxLines && linesUsed >= maxLines) return; }
+      if (pi < paragraphs.length-1){ cursorY += paragraphSpacing; }
+    }
+  }
+
   // ===== 主题侦测 =====
   function parseColorToRGB(str){
     if(!str) return null;
@@ -840,6 +965,7 @@
         <div class="card card-head" :data-title="title" ref="card">
           <div class="read-progress" aria-hidden="true"><span :style="\`width:\${progress}%\`"></span></div>
           <div class="card-tools" role="toolbar" aria-label="card tools">
+            <button class="tbtn" @click="share" :title="tt.share">{{ tt.share }}</button>
             <button class="tbtn" @click="copy" :title="tt.copy">{{ tt.copy }}</button>
             <button class="tbtn" @click="toggle" :aria-pressed="collapsed? 'true':'false'" :title="collapsed? tt.expand: tt.collapse">
               {{ collapsed? tt.expand: tt.collapse }}
@@ -858,6 +984,7 @@
       progress: 0,
       tt: {
         get copy(){ return currentLangCache==='en' ? 'Copy' : '复制'; },
+        get share(){ return currentLangCache==='en' ? 'Share' : '分享'; },
         get collapse(){ return currentLangCache==='en' ? 'Collapse' : '收起'; },
         get expand(){ return currentLangCache==='en' ? 'Expand' : '展开'; },
         get collapsed(){ return currentLangCache==='en' ? 'Collapsed' : '已收起'; },
@@ -899,13 +1026,32 @@
         }catch{}
       },
       toggle(){ this.collapsed = !this.collapsed; },
+      async share(){
+        const ok = await generateShareImageFromSummary(shadow);
+        this._flashBtn('.tbtn:first-child');
+        if (!ok){
+          try{
+            const box=this.$refs.card; const alert=document.createElement('div');
+            alert.className='alert'; alert.innerHTML=`<button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${currentLangCache==='en'?'Failed to copy image to clipboard':'复制图片到剪贴板失败'}</p></div>`;
+            box.insertBefore(alert, box.querySelector('.md'));
+          }catch{}
+        } else {
+          try{
+            const card=this.$refs.card;
+            const hint=document.createElement('div');
+            hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px'; hint.style.background='rgba(34,197,94,.12)'; hint.style.border='1px solid rgba(34,197,94,.35)'; hint.style.color='#166534';
+            hint.textContent = currentLangCache==='en' ? 'Summary card copied. Paste anywhere.' : '已生成摘要卡片到剪贴板，可在任意处粘贴';
+            card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1200);
+          }catch{}
+        }
+      },
       async copy(){
         try{
           const tmp = document.createElement('div');
           tmp.innerHTML = this.html;
           const text = tmp.innerText;
           await navigator.clipboard.writeText(text);
-          this._flashBtn('.tbtn:first-child');
+          this._flashBtn('.tbtn:nth-child(2)');
         }catch(e){ console.warn('copy failed', e); }
       },
       _flashBtn(sel){
@@ -943,6 +1089,7 @@
     const $s = shadow.getElementById('sx-summary');
     const $c = shadow.getElementById('sx-cleaned');
     $s.innerHTML = summary ? stripInlineColor(renderMarkdown(summary)) : $s.innerHTML;
+    try{ ensureShareButton(shadow); }catch{}
     $c.innerHTML = (cleaned===null) ? `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`
       : (cleaned ? stripInlineColor(renderMarkdown(cleaned)) : $c.innerHTML);
     try{ $s.firstElementChild?.classList?.add('revive'); $c.firstElementChild?.classList?.add('revive'); }catch{}
@@ -1187,6 +1334,7 @@
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
     }catch(e){ console.warn('Failed to update UI text:', e); }
     try{ updateEmptyArrowPosition(); }catch{}
+    try{ ensureShareButton(shadow); }catch{}
   }
 
   function setLoading(shadow,loading){
@@ -1237,7 +1385,7 @@
   }
   async function renderCards(summaryMarkdown, cleanedMarkdown){
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
-    if (vmSummary) vmSummary.html = sumHTML; else shadow.getElementById('sx-summary').innerHTML = sumHTML;
+    if (vmSummary) vmSummary.html = sumHTML; else { const root=shadow.getElementById('sx-summary'); root.innerHTML = sumHTML; try{ ensureShareButton(shadow); }catch{} }
     if (cleanedMarkdown===null){
       if (vmCleaned) vmCleaned.html = `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
       else shadow.getElementById('sx-cleaned').innerHTML = `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
@@ -1245,6 +1393,39 @@
     }
     const cleanedHTML = cleanedMarkdown ? stripInlineColor(renderMarkdown(cleanedMarkdown)) : '';
     if (vmCleaned) vmCleaned.html = cleanedHTML; else shadow.getElementById('sx-cleaned').innerHTML = cleanedHTML;
+  }
+
+  function ensureShareButton(shadow){
+    try{
+      const card = shadow.getElementById('sx-summary');
+      if (!card) return;
+      let tools = card.querySelector('.card-tools');
+      if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; card.appendChild(tools); }
+      let btn = tools.querySelector('.tbtn-share');
+      const label = currentLangCache==='en' ? 'Share' : '分享';
+      if (!btn){ btn = document.createElement('button'); btn.className='tbtn tbtn-share'; btn.type='button'; btn.textContent = label; tools.insertBefore(btn, tools.firstChild || null);
+        btn.addEventListener('click', async ()=>{
+          const ok = await generateShareImageFromSummary(shadow);
+          try{ btn.setAttribute('aria-pressed','true'); setTimeout(()=>btn.setAttribute('aria-pressed','false'), 900); }catch{}
+          if (!ok){
+            try{
+              const alert=document.createElement('div'); alert.className='alert';
+              alert.innerHTML=`<button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${currentLangCache==='en'?'Failed to copy image to clipboard':'复制图片到剪贴板失败'}</p></div>`;
+              const md=card.querySelector('.md'); card.insertBefore(alert, md||card.firstChild);
+            }catch{}
+          } else {
+            try{
+              const hint=document.createElement('div');
+              hint.style.position='absolute'; hint.style.right='14px'; hint.style.top='42px'; hint.style.fontSize='12px'; hint.style.padding='4px 8px'; hint.style.borderRadius='6px'; hint.style.background='rgba(34,197,94,.12)'; hint.style.border='1px solid rgba(34,197,94,.35)'; hint.style.color='#166534';
+              hint.textContent = currentLangCache==='en' ? 'Summary card copied. Paste anywhere.' : '已生成摘要卡片到剪贴板，可在任意处粘贴';
+              card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1200);
+            }catch{}
+          }
+        });
+      } else {
+        btn.textContent = label;
+      }
+    }catch{}
   }
 
   // ===== Run 按钮 =====
