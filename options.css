@@ -23,6 +23,12 @@ html, body { height: 100%; }
   --accent: #10b981;      /* success */
   --danger: #dc2626;      /* error */
   --link: #2563eb;
+  --candy-az: rgba(59,130,246,.10);
+  --candy-vi: rgba(99,102,241,.10);
+  --glass: rgba(255,255,255,.72);
+  --glass-soft: rgba(255,255,255,.48);
+  --card-glass: rgba(255,255,255,.82);
+  --card-glass-soft: rgba(255,255,255,.68);
 
   --radius: 12px;
   --ring: 0 0 0 3px rgba(37,99,235,.20);
@@ -35,6 +41,50 @@ body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif;
   background: var(--bg);
   color: var(--text);
+}
+
+/* =========================
+ * Language switch transition (soft cross-fade)
+ * ========================= */
+html.lang-anim .hero,
+html.lang-anim .main-with-dock,
+html.lang-anim .save-dock{
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+/* =========================
+ * Page open animations (subtle and respectful)
+ * ========================= */
+@keyframes optFadeInUp {
+  0%   { opacity: 0; transform: translateY(8px) scale(.985); filter: blur(3px); }
+  60%  { opacity: .96; transform: translateY(0)   scale(1);    filter: blur(1px); }
+  100% { opacity: 1; transform: translateY(0)   scale(1);    filter: blur(0); }
+}
+@keyframes optFadeInDown {
+  0%   { opacity: 0; transform: translateY(-6px) scale(.99); filter: blur(2px); }
+  100% { opacity: 1; transform: translateY(0)    scale(1);   filter: blur(0); }
+}
+
+html.page-enter .hero{ animation: optFadeInDown .48s cubic-bezier(.2,.7,.3,1) both; }
+html.page-enter .section.card.fx-in{ animation: optFadeInUp .46s cubic-bezier(.2,.7,.3,1) both; }
+html.page-enter .save-dock{ animation: optFadeInUp .40s ease .08s both; }
+
+@media (prefers-reduced-motion: reduce){
+  html.page-enter .hero,
+  html.page-enter .section.card.fx-in,
+  html.page-enter .save-dock{ animation: none; }
+}
+html.lang-anim.lang-out .hero,
+html.lang-anim.lang-out .main-with-dock,
+html.lang-anim.lang-out .save-dock{
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce){
+  html.lang-anim .hero,
+  html.lang-anim .main-with-dock,
+  html.lang-anim .save-dock{ transition: none; }
 }
 
 /* 内容避免被底栏遮挡 */
@@ -58,15 +108,17 @@ body{
  * ========================= */
 .hero{
   position: relative;
-  background: var(--surface);
+  background:
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: blur(12px) saturate(1.05);
   border: 1px solid var(--border);
-  border-top-left-radius: 0;     /* 可选：去掉上圆角让它与顶部齐平 */
-  border-top-right-radius: 0;    /* 可选 */
-  /*border-radius: var(--radius);   如果加了上两行，这行可以删；或保留并单独覆盖上圆角 */
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
   padding: 20px 0 16px;
-  margin: 0 0 16px;              /* 顶部外边距改为 0 */
-  /* 可选：如果仍然看到顶端有1px缝隙，直接去掉上边框 */
-  /* border-top: none; */
+  margin: 0 0 16px;
+  box-shadow: 0 2px 10px rgba(16,24,40,.06);
 }
 
 .hero-header{
@@ -106,14 +158,26 @@ body{
  * ========================= */
 .section.card{
   position: relative;
-  background: var(--surface);
+  background:
+    radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
   margin: 16px 0;
-  /* 上浮动效所需的过渡与优化 */
-  transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease, background-color .2s ease;
+  transition: transform .15s ease, box-shadow .22s ease, border-color .2s ease, background-color .2s ease;
   will-change: transform, box-shadow;
+  box-shadow: 0 1px 1px rgba(16,24,40,.05), 0 8px 22px rgba(16,24,40,.08);
+}
+
+/* Light mode: add a gentle tint so cards aren't pure white */
+html[data-theme="light"] .section.card{
+  background:
+    radial-gradient(160px 120px at 24px -24px, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 68%),
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
 }
 .section-title{ margin:0 0 12px; font-size:16px; font-weight:700; color: var(--text); display:flex; align-items:center; gap:8px; }
 .section-title .dot{ width:8px; height:8px; border-radius:50%; background: var(--primary); display:inline-block; }
@@ -133,6 +197,20 @@ body{
 .ctrl{
   width:100%; padding:10px 12px; border-radius: 10px; font-size:14px; outline:none; transition: box-shadow .15s, border-color .15s, background .15s;
   background:#fff; border:1px solid #d1d5db; color: var(--text);
+}
+.ctrl::placeholder{ color:#9aa3b2; }
+
+/* Improve select dropdown affordance and spacing for arrow */
+select.ctrl{
+  -webkit-appearance: none; appearance: none;
+  padding-right: 38px; /* leave room for chevron */
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b667a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] select.ctrl{
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23dbe3ee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 .ctrl::placeholder{ color:#9aa3b2; }
 .ctrl:hover{ border-color:#cbd5e1; }
@@ -202,7 +280,75 @@ html[data-theme="light"] .language-switcher .lang-btn.active{ background: var(--
 .btn.primary:hover{ background:#1d4ed8; border-color:#1d4ed8; }
 
 /* Helper/notes */
-.help{ font-size:13px; color:#475467; line-height:1.7; background: var(--surface-2); border:1px dashed var(--border); padding:10px 12px; border-radius:10px; }
+.help{
+  position:relative;
+  font-size:13px;
+  color:#374151; /* clearer text on light */
+  line-height:1.7;
+  padding:12px 14px;
+  border-radius:12px;
+  /* warm subtle amber tint + recessed glass */
+  border:1px solid #f3e9c5;
+  background:
+    linear-gradient(180deg, rgba(255, 245, 200, .64) 0%, rgba(255, 250, 220, .90) 100%),
+    #fffef8;
+  -webkit-backdrop-filter: blur(5px) saturate(1.04);
+  backdrop-filter: blur(5px) saturate(1.04);
+  /* recessed (pressed-in) bevel: darker inner top + lighter inner bottom */
+  box-shadow:
+    inset 0 1px 0 rgba(245, 200, 120, .24),
+    inset 0 -1px 0 rgba(255,255,255,.78),
+    inset 1px 0 0 rgba(245,200,120,.12),
+    inset -1px 0 0 rgba(255,255,255,.40);
+}
+.consent-attn .help{
+  /* Light theme: pale yellow background + red frame pulse */
+  border-color: #ef4444; /* red-500 (frame + border emphasis) */
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, .92) 0%, rgba(254, 243, 199, .98) 100%),
+    #fffbeb; /* pale yellow */
+  animation: consentPulse 1.2s ease-in-out 3;
+}
+/* Ensure same specificity as dark variant so light mode always animates */
+html[data-theme="light"] .consent-attn .help{
+  animation: consentPulse 1.2s ease-in-out 3;
+}
+/* Dark theme variant: stronger contrast with deep tints */
+html[data-theme="dark"] .consent-attn .help{
+  border-color: #fb7185; /* rose-400 */
+  background:
+    linear-gradient(180deg, rgba(127, 29, 29, .42) 0%, rgba(69, 10, 10, .62) 100%),
+    #1b0f10; /* deep, slightly reddish base */
+  color: #fde2e2; /* light rose text */
+  animation: consentPulseDark 1.2s ease-in-out 3;
+}
+/* Emphasize the checkbox color while drawing attention */
+.consent-attn input[type="checkbox"]{ accent-color: #ef4444; } /* red for light theme */
+html[data-theme="dark"] .consent-attn input[type="checkbox"]{ accent-color: #fb7185; }
+/* Replace default blue focus ring on the checkbox with a soft ring on the container */
+.consent-attn input[type="checkbox"]:focus,
+.consent-attn input[type="checkbox"]:focus-visible{
+  outline: none !important;
+  box-shadow: none !important;
+}
+.consent-attn .help{ position: relative; }
+.consent-attn .help:focus-within{
+  /* red focus ring in light */
+  box-shadow: 0 0 0 3px rgba(239,68,68,.28);
+}
+html[data-theme="dark"] .consent-attn .help:focus-within{
+  box-shadow: 0 0 0 4px rgba(251,113,133,.28);
+}
+@keyframes consentPulse{
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); }
+  50%{ box-shadow: 0 0 0 6px rgba(239,68,68,.18); }
+  100%{ box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+@keyframes consentPulseDark{
+  0% { box-shadow: 0 0 0 0 rgba(251,113,133,.55); }
+  50%{ box-shadow: 0 0 0 8px rgba(251,113,133,.22); }
+  100%{ box-shadow: 0 0 0 0 rgba(251,113,133,0); }
+}
 .meta{ margin-top:8px; font-size:12px; color:#475467; border:1px dashed var(--border); background: #f7f8fb; padding:8px; border-radius:8px; }
 .hint{ font-size:12px; color:#6b7280; }
 
@@ -216,8 +362,15 @@ html[data-theme="dark"] .shortcut .shortcut-desc{ color:#b6c0cf; }
  * ========================= */
 .save-dock{
   position: fixed; left: 0; right: 0; bottom: 0; min-height: var(--dock-h);
-  padding: 10px 0 12px; background: var(--surface); border-top:1px solid var(--border);
+  padding: 10px 0 12px;
+  background:
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  backdrop-filter: blur(10px) saturate(1.05);
+  border-top:1px solid var(--border);
   display:flex; align-items:center; z-index:50;
+  box-shadow: 0 -1px 8px rgba(16,24,40,.08);
 }
 .dock-inner{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .dock-left{ display:flex; flex-direction:column; gap:6px; min-width: 380px; max-width: 520px; flex-shrink:1; }
@@ -233,7 +386,7 @@ html[data-theme="dark"] .shortcut .shortcut-desc{ color:#b6c0cf; }
 
 /* Field sizing helpers */
 .field-full { margin-bottom: 16px; }
-select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0 28px 0 10px; }
+select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0 34px 0 10px; background-position: right 10px center; }
 #aiProvider.ctrl { max-width: 400px; display: inline-block; }
 #dock-spacer { height: 12px; }
 
@@ -242,6 +395,9 @@ select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0
 .buy-help-inline a{ color: var(--link); text-decoration: underline; text-underline-offset: 2px; margin: 0 2px; }
 .buy-help-inline a:hover{ filter: brightness(0.95); }
 @media (max-width: 800px){ .buy-help-inline{ display:block; margin:6px 0 0; white-space: normal; } }
+
+/* Dark theme: brighten inline purchase helper text for readability */
+html[data-theme="dark"] .buy-help-inline{ color:#cbd5e1; }
 
 /* Utility */
 .hidden { display: none !important; }
@@ -253,7 +409,13 @@ select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0
 .theme-toggle .label{ display:flex; align-items:center; justify-content:center; height:42px; line-height:42px; font-size:12px; font-weight:700; color:#475569; margin-right:2px; }
 .theme-toggle .seg{ display:flex; align-items:center; gap:6px; background:#f4f6fb; border:1px solid #d9e4f5; border-radius: 999px; padding:4px; }
 .theme-toggle .seg button, .theme-btn{ width:34px; height:34px; display:grid; place-items:center; border:none; border-radius:999px; cursor:pointer; background:transparent; color:#5b6b7f; padding:0; }
-.theme-toggle .seg button.active, .theme-toggle .seg button[aria-selected="true"], .theme-btn.active, .theme-btn[aria-selected="true"]{ background: #1f2937; color:#fff; }
+.theme-toggle .seg button.active,
+.theme-toggle .seg button[aria-selected="true"],
+.theme-btn.active,
+.theme-btn[aria-selected="true"]{
+  background: var(--primary);
+  color:#fff;
+}
 .theme-toggle .seg button svg, .theme-btn svg{ width:18px; height:18px; pointer-events:none; stroke: currentColor; fill:none; opacity:.95; }
 
 /* =========================
@@ -284,17 +446,38 @@ html[data-theme="dark"]{
   --primary-600:#7b8cff;
   --accent:#7dd3a7;
   --link:#a7b7ff;
+  --candy-az: rgba(142,162,255,.14);
+  --candy-vi: rgba(123,140,255,.12);
+  --glass: rgba(17,26,46,.62);
+  --glass-soft: rgba(17,26,46,.44);
+  --card-glass: rgba(17,26,46,.78);
+  --card-glass-soft: rgba(17,26,46,.60);
 }
 
 html[data-theme="dark"] .hero,
 html[data-theme="dark"] .section.card,
 html[data-theme="dark"] .save-dock{
-  background: var(--surface);
+  /* keep glass backgrounds; only ensure border tone */
   border-color: var(--border);
 }
-html[data-theme="dark"] .help{ color:#cfdae8; background: var(--surface-2); border-color: var(--border); }
+html[data-theme="dark"] .help{
+  color:#e5ecf7;
+  border-color:#2a3a57;
+  background:
+    linear-gradient(180deg, rgba(17,26,46,.62) 0%, rgba(17,26,46,.44) 100%),
+    var(--surface-2);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(0,0,0,.28);
+}
 html[data-theme="dark"] .meta{ color:#b9c3d3; background: #101826; border-color: var(--border); }
 html[data-theme="dark"] .hint{ color:#9fb0c6; }
+/* Brighten form labels and headings for readability */
+html[data-theme="dark"] .label{ color: var(--text); }
+html[data-theme="dark"] .section-title{ color: var(--text); }
+html[data-theme="dark"] .theme-toggle .label{ color: var(--text); }
+/* Slightly brighter placeholders in dark */
+html[data-theme="dark"] .ctrl::placeholder{ color:#b7c2d8; }
 html[data-theme="dark"] .section-title .dot{ background: var(--primary-600); }
 html[data-theme="dark"] .section.card.note .section-title .dot{ background: var(--accent); }
 html[data-theme="dark"] .ctrl{ background:#0f172a; border-color:#2a3a57; color: var(--text); }
@@ -310,6 +493,15 @@ html[data-theme="dark"] .language-switcher{ background:#1a2333; border-color:#2a
 html[data-theme="dark"] .language-switcher .lang-btn{ color:#e6e9ef; }
 html[data-theme="dark"] .language-switcher .lang-btn:hover{ background:#24324a; color:#fff; }
 html[data-theme="dark"] .language-switcher .lang-btn.active{ background: var(--primary-600); color:#fff; }
+/* Re-apply custom chevron for selects in dark theme (background shorthand above clears it) */
+html[data-theme="dark"] select.ctrl{
+  -webkit-appearance: none; appearance: none;
+  padding-right: 38px;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23dbe3ee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
 
 /* --- Dark mode refinements: shortcuts & buttons --- */
 html[data-theme="dark"] .shortcut{
@@ -317,6 +509,13 @@ html[data-theme="dark"] .shortcut{
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px;
+}
+
+/* Dark theme: soften and enlarge the card highlight for a more natural look */
+html[data-theme="dark"] .section.card{
+  background:
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
 }
 
 /* Ensure buttons in save dock and shortcuts also follow dark tone */
@@ -364,9 +563,10 @@ html[data-theme="light"]{
 }
 
 /* Surfaces: hero & dock 使用与卡片一致的淡蓝配色（更和谐） */
+/* Light theme uses glass backgrounds defined above; keep borders if needed */
 html[data-theme="light"] .hero,
-html[data-theme="light"] .save-dock{ background: var(--card-bg); border-color: var(--card-br); }
-html[data-theme="light"] .section.card{ background: var(--card-bg); border-color: var(--card-br); }
+html[data-theme="light"] .save-dock{ border-color: var(--card-br); }
+html[data-theme="light"] .section.card{ border-color: var(--card-br); }
 
 /* Card elevation — light theme */
 html[data-theme="light"] .section.card:hover,
@@ -380,6 +580,15 @@ html[data-theme="light"] .section.card:focus-within{
 html[data-theme="light"] .ctrl{ background:#fff; border-color:#d7dbe6; color: var(--text); }
 html[data-theme="light"] .ctrl:hover{ border-color:#c9cedb; }
 html[data-theme="light"] .ctrl:focus{ border-color:#aab2ff; box-shadow: 0 0 0 3px rgba(99,102,241,.18); }
+/* Re-apply custom chevron for selects in light theme (background shorthand above clears it) */
+html[data-theme="light"] select.ctrl{
+  -webkit-appearance: none; appearance: none;
+  padding-right: 38px;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b667a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
 
 /* Headings & accents */
 html[data-theme="light"] .section-title .dot{ background: var(--primary); }
@@ -411,3 +620,53 @@ html[data-theme="dark"] .section.card:focus-within{
     transform: none; box-shadow: none;
   }
 }
+
+/* =====================================================
+ * Consent-attention overrides (placed AFTER theme rules)
+ * Ensure pale yellow background in LIGHT theme even if
+ * global light .help styles set gray backgrounds.
+ * ===================================================== */
+html[data-theme="light"] #trial-consent-wrap.consent-attn .help{
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, .92) 0%, rgba(254, 243, 199, .98) 100%),
+    #fffbeb !important; /* pale yellow */
+  border-color: #ef4444 !important; /* red frame */
+}
+html[data-theme="light"] #trial-consent-wrap.consent-attn .help:focus-within{
+  /* Keep a light focus hint, but do not override the animated box-shadow */
+  box-shadow: 0 0 0 3px rgba(239,68,68,.28);
+}
+html[data-theme="light"] #trial-consent-wrap.consent-attn input[type="checkbox"]{
+  accent-color: #ef4444;
+}
+
+/* Consent OK — soften visuals and turn checkbox green */
+#trial-consent-wrap.consent-ok .help{
+  animation: none !important;
+}
+html[data-theme="light"] #trial-consent-wrap.consent-ok .help{
+  background: #f3f4f6 !important;  /* light gray */
+  border-color: #e5e7eb !important; /* neutral border by default */
+  box-shadow: none !important; /* no persistent ring */
+}
+html[data-theme="dark"] #trial-consent-wrap.consent-ok .help{
+  background: #142037 !important;  /* slightly lighter than dark bg */
+  border-color: #27344b !important;
+  color: #dbe3ee !important;
+  box-shadow: none !important;
+}
+#trial-consent-wrap.consent-ok input[type="checkbox"]{ accent-color: #22c55e; } /* green */
+#trial-consent-wrap.consent-ok input[type="checkbox"]:focus,
+#trial-consent-wrap.consent-ok input[type="checkbox"]:focus-visible{
+  outline: none !important;
+  box-shadow: none !important; /* use container green ring instead */
+}
+#trial-consent-wrap.consent-ok .help:focus-within{
+  box-shadow: 0 0 0 4px rgba(34,197,94,.28) !important;
+  border-color: #22c55e !important;
+}
+html[data-theme="light"] #trial-consent-wrap.consent-ok .help:focus-within{
+  outline: 2px solid rgba(34,197,94,.55);
+  outline-offset: 2px;
+}
+html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }

@@ -259,6 +259,7 @@ function applyPresetToTextarea(force = false) {
  * ========================= */
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
+  const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -275,6 +276,18 @@ async function loadSettings() {
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
 
   if (aiProvider === "trial") await setTrialLock(true); else await setTrialLock(false);
+  // 显示试用模式同意复选框
+  reflectTrialConsentVisibility(aiProvider);
+  const consentEl = $("trial_consent");
+  if (consentEl) consentEl.checked = !!trial_consent;
+  // 若来自前台引导需要强调试用同意，进行闪烁提醒并滚动到视图内
+  if (aiProvider === 'trial' && !trial_consent && need_trial_consent_focus) {
+    try { await flashTrialConsentAttention(); } catch {}
+    // 清一次标记，避免反复闪烁
+    try { await chrome.storage.sync.set({ need_trial_consent_focus: false }); } catch {}
+  }
+  // 初始化同意区视觉状态与事件
+  try { initTrialConsentUI(); } catch {}
 
   $("system_prompt_preset").value = d.system_prompt_preset || DEFAULTS.system_prompt_preset;
   if (d.system_prompt_custom && d.system_prompt_custom.trim()) {
@@ -298,7 +311,10 @@ async function loadSettings() {
 
 async function saveSettings() {
   try{ window.dispatchEvent(new CustomEvent('SX_OPT_SAVE_START')); }catch{}
-  const aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
+  // 读取当前选择
+  let aiProvider = $("aiProvider").value || DEFAULTS.aiProvider;
+
+  // Trial 模式：允许在未同意的情况下保存（面板端拦截试用），不自动切换到 OpenAI
 
   // Trial：强制固定值
   if (aiProvider === "trial") {
@@ -319,7 +335,8 @@ async function saveSettings() {
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value,
     system_prompt_preset: $("system_prompt_preset").value,
-    system_prompt_custom: $("system_prompt_custom").value.trim()
+    system_prompt_custom: $("system_prompt_custom").value.trim(),
+    trial_consent: !!($("trial_consent")?.checked)
   };
 
   // 同步保存平台专用 key（便于切换回填）
@@ -432,6 +449,19 @@ async function onProviderChange() {
     }
     await setTrialLock(false);
   }
+  reflectTrialConsentVisibility(provider);
+  // 进入试用模式时，若尚未同意，进行高亮提醒
+  if (provider === 'trial') {
+    try {
+      const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+      updateTrialConsentVisual(!!trial_consent);
+      if (!trial_consent) { try { await flashTrialConsentAttention(); } catch {} }
+    } catch {}
+  }
+  else {
+    // 非试用模式清理视觉标记
+    try { updateTrialConsentVisual(null); } catch {}
+  }
 
   await setMeta({
     aiProvider: provider,
@@ -456,6 +486,73 @@ function markCustomIfManualChange() {
     sel.value = "custom";
     isProgrammaticProviderChange = false;
     onProviderChange();
+  }
+}
+
+function reflectTrialConsentVisibility(provider){
+  const wrap = document.getElementById('trial-consent-wrap');
+  if (!wrap) return;
+  wrap.style.display = (provider === 'trial') ? '' : 'none';
+}
+
+// 试用同意的闪烁/高亮提醒，并滚动到视图内
+async function flashTrialConsentAttention() {
+  const wrap = document.getElementById('trial-consent-wrap');
+  const cb = document.getElementById('trial_consent');
+  if (!wrap) return;
+  try {
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch {}
+  wrap.classList.remove('consent-attn');
+  // 触发重绘以便重复添加动画类生效
+  void wrap.offsetWidth;
+  wrap.classList.add('consent-attn');
+  // 聚焦复选框以显示系统焦点样式，提高可达性
+  try { cb && cb.focus({ preventScroll: true }); } catch {}
+}
+
+// 初始化并绑定“我已阅读并同意”区域的视觉状态与交互
+function initTrialConsentUI(){
+  const cb = document.getElementById('trial_consent');
+  const sel = document.getElementById('aiProvider');
+  if (!cb) return;
+  // 初始应用一次视觉
+  updateTrialConsentVisual(!!cb.checked);
+  // 变更时即时反馈视觉（不写入存储，仅 UI）
+  cb.addEventListener('change', () => {
+    updateTrialConsentVisual(!!cb.checked);
+    // 未勾选时重新触发一次闪烁提示
+    if (!cb.checked) {
+      try { flashTrialConsentAttention(); } catch {}
+    } else {
+      // 勾选后确保出现绿色焦点环
+      try { setTimeout(()=> cb.focus({ preventScroll: true }), 0); } catch {}
+    }
+  });
+}
+
+// 根据勾选状态应用视觉：true => 绿色勾选 + 温和背景；false => 恢复跳动提示
+function updateTrialConsentVisual(checked){
+  const wrap = document.getElementById('trial-consent-wrap');
+  const help = document.getElementById('trial-consent-help');
+  if (!wrap) return;
+  if (checked === null) { wrap.classList.remove('consent-ok'); wrap.classList.remove('consent-attn'); return; }
+  if (checked) {
+    wrap.classList.add('consent-ok');
+    wrap.classList.remove('consent-attn');
+  } else {
+    wrap.classList.remove('consent-ok');
+    // 重新触发 attention 脉冲
+    wrap.classList.remove('consent-attn'); void wrap.offsetWidth; wrap.classList.add('consent-attn');
+    // 进一步确保动画在所有浏览器/主题下可靠重启（特别是浅色模式）
+    try {
+      if (help && help.style) {
+        help.style.animation = 'none';
+        // 强制重绘后清空，恢复到样式表定义的动画
+        void help.offsetWidth;
+        help.style.animation = '';
+      }
+    } catch {}
   }
 }
 
@@ -548,6 +645,7 @@ async function updateUIText() {
   updateElementText('link-buy-openai', await t('settings.openaiGuide'));
   updateElementText('link-buy-deepseek', await t('settings.deepseekGuide'));
   updateElementText('platform-hint', await t('settings.hint'));
+  updateElementText('trial-consent-text', await t('settings.trialConsentText'));
   
   // 更新表单标签
   updateElementText('api-key-label', await t('settings.apiKey'));
@@ -615,18 +713,32 @@ function bindLanguageEvents() {
   }
 }
 
+let __langSwitching = false;
 async function switchLanguage(lang) {
-  // 保存语言设置
-  await chrome.storage.sync.set({ ui_language: lang });
-  
-  // 更新页面语言属性
-  await updatePageLanguage();
-  
-  // 更新语言切换器状态
-  updateLanguageSwitcher(lang);
-  
-  // 更新界面文本
-  await updateUIText();
+  if (__langSwitching) return; // 避免重复触发
+  __langSwitching = true;
+  const root = document.documentElement; // 使用 html 作为动画根
+  try{
+    // 添加动画类并触发淡出
+    root.classList.add('lang-anim');
+    root.classList.add('lang-out');
+
+    // 等待淡出完成（或超时兜底）
+    await new Promise(res=> setTimeout(res, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 180));
+
+    // 保存语言设置 + 更新文案
+    await chrome.storage.sync.set({ ui_language: lang });
+    await updatePageLanguage();
+    updateLanguageSwitcher(lang);
+    await updateUIText();
+
+  }catch(e){ console.warn('switchLanguage failed:', e); }
+  finally{
+    // 触发淡入
+    root.classList.remove('lang-out');
+    // 稍后移除动画根（保持可重用）
+    setTimeout(()=>{ try{ root.classList.remove('lang-anim'); }catch{} __langSwitching=false; }, 260);
+  }
 }
 
 function toggleBuyHelpInline(provider){
@@ -637,6 +749,24 @@ function toggleBuyHelpInline(provider){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Subtle page enter animation
+  try{
+    const root = document.documentElement;
+    root.classList.add('page-enter');
+    // Stagger sections slightly for layered feel
+    const cards = Array.from(document.querySelectorAll('.section.card'));
+    cards.forEach((el, i)=>{
+      el.classList.add('fx-in');
+      el.style.animationDelay = (80 + i*40) + 'ms';
+    });
+    // Cleanup after a short duration
+    const clear = () => {
+      try{ root.classList.remove('page-enter'); }catch{}
+      try{ cards.forEach(el=>{ el.classList.remove('fx-in'); el.style.animationDelay=''; }); }catch{}
+    };
+    setTimeout(clear, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 900);
+  }catch{}
+
   fitDockPadding();
   window.addEventListener('resize', fitDockPadding);
   const dock = document.querySelector('.save-dock');
@@ -644,6 +774,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const ro = new ResizeObserver(() => fitDockPadding());
     ro.observe(dock);
   }
+
+  // 监听存储变化：当前台触发 need_trial_consent_focus 时，若本页已打开，则重置未保存的“同意”选中状态
+  try{
+    chrome.storage.onChanged.addListener(async (changes, area) => {
+      if (area !== 'sync') return;
+      if (changes.need_trial_consent_focus && changes.need_trial_consent_focus.newValue) {
+        try {
+          const sel = document.getElementById('aiProvider');
+          const provider = sel ? sel.value : (await chrome.storage.sync.get({ aiProvider: DEFAULTS.aiProvider })).aiProvider;
+          const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+          if (provider === 'trial' && !trial_consent) {
+            const cb = document.getElementById('trial_consent');
+            if (cb) cb.checked = false; // 强制与存储一致，避免“看起来已同意但未生效”的错觉
+            updateTrialConsentVisual(false);
+            try { await flashTrialConsentAttention(); } catch {}
+          }
+        } catch {}
+      }
+    });
+  }catch{}
+
+  // 当页面重新可见时，若存在“需要聚焦同意”的标记且仍未保存同意，则重置复选框并高亮
+  try{
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState !== 'visible') return;
+      try{
+        const { need_trial_consent_focus = false, trial_consent = false, aiProvider = DEFAULTS.aiProvider } = await chrome.storage.sync.get({ need_trial_consent_focus:false, trial_consent:false, aiProvider: DEFAULTS.aiProvider });
+        if (need_trial_consent_focus && aiProvider === 'trial' && !trial_consent) {
+          const cb = document.getElementById('trial_consent');
+          if (cb) cb.checked = false;
+          updateTrialConsentVisual(false);
+          try { await flashTrialConsentAttention(); } catch {}
+        }
+      }catch{}
+    });
+  }catch{}
 });
 
 // (function(){

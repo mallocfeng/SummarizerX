@@ -1,5 +1,187 @@
 # Changelog
 
+## v1.9.1
+
+### English
+- Trial Mode UX: Improved consent flow with better user guidance and visual feedback
+- Settings Integration: Enhanced trial consent checkbox with attention-grabbing animations when needed
+- Panel Feedback: Clear error messages in floating panel when trial consent is required
+- User Flow: Streamlined experience - users can now save settings without auto-switching to OpenAI when trial consent is missing
+- Visual Cues: Added flashing animation to draw attention to trial consent checkbox when accessed from panel
+- Fix: In light theme, the consent “breathing” pulse did not replay after unchecking; aligned CSS specificity with dark theme and force-restarted the animation in JS to ensure consistent behavior.
+
+### 中文
+- 试用模式体验：改进同意流程，提供更好的用户引导和视觉反馈
+- 设置页集成：增强试用同意复选框，在需要时提供醒目的动画提醒
+- 面板反馈：在浮动面板中提供清晰的错误信息，当需要试用同意时
+- 用户流程：简化体验 - 用户现在可以在缺少试用同意的情况下保存设置，而不会自动切换到 OpenAI
+- 视觉提示：添加闪烁动画，在从面板访问时吸引用户注意试用同意复选框
+- 修复：亮色模式下在取消勾选后不会重新出现“同意提示”呼吸动画；通过提升与暗色模式一致的 CSS 选择器优先级并在 JS 中强制重启动画，确保两种主题表现一致。
+
+## v1.9.0
+
+### English
+- UI/UX: High-transparency frosted blank state with no opaque center; rounded outer frame; consistent Chrome-like corner radius by platform
+- Empty State: Cards hidden by default; panel width adjustable even when empty; middle area compressed (configurable) with smooth expand-on-run (scroll-like)
+- Arrow Guide: Upward arrow centered under the “Extract & Summarize” button; stays aligned while resizing; refined baseline and anti-jitter behavior
+- Animations: Synchronized middle+footer expansion; removed flickery clip-path; refined pull-in for cards; progress bar gains non-transparent glass base
+- Dark Mode: Fixed transparency “leak” at bottom in folded state; tuned glass opacity for bars; consistent glass tokens across themes
+- Options (Compliance): Removed inline scripts for MV3 CSP; added Trial-mode consent checkbox with i18n; block trial without consent; prompt to auto-switch to OpenAI on save when not consented
+- Accessibility: Bilingual labels, improved focus and visual clarity; reduced-motion respects
+
+### 中文
+- UI/UX：默认空白态为高透磨砂、去中心块；整体外框圆角；按平台对齐 Chrome 原生圆角
+- 空态：默认隐藏卡片；空态也可拖拽改宽；中间压缩（可调），点击“提取并摘要”先展开、再加载卡片，类似“卷轴展开”效果
+- 引导箭头：小箭头固定指向“提取并摘要”按钮中心；拖动改宽时保持居中；优化基线与抖动
+- 动效：中间磨砂与底栏同步下移；移除导致闪烁的 clip-path；精修卡片下拉入场；进度条拥有与标题栏一致的玻璃底色
+- 深色模式：修复折叠态底部“露馅”；调整顶/底栏玻璃透明度；统一玻璃变量
+- 设置页（合规）：移除内联脚本以满足 MV3 CSP；新增试用模式同意勾选并支持中英；未同意时阻止 trial 调用；保存时提示并可改为 OpenAI
+- 可访问性：文案双语、对比与焦点更清晰；尊重降低动效偏好
+
+## v1.8.0
+
+### English
+- 🔧 **Chrome Web Store Compliance**: Fixed ESM remote dependencies to comply with 'Blue Argon' requirements
+- 🚫 **Removed External Dependencies**: Eliminated vendor/petite-vue.es.js that contained external link fragments
+- ⚡ **MV3 Manifest Compliance**: Ensured all resources are local and properly packaged
+- 🎯 **Maintained Functionality**: Preserved all features with vanilla DOM rendering fallback
+- 🛡️ **Security Enhancement**: Removed potential security risks from external dependencies
+
+### 中文
+- 🔧 **Chrome扩展商店合规性**: 修复ESM远程依赖以符合'Blue Argon'要求
+- 🚫 **移除外部依赖**: 删除包含外部链接片段的vendor/petite-vue.es.js文件
+- ⚡ **MV3清单合规性**: 确保所有资源都是本地且正确打包的
+- 🎯 **保持功能完整**: 通过vanilla DOM渲染降级保留所有功能
+- 🛡️ **安全性增强**: 移除外部依赖带来的潜在安全风险
+
+## v1.7.9
+
+### English
+- 🎨 **Enhanced UI Improvements**: Comprehensive glass morphism effects across all components
+- 🔧 **Translation Popup Optimization**: Better visual design and user experience
+- 📱 **Options Page Enhancement**: Improved layout and interaction design
+- ✨ **Float Panel Refinement**: Enhanced styling and smooth animations
+- 🌙 **Dark Mode Enhancement**: Better support and accessibility features
+- 📱 **Responsive Design**: Improved mobile compatibility and responsive behavior
+- 🎯 **User Experience**: Overall UI/UX improvements and optimizations
+
+### 中文
+- 🎨 **UI增强改进**: 所有组件采用全面的玻璃拟态效果
+- 🔧 **翻译弹窗优化**: 更好的视觉设计和用户体验
+- 📱 **设置页面增强**: 改进布局和交互设计
+- ✨ **浮动面板优化**: 增强样式和平滑动画
+- 🌙 **暗色模式增强**: 更好的支持和可访问性功能
+- 📱 **响应式设计**: 改进移动端兼容性和响应式行为
+- 🎯 **用户体验**: 整体UI/UX改进和优化
+
+## v1.7.8
+
+### English
+- 🎨 **Enhanced Translation Bubble**: Added resize functionality to translation popup for better user control
+- 🔧 **Improved Text Formatting**: Better paragraph handling and line spacing in translation results
+- 🎯 **Enhanced User Experience**: Removed selection-based positioning constraints for more flexible bubble placement
+- ✨ **Visual Improvements**: Added resize handle with subtle visual design for intuitive interaction
+- 🌟 **Better Responsiveness**: Improved bubble positioning with optimized spacing and gap calculations
+- 🔮 **Glass Morphism System**: Comprehensive glass effect system with CSS variables for consistent UI
+- 🎨 **Card Header Enhancement**: Fixed card title bar colors and inset glass effects for better visual hierarchy
+- 🌙 **Dark Mode Optimization**: Enhanced readability and contrast in dark theme across all components
+- 📱 **Options Page Upgrade**: Applied glass morphism effects to settings page for unified design language
+
+### 中文
+- 🎨 **增强翻译弹窗**: 为翻译弹出框添加调整大小功能，提供更好的用户控制
+- 🔧 **改进文本格式**: 优化翻译结果的段落处理和行间距
+- 🎯 **增强用户体验**: 移除基于选区的定位限制，提供更灵活的弹窗放置
+- ✨ **视觉改进**: 添加调整大小手柄，具有微妙的视觉设计，提供直观的交互
+- 🌟 **更好的响应性**: 改进弹窗定位，优化间距和间隙计算
+- 🔮 **玻璃拟态系统**: 完整的玻璃效果系统，使用CSS变量确保UI一致性
+- 🎨 **卡片标题栏增强**: 修复卡片标题栏颜色和内凹玻璃效果，改善视觉层次
+- 🌙 **暗色模式优化**: 在所有组件中增强暗色主题的可读性和对比度
+- 📱 **设置页面升级**: 为设置页面应用玻璃拟态效果，统一设计语言
+
+## v1.7.7
+
+### English
+- 🎨 **Enhanced Button Feedback**: Improved visual feedback for the force dark mode toggle button
+- 🔘 **Better UX**: Added hover effects, shadows, and click animations to make the toggle button more interactive
+- 🎯 **Visual Clarity**: Users can now clearly see that the force dark mode button is clickable
+- 🌙 **Theme Consistency**: Enhanced button styling for both light and dark themes
+- 🎨 **Dark Mode Icon Fix**: Fixed the white gradient background of empty state icons in dark mode
+- 🌙 **Theme Consistency**: Empty state icons now use blue gradient background in dark mode for better visual harmony
+- 🎯 **Visual Improvement**: Removed the abrupt white rounded rectangle around icons in dark theme
+- 🎨 **Enhanced Glass Effect**: Improved glass morphism effect for translation popup with higher transparency
+- 🌟 **Better Visual Clarity**: Enhanced title text and button contrast for better readability in both light and dark modes
+- 🔮 **Advanced Backdrop Filter**: Increased blur and saturation for more pronounced glass effect
+- ✨ **Interactive Feedback**: Added hover animations and transitions for buttons and close button
+- 🔧 **Rounded Corner Transparency Fix**: Fixed issue where rounded corners of translation popup were not transparent
+- 🎨 **Browser Compatibility**: Added `isolation: isolate` and `overflow: hidden` to ensure proper rendering of rounded corners with backdrop-filter
+- 🌟 **Visual Consistency**: Ensured consistent transparency across all rounded corners in both light and dark modes
+- 🎨 **Morandi Blue Header**: Added subtle Morandi blue background to translation popup header in light mode
+- 🌟 **Enhanced Visual Appeal**: Replaced plain white header with elegant blue gradient for better visual interest
+- 🎯 **Color Harmony**: Updated button and close button colors to match the new Morandi blue theme
+- ✨ **Refined Aesthetics**: Improved overall visual consistency and elegance in light mode
+- 🎨 **Enhanced Blue Visibility**: Increased opacity and saturation of Morandi blue in light mode header
+- 🌟 **Better Contrast**: Made the blue background more prominent and visible in translation popup
+- 🎯 **Improved Button Styling**: Enhanced button colors to match the more visible blue theme
+- ✨ **Stronger Visual Impact**: Increased overall blue presence for better visual distinction
+- 🔮 **Enhanced Glass Morphism**: Added stronger glass effect to light mode header with improved backdrop-filter
+- ✨ **Glass Texture**: Enhanced glass texture with inner shadows and gradient overlays
+- 🌟 **Button Glass Effect**: Added glass morphism to buttons with backdrop-filter and shadows
+- 🎨 **Visual Depth**: Improved visual depth with layered shadows and glass reflections
+- 🔮 **Dark Mode Glass Effect**: Enhanced glass morphism for dark mode translation popup header
+- ✨ **Consistent Glass Texture**: Applied same glass effects to dark mode as light mode for visual consistency
+- 🌟 **Enhanced Button Glass**: Improved glass effect for buttons in dark mode with backdrop-filter and shadows
+- 🎨 **Unified Visual Experience**: Both light and dark modes now have consistent glass morphism aesthetics
+
+### 中文
+- 🎨 **增强按钮反馈**：改进强制深色模式切换按钮的视觉反馈
+- 🔘 **更好的用户体验**：添加悬停效果、阴影和点击动画，使切换按钮更具交互性
+- 🎯 **视觉清晰度**：用户可以清楚地看到强制深色模式按钮是可点击的
+- 🌙 **主题一致性**：增强亮色和暗色主题下的按钮样式
+- 🎨 **暗色模式图标修复**：修复暗色模式下空状态图标的白色渐变背景问题
+- 🌙 **主题一致性**：空状态图标在暗色模式下现在使用蓝色渐变背景，视觉更协调
+- 🎯 **视觉改进**：移除暗色主题下图标的突兀白色圆角矩形
+- 🎨 **增强玻璃效果**：改进翻译弹窗的玻璃拟态效果，提高透明度
+- 🌟 **更好的视觉清晰度**：增强标题文字和按钮对比度，在亮色和暗色模式下都有更好的可读性
+- 🔮 **高级背景模糊**：增加模糊和饱和度，使玻璃效果更明显
+- ✨ **交互反馈**：为按钮和关闭按钮添加悬停动画和过渡效果
+- 🔧 **圆角透明度修复**：修复翻译弹窗圆角不透明的问题
+- 🎨 **浏览器兼容性**：添加`isolation: isolate`和`overflow: hidden`确保圆角与背景模糊的正确渲染
+- 🌟 **视觉一致性**：确保亮色和暗色模式下所有圆角都有一致的透明度
+- 🎨 **莫兰迪蓝标题栏**：在亮色模式下为翻译弹窗标题栏添加淡淡的莫兰迪蓝色背景
+- 🌟 **增强视觉吸引力**：用优雅的蓝色渐变替换纯白标题栏，提升视觉趣味性
+- 🎯 **色彩协调**：更新按钮和关闭按钮颜色以匹配新的莫兰迪蓝色主题
+- ✨ **精致美学**：改善亮色模式下的整体视觉一致性和优雅度
+- 🎨 **增强蓝色可见度**：增加亮色模式标题栏中莫兰迪蓝色的透明度和饱和度
+- 🌟 **更好的对比度**：使翻译弹窗中的蓝色背景更加突出和可见
+- 🎯 **改进按钮样式**：增强按钮颜色以匹配更明显的蓝色主题
+- ✨ **更强的视觉冲击**：增加整体蓝色存在感以获得更好的视觉区分
+- 🔮 **增强玻璃拟态**：为亮色模式标题栏添加更强的玻璃效果，改进背景模糊
+- ✨ **玻璃质感**：通过内阴影和渐变叠加增强玻璃质感
+- 🌟 **按钮玻璃效果**：为按钮添加玻璃拟态效果，包括背景模糊和阴影
+- 🎨 **视觉深度**：通过分层阴影和玻璃反射改善视觉深度
+- 🔮 **暗色模式玻璃效果**：增强暗色模式翻译弹窗标题栏的玻璃拟态效果
+- ✨ **一致的玻璃质感**：为暗色模式应用与亮色模式相同的玻璃效果，保持视觉一致性
+- 🌟 **增强按钮玻璃效果**：改进暗色模式按钮的玻璃效果，包括背景模糊和阴影
+- 🎨 **统一的视觉体验**：亮色和暗色模式现在都具有一致的玻璃拟态美学
+
+---
+
+## v1.7.6
+
+### English
+- 🌙 **Force Dark Mode**: New toggle in the floating panel footer to force dark mode on any webpage
+- 🎨 **Text Color Optimization**: Automatically converts colored text to readable light colors for better contrast
+- 💾 **Persistent Settings**: Force dark mode preference is saved and restored across sessions
+- 🌐 **Internationalization**: Full support for Chinese and English UI text
+
+### 中文
+- 🌙 **强制深色模式**：浮动面板底部新增开关，可强制任何网页开启深色模式
+- 🎨 **文字颜色优化**：自动将彩色文字转换为可读的亮色，确保对比度
+- 💾 **设置持久化**：强制深色模式偏好会被保存并在会话间恢复
+- 🌐 **国际化支持**：完整支持中英文界面文本
+
+---
+
 ## v1.7.5
 
 ### English

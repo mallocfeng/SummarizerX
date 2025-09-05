@@ -162,6 +162,7 @@
 
   /* ===================== UI 构建 ===================== */
   let host, wrap, contentEl, closeBtn, spinner, shadowRootEl, copyBtn;
+  let resizeHandle;
 
   function ensureUI() {
     if (host) return;
@@ -186,45 +187,95 @@
         .bubble{
           max-width: 480px;
           min-width: 260px;
-          background: rgba(17, 24, 39, 0.72);
+          background: rgba(17, 24, 39, 0.55);
           color: #f8fafc;
-          border-radius: 12px;
+          border-radius: 16px;
           box-shadow:
-            0 12px 28px rgba(0,0,0,.35),
-            0 0 0 1px rgba(255,255,255,.08) inset;
+            0 20px 40px rgba(0,0,0,.25),
+            0 0 0 1px rgba(255,255,255,.12) inset,
+            0 8px 32px rgba(0,0,0,.15);
           padding: 8px 10px 10px;
           font: 14px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-          backdrop-filter: blur(8px) saturate(140%);
-          -webkit-backdrop-filter: blur(8px) saturate(140%);
+          backdrop-filter: blur(16px) saturate(180%);
+          -webkit-backdrop-filter: blur(16px) saturate(180%);
+          position: relative;
+          /* 修复圆角透明问题 */
+          isolation: isolate;
           /* enter/leave base */
           opacity: 0;
           transform: translateY(6px) scale(.98);
           transition: opacity .58s ease, transform .58s cubic-bezier(.2,.7,.3,1), box-shadow .62s ease;
         }
+        .bubble::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border-radius: 16px;
+          background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, rgba(255,255,255,.05) 50%, rgba(255,255,255,.02) 100%);
+          pointer-events: none;
+          z-index: -1;
+          /* 确保圆角区域完全透明 */
+          overflow: hidden;
+        }
         .bubble.on{ opacity:1; transform: translateY(0) scale(1); }
         .bubble.leaving{ opacity:.0; transform: translateY(4px) scale(.985); transition: opacity .50s ease, transform .50s ease; }
         .bubble.light{
-          background: rgba(255,255,255,0.72);
+          background: rgba(255,255,255,0.55);
           color: #0f172a;
           box-shadow:
-            0 10px 24px rgba(2,6,23,.12),
-            0 0 0 1px rgba(15,23,42,.06) inset;
+            0 20px 40px rgba(2,6,23,.15),
+            0 0 0 1px rgba(15,23,42,.08) inset,
+            0 8px 32px rgba(2,6,23,.08);
+        }
+        .bubble.light::before {
+          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
         }
 
         /* ===== 标题栏（可拖动区域）====== */
         .header{
           display:flex; align-items:center; justify-content:space-between; gap:8px;
-          margin:-2px -2px 8px; padding:6px 8px;
-          border-radius: 8px;
+          margin:-2px -2px 8px; padding:8px 10px;
+          border-radius: 12px;
           user-select: none;
           cursor: grab;
-          /* 深色：低饱和蓝灰玻璃；亮色：柔和浅蓝 */
-          background: linear-gradient(180deg, rgba(82,98,128,.16), rgba(82,98,128,.06));
-          border: 1px solid rgba(255,255,255,.10);
+          /* 深色：内凹玻璃质感 */
+          background: linear-gradient(180deg, rgba(82,98,128,.25), rgba(82,98,128,.12));
+          border: 1px solid rgba(255,255,255,.15);
+          backdrop-filter: blur(12px) saturate(150%);
+          -webkit-backdrop-filter: blur(12px) saturate(150%);
+          position: relative;
+          /* 修复圆角透明问题 */
+          isolation: isolate;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.1), inset 0 -1px 1px rgba(255,255,255,.05);
+        }
+        .header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, rgba(255,255,255,.05) 50%, rgba(255,255,255,.02) 100%);
+          pointer-events: none;
+          z-index: -1;
+          /* 确保圆角区域完全透明 */
+          overflow: hidden;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,.15), inset 0 -1px 1px rgba(255,255,255,.08);
         }
         .bubble.light .header{
-          background: linear-gradient(180deg, rgba(178,196,230,.28), rgba(178,196,230,.12));
-          border: 1px solid rgba(74,102,145,.18);
+          background: linear-gradient(180deg, rgba(100,116,139,.25), rgba(100,116,139,.12));
+          border: 1px solid rgba(100,116,139,.2);
+          backdrop-filter: blur(12px) saturate(150%);
+          -webkit-backdrop-filter: blur(12px) saturate(150%);
+          box-shadow: inset 0 1px 2px rgba(100,116,139,.1), inset 0 -1px 1px rgba(255,255,255,.08);
+        }
+        .bubble.light .header::before {
+          background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.03) 100%);
+          box-shadow: inset 0 1px 3px rgba(100,116,139,.12), inset 0 -1px 1px rgba(255,255,255,.1);
         }
         .dragging .header { cursor: grabbing; }
 
@@ -233,9 +284,13 @@
           font-size: 12px;
           letter-spacing: .25px;
           /* “淡淡的颜色”——暗色偏蓝灰、亮色偏清爽蓝 */
-          color: #86a1c7;
+          color: #e2e8f0;
+          text-shadow: 0 1px 2px rgba(0,0,0,.3);
         }
-        .bubble.light .title{ color:#2a64c9cc; }
+        .bubble.light .title{ 
+          color: #1e293b;
+          text-shadow: 0 1px 2px rgba(255,255,255,.5);
+        }
 
         .toolbar{
           display:flex; align-items:center; gap:6px;
@@ -244,58 +299,138 @@
           all: unset; cursor:pointer;
           min-width: 22px; height: 22px; padding: 0 8px;
           display:inline-flex; align-items:center; justify-content:center;
-          border-radius: 6px;
+          border-radius: 8px;
           font-size: 12px;
-          color: inherit; opacity: .88;
-          border: 1px solid rgba(255,255,255,.12);
-          background: rgba(255,255,255,.08);
+          color: inherit; opacity: .9;
+          border: 1px solid rgba(255,255,255,.2);
+          background: rgba(255,255,255,.15);
+          backdrop-filter: blur(8px) saturate(120%);
+          -webkit-backdrop-filter: blur(8px) saturate(120%);
+          transition: all .2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,.2);
         }
-        .tbtn:hover{ opacity: 1; background: rgba(255,255,255,.15); }
+        /* Round, smaller variant for A-/A+ */
+        #sx-font-inc, #sx-font-dec{
+          min-width: 20px; width: 20px; height: 20px; padding: 0;
+          border-radius: 999px; font-weight: 800; line-height: 1; font-size: 12px;
+        }
+        .tbtn:hover{ 
+          opacity: 1; 
+          background: rgba(255,255,255,.25);
+          border-color: rgba(255,255,255,.3);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 6px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+        }
         .bubble.light .tbtn{
-          border-color: rgba(2,6,23,.10);
-          background: rgba(2,6,23,.06);
+          border-color: rgba(100,116,139,.3);
+          background: rgba(100,116,139,.15);
+          backdrop-filter: blur(8px) saturate(120%);
+          -webkit-backdrop-filter: blur(8px) saturate(120%);
+          box-shadow: 0 1px 3px rgba(100,116,139,.1);
         }
-        .bubble.light .tbtn:hover{ background: rgba(2,6,23,.10); }
+        .bubble.light .tbtn:hover{ 
+          background: rgba(100,116,139,.25);
+          border-color: rgba(100,116,139,.4);
+          box-shadow: 0 2px 6px rgba(100,116,139,.2), 0 1px 2px rgba(0,0,0,.1);
+          transform: translateY(-1px);
+        }
 
         .close{
           all: unset;
           cursor: pointer;
           width: 22px; height: 22px;
-          border-radius: 6px;
+          border-radius: 8px;
           display:grid; place-items:center;
-          color: inherit; opacity: .80;
+          color: inherit; opacity: .85;
+          transition: all .2s ease;
         }
         .close:hover{
-          background: rgba(255,255,255,.12);
+          background: rgba(255,255,255,.2);
+          transform: scale(1.1);
+          backdrop-filter: blur(6px) saturate(110%);
+          -webkit-backdrop-filter: blur(6px) saturate(110%);
+          box-shadow: 0 1px 3px rgba(0,0,0,.3);
         }
         .bubble.light .close:hover{
-          background: rgba(15,23,42,.06);
+          background: rgba(100,116,139,.25);
+          backdrop-filter: blur(6px) saturate(110%);
+          -webkit-backdrop-filter: blur(6px) saturate(110%);
+          box-shadow: 0 1px 3px rgba(100,116,139,.15);
         }
 
         .content{
-          white-space: pre-wrap; word-break: break-word;
+          white-space: normal; word-break: break-word;
           max-height: 56vh; overflow:auto;
+          padding: 0 14px;
+          line-height: 1.56;
+          min-height: 10px; /* slightly larger default height */
+        }
+        /* petite-vue style enter transitions (staggered) */
+        .content .p{ opacity: 0; transform: translateY(4px); transition: opacity .32s ease, transform .32s ease; }
+        .content .p.on{ opacity: 1; transform: translateY(0); }
+        .content .p{ margin:0; }
+        .content .p + .p{ margin-top: 8px; }
+
+        /* ===== Resize handle (bottom-right) ===== */
+        .resize-handle{
+          position:absolute; right:5px; bottom:5px; width:9px; height:9px; cursor: se-resize;
+        }
+        /* Small 45° triangle pointing to top-left, with subtle bevel */
+        .resize-handle::before{
+          content:""; position:absolute; right:0; bottom:0; width:9px; height:9px;
+          background:
+            /* inner edge highlight */
+            linear-gradient(135deg, rgba(255,255,255,.10) 48%, rgba(255,255,255,0) 52%),
+            /* main triangle fill */
+            linear-gradient(135deg, rgba(255,255,255,.28) 0 49%, rgba(255,255,255,0) 50% 100%);
+          filter: drop-shadow(0 0 1px rgba(0,0,0,.10));
+        }
+        .bubble.light .resize-handle::before{
+          background:
+            linear-gradient(135deg, rgba(31,41,55,.18) 48%, rgba(31,41,55,0) 52%),
+            linear-gradient(135deg, rgba(31,41,55,.40) 0 49%, rgba(31,41,55,0) 50% 100%);
+          filter: drop-shadow(0 0 1px rgba(31,41,55,.08));
         }
 
-        .spinner{
-          width:16px; height:16px;
-          border:2px solid currentColor; border-right-color: transparent;
-          border-radius:50%;
-          animation: r .8s linear infinite; opacity:.6;
-          display:inline-block;
-        }
+        /* Simple spinner (legacy) */
+        .spinner{ width:16px; height:16px; border:2px solid currentColor; border-right-color: transparent; border-radius:50%; animation: r .8s linear infinite; opacity:.6; display:inline-block; }
         @keyframes r{ to{ transform: rotate(360deg); } }
+
+        /* Equalizer bars loader */
+        .loader-eq{ display:flex; align-items:flex-end; gap:4px; height:40px; padding: 6px 0 10px; }
+        .loader-eq .bar{ width:4px; height: 24px; border-radius: 3px; opacity:.9; transform-origin: center bottom; will-change: transform, opacity; }
+        .loader-eq .bar{ background: rgba(255,255,255,.85); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+        .bubble.light .loader-eq .bar{ background: rgba(15,23,42,.75); box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+        .loader-eq .b1{  animation: eq 900ms ease-in-out -120ms infinite; }
+        .loader-eq .b2{  animation: eq 840ms ease-in-out  -60ms infinite; }
+        .loader-eq .b3{  animation: eq 760ms ease-in-out   -0ms infinite; }
+        .loader-eq .b4{  animation: eq 880ms ease-in-out  -180ms infinite; }
+        .loader-eq .b5{  animation: eq 820ms ease-in-out   -90ms infinite; }
+        .loader-eq .b6{  animation: eq 940ms ease-in-out   -30ms infinite; }
+        .loader-eq .b7{  animation: eq 800ms ease-in-out  -150ms infinite; }
+        .loader-eq .b8{  animation: eq 860ms ease-in-out   -75ms infinite; }
+        .loader-eq .b9{  animation: eq 780ms ease-in-out  -210ms infinite; }
+        .loader-eq .b10{ animation: eq 920ms ease-in-out   -45ms infinite; }
+        @keyframes eq{
+          0%, 100% { transform: scaleY(.35); opacity:.7; }
+          25%      { transform: scaleY(1.00); opacity:1; }
+          50%      { transform: scaleY(.55); opacity:.9; }
+          75%      { transform: scaleY(.85); opacity:.95; }
+        }
       </style>
 
       <div class="bubble" id="sx-bubble" data-theme="dark">
         <div class="header" id="sx-drag-handle">
           <div class="title" id="sx-title">SummarizerX · Translate</div>
           <div class="toolbar">
+            <button class="tbtn" id="sx-font-dec" title="A-">−</button>
+            <button class="tbtn" id="sx-font-inc" title="A+">＋</button>
             <button class="tbtn" id="sx-copy" title="Copy result">Copy</button>
             <button class="close" id="sx-close" aria-label="Close">✕</button>
           </div>
         </div>
         <div class="content" id="sx-content"></div>
+        <div class="resize-handle" id="sx-resize" title="拖动调整大小" aria-label="调整大小"></div>
       </div>
     `;
 
@@ -304,6 +439,9 @@
     contentEl = shadow.getElementById('sx-content');
     closeBtn = shadow.getElementById('sx-close');
     copyBtn  = shadow.getElementById('sx-copy');
+    const fontIncBtn = shadow.getElementById('sx-font-inc');
+    const fontDecBtn = shadow.getElementById('sx-font-dec');
+    resizeHandle = shadow.getElementById('sx-resize');
 
     // trigger enter animation on next frame
     try {
@@ -344,6 +482,30 @@
       }
     });
 
+    // 字号调节（持久化）
+    function applyFontPx(px){
+      const n = Math.max(12, Math.min(22, Math.round(px||14)));
+      try{ contentEl.style.fontSize = n + 'px'; }catch{}
+      try{ chrome.storage.sync.set({ sx_translate_font_px: n }); }catch{}
+      return n;
+    }
+    async function initFontPx(){
+      try{
+        const { sx_translate_font_px } = await chrome.storage.sync.get(['sx_translate_font_px']);
+        const v = Number.isFinite(+sx_translate_font_px) ? +sx_translate_font_px : 14;
+        applyFontPx(v);
+      }catch{ applyFontPx(14); }
+    }
+    initFontPx();
+
+    function getCurrentFontPx(){
+      const cs = getComputedStyle(contentEl);
+      const v = parseFloat(cs.fontSize||'14')||14;
+      return Math.round(v);
+    }
+    fontIncBtn?.addEventListener('click', ()=>{ applyFontPx(getCurrentFontPx()+1); });
+    fontDecBtn?.addEventListener('click', ()=>{ applyFontPx(getCurrentFontPx()-1); });
+
     // 延后一帧绑定“外点关闭”，避免打开时被误判
     setTimeout(() => {
       document.addEventListener('keydown', escToClose, { passive: true });
@@ -353,6 +515,7 @@
     // ===== 拖拽：以 header 为手柄 =====
     const handle = shadow.getElementById('sx-drag-handle');
     let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
+    // 拖动不设与选区关联的限制，用户可在视窗任意区域放置
 
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -361,6 +524,7 @@
       const rect = host.getBoundingClientRect();
       dragOffsetX = e.clientX - rect.left;
       dragOffsetY = e.clientY - rect.top;
+      // 不再绑定选区矩形为牵引范围
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -371,6 +535,7 @@
       const bubbleH = br.height || wrap.getBoundingClientRect().height || 120;
       let newX = e.clientX - dragOffsetX;
       let newY = e.clientY - dragOffsetY;
+      // 不设置与选区相关的限制
       newX = Math.min(Math.max(0, newX), vw - bubbleW);
       newY = Math.min(Math.max(0, newY), vh - bubbleH);
       host.style.left = `${Math.round(newX)}px`;
@@ -382,7 +547,60 @@
       if (!dragging) return;
       dragging = false;
       wrap.classList.remove('dragging');
+      // 无牵引范围需要清理
     });
+
+    // ===== 右下角缩放：拖动改变宽高 =====
+    let resizing = false; let startX=0, startY=0; let startW=0, startH=0;
+    const headerEl = shadow.getElementById('sx-drag-handle');
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+    function onResizeMove(e){
+      if (!resizing) return;
+      const clientX = e.touches? e.touches[0]?.clientX : e.clientX;
+      const clientY = e.touches? e.touches[0]?.clientY : e.clientY;
+      if (clientX==null || clientY==null) return;
+      const dx = clientX - startX; const dy = clientY - startY;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const rawW = clamp(startW + dx, 240, Math.max(320, Math.floor(vw * 0.9)));
+      const rawH = clamp(startH + dy, 120, Math.max(160, Math.floor(vh * 0.8)));
+
+      // Apply directly for immediate, predictable resizing (original behavior)
+      wrap.style.maxWidth = 'none';
+      wrap.style.width = Math.round(rawW) + 'px';
+
+      const padTop = 8, padBottom = 10; // as defined in .bubble padding
+      const headerH = headerEl?.getBoundingClientRect()?.height || 28;
+      const contentH = Math.max(80, Math.round(rawH - headerH - padTop - padBottom));
+      contentEl.style.maxHeight = contentH + 'px';
+      contentEl.style.height    = contentH + 'px';
+
+      __sxUserMovedBubble = true;
+      e.preventDefault();
+    }
+    function endResize(){
+      if (!resizing) return;
+      resizing = false;
+      document.removeEventListener('mousemove', onResizeMove, true);
+      document.removeEventListener('mouseup', endResize, true);
+      document.removeEventListener('touchmove', onResizeMove, {capture:true, passive:false});
+      document.removeEventListener('touchend', endResize, {capture:true});
+    }
+    function startResize(e){
+      resizing = true;
+      const br = wrap.getBoundingClientRect();
+      startW = br.width; 
+      startH = br.height;
+      const ptX = e.touches? e.touches[0]?.clientX : e.clientX;
+      const ptY = e.touches? e.touches[0]?.clientY : e.clientY;
+      startX = ptX||0; startY = ptY||0;
+      document.addEventListener('mousemove', onResizeMove, true);
+      document.addEventListener('mouseup', endResize, true);
+      document.addEventListener('touchmove', onResizeMove, {capture:true, passive:false});
+      document.addEventListener('touchend', endResize, {capture:true});
+      e.preventDefault();
+    }
+    resizeHandle?.addEventListener('mousedown', startResize);
+    resizeHandle?.addEventListener('touchstart', startResize, {passive:false});
   }
 
   function removeUI() {
@@ -413,6 +631,8 @@
       const title = shadow.getElementById('sx-title');
       const copyBtn = shadow.getElementById('sx-copy');
       const closeBtn = shadow.getElementById('sx-close');
+      const fontIncBtn = shadow.getElementById('sx-font-inc');
+      const fontDecBtn = shadow.getElementById('sx-font-dec');
       
       if (title) {
         const currentLang = await i18n.getCurrentLanguage();
@@ -431,6 +651,13 @@
       if (closeBtn) {
         closeBtn.setAttribute('aria-label', await i18n.t('floatPanel.close'));
       }
+
+      // 字号按钮标题（不改显示字符，仅更新提示）
+      try{
+        const lang = await i18n.getCurrentLanguage();
+        if (fontIncBtn) fontIncBtn.title = lang==='zh' ? '增大字号' : 'Increase font size';
+        if (fontDecBtn) fontDecBtn.title = lang==='zh' ? '减小字号' : 'Decrease font size';
+      }catch{}
     } catch (e) {
       console.warn('Failed to update UI text:', e);
     }
@@ -450,19 +677,20 @@
   /* ===================== 位置计算 ===================== */
   function computePositionFor(rect, desiredW = 320, desiredH = 140) {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const gap = 8;
+    const hGap = 8;   // horizontal spacing from selection
+    const vGap = 12;  // vertical spacing from selection (slightly larger by default)
     // 依次尝试：右上、左上、右下、左下
     const candidates = [
-      { x: rect.right + gap,            y: rect.top    - gap - desiredH }, // TR
-      { x: rect.left  - gap - desiredW, y: rect.top    - gap - desiredH }, // TL
-      { x: rect.right + gap,            y: rect.bottom + gap },            // BR
-      { x: rect.left  - gap - desiredW, y: rect.bottom + gap }             // BL
+      { x: rect.right + hGap,            y: rect.top    - vGap - desiredH }, // TR
+      { x: rect.left  - hGap - desiredW, y: rect.top    - vGap - desiredH }, // TL
+      { x: rect.right + hGap,            y: rect.bottom + vGap },           // BR
+      { x: rect.left  - hGap - desiredW, y: rect.bottom + vGap }            // BL
     ];
     let pos = candidates.find(p => p.x >= 0 && p.y >= 0 && (p.x + desiredW) <= vw && (p.y + desiredH) <= vh);
     if (!pos) {
       pos = {
-        x: Math.min(Math.max(8, rect.right + gap), vw - desiredW - 8),
-        y: Math.min(Math.max(8, rect.top),         vh - desiredH - 8)
+        x: Math.min(Math.max(8, rect.right + hGap), vw - desiredW - 8),
+        y: Math.min(Math.max(8, rect.top),          vh - desiredH - 8)
       };
     }
     return pos;
@@ -530,17 +758,50 @@
         startTranslateFlow._bound = true;
       }
 
-      // 加载中
+      // 加载中：均衡器柱条动画（equalizer bars）
       contentEl.textContent = '';
       spinner = document.createElement('div');
-      spinner.className = 'spinner';
+      spinner.className = 'loader-eq';
+      spinner.setAttribute('role','progressbar');
+      spinner.setAttribute('aria-label','Loading');
+      spinner.innerHTML = `
+        <span class="bar b1"></span>
+        <span class="bar b2"></span>
+        <span class="bar b3"></span>
+        <span class="bar b4"></span>
+        <span class="bar b5"></span>
+        <span class="bar b6"></span>
+        <span class="bar b7"></span>
+        <span class="bar b8"></span>
+        <span class="bar b9"></span>
+        <span class="bar b10"></span>
+      `;
       contentEl.appendChild(spinner);
 
       const resp = await chrome.runtime.sendMessage({ type: 'SX_TRANSLATE_REQUEST', text });
       if (!resp?.ok) throw new Error(resp?.error || 'Translate failed');
 
-      // 设置结果内容；不要改动位置
-      contentEl.textContent = resp.result;
+      // 设置结果内容；规范换行并去除空行，避免段落间距过大
+      try{
+        let txt = String(resp.result || '');
+        txt = txt.replace(/\r\n?/g,'\n');           // normalize CRLF
+        txt = txt.replace(/^\s*\n+/,'');            // trim leading blank lines
+        txt = txt.replace(/\n+\s*$/,'');            // trim trailing blank lines
+        // collapse multiple blank lines to a single separator
+        txt = txt.replace(/\n[ \t]*\n+/g,'\n');
+        const lines = txt.split(/\n/).map(s=>s.trim()).filter(Boolean);
+        const esc = (s)=> s.replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m]));
+        contentEl.innerHTML = lines.map(l=>`<div class="p">${esc(l)}</div>`).join('');
+        // stagger enter reveal
+        try{
+          const ps = Array.from(contentEl.querySelectorAll('.p'));
+          ps.forEach((el, i)=>{
+            setTimeout(()=>{ try{ el.classList.add('on'); }catch{} }, Math.min(320, i*36));
+          });
+        }catch{}
+      }catch{
+        contentEl.textContent = resp.result;
+      }
       spinner?.remove(); spinner = null;
 
       // 仅当用户未拖动时，做一次微调（防止气泡溢出视窗）
