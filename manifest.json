@@ -7,10 +7,11 @@
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
     {
-      "resources": ["i18n.js", "vendor/petite-vue.iife.js"],
+      "resources": ["i18n.js", "vendor/petite-vue.iife.js", "privacy.html"],
       "matches": ["<all_urls>"]
     }
   ],
+  "homepage_url": "https://github.com/mallocfeng/SummarizerX/blob/main/privacy.html",
   "action": {
     "default_title": "Open/Close right sidebar",
     "default_icon": {

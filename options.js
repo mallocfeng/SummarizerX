@@ -15,6 +15,21 @@ const THEME_STORAGE_KEY = 'options_theme_override';
 // 与浮窗一致，保持两处选择同步（面板使用 float_theme_override）
 const FLOAT_THEME_KEY = 'float_theme_override';
 
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const { data_consent = false } = await chrome.storage.sync.get({ data_consent: false });
+    if (!data_consent) {
+      const lang = await getCurrentLanguage();
+      const msg = (lang === 'en')
+        ? 'Using this extension will send page content to the selected API service for processing. Do you agree?'
+        : '使用本扩展将把当前页面内容发送至所选的 API 服务端进行处理。是否同意？';
+      if (confirm(msg)) {
+        await chrome.storage.sync.set({ data_consent: true });
+      }
+    }
+  } catch {}
+});
+
 function computeAutoTheme(){
   try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch { return 'light'; }
 }
@@ -274,6 +289,7 @@ async function loadSettings() {
 
   $("output_lang").value = d.output_lang || DEFAULTS.output_lang;
   $("extract_mode").value = d.extract_mode || DEFAULTS.extract_mode;
+  $("local_mode").checked = !!d.local_mode;
 
   if (aiProvider === "trial") await setTrialLock(true); else await setTrialLock(false);
   // 显示试用模式同意复选框
@@ -334,6 +350,7 @@ async function saveSettings() {
     model_summarize: $("model_summarize").value.trim(),
     output_lang: $("output_lang").value,
     extract_mode: $("extract_mode").value,
+    local_mode: !!($("local_mode")?.checked),
     system_prompt_preset: $("system_prompt_preset").value,
     system_prompt_custom: $("system_prompt_custom").value.trim(),
     trial_consent: !!($("trial_consent")?.checked)
@@ -659,7 +676,9 @@ async function updateUIText() {
   updateElementText('extract-mode-label', await t('settings.extractMode'));
   updateElementText('fast-option', await t('settings.fastLocal'));
   updateElementText('ai-option', await t('settings.aiExtract'));
-  
+  updateElementText('local-mode-text', await t('settings.localMode'));
+  updateElementText('local-mode-hint', await t('settings.localModeHint'));
+
   // 更新System Prompt
   updateElementText('system-prompt-title', await t('settings.systemPrompt'));
   updateElementText('presets-label', await t('settings.presets'));
@@ -674,12 +693,13 @@ async function updateUIText() {
   updateElementText('shortcut-desc', await t('settings.shortcutDesc'));
   updateElementText('open-shortcut', await t('settings.setShortcut'));
   updateElementText('shortcut-hint', await t('settings.shortcutHint'));
-  
+
   // 更新底部按钮
   updateElementText('appearance-label', await t('settings.appearance'));
   updateElementText('btn-test', await t('settings.testApi'));
   updateElementText('btn-save', await t('settings.saveAll'));
-  
+  updateElementText('privacy-link', await t('settings.privacyPolicy'));
+
   // 更新状态文本
   updateElementText('status', await t('settings.ready'));
   

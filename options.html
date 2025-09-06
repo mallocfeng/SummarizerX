@@ -24,6 +24,7 @@
         </div>
       </div>
       <p class="hero-sub" id="settings-subtitle">配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的"保存全部设置"。</p>
+      <p class="hero-sub"><a id="privacy-link" href="privacy.html" target="_blank" rel="noopener">隐私政策 / Privacy Policy</a></p>
     </div>
   </header>
 
@@ -125,6 +126,14 @@
             <option value="fast" id="fast-option">本地快速（推荐）</option>
             <option value="ai" id="ai-option">AI 清洗</option>
           </select>
+        </div>
+
+        <div class="field">
+          <label class="label" id="local-mode-label">
+            <input id="local_mode" type="checkbox" />
+            <span id="local-mode-text">本地模式（不上传内容）</span>
+          </label>
+          <p class="hint" id="local-mode-hint">启用后，摘要和翻译功能将禁用，页面内容不会上传。</p>
         </div>
       </div>
     </section>

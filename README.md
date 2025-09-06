@@ -91,7 +91,7 @@ Supports light and dark themes to reduce eye strain and match your browser prefe
 
 ### 🔒 Privacy
 
-All processing happens locally or via your configured AI API key. No data is sent to third parties without your consent.
+See the [Privacy Policy](privacy.html) for details on data handling. Page content you request is sent to your selected API provider to generate summaries or translations. You can enable **Local Mode** in settings to keep all processing on your device without uploading content.
 
 ### 🛠 Troubleshooting
 
@@ -186,7 +186,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 ### 🔒 隐私说明
 
-所有处理均在本地或通过您配置的 AI API 密钥完成，未经允许不会发送数据给第三方。
+详见[隐私政策](privacy.html)。当你使用摘要或翻译功能时，页面内容会发送到所选的 API 服务端。设置页提供“本地模式”，可在不上传内容的情况下禁用远程 AI 功能。
 
 ### 🛠 常见问题
 

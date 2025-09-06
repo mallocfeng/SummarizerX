@@ -8,6 +8,7 @@ export const DEFAULTS = {
   model_summarize: "gpt-4o-mini",
   output_lang: "",
   extract_mode: "fast",
+  local_mode: false,
   system_prompt_preset: "general_summary",
   system_prompt_custom: ""
 };
@@ -51,7 +52,8 @@ export async function getSettings() {
     "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_custom", "apiKey_trial",
     "baseURL", "model_extract", "model_summarize",
     "output_lang", "extract_mode",
-    "system_prompt_preset", "system_prompt_custom"
+    "system_prompt_preset", "system_prompt_custom",
+    "local_mode"
   ]);
 
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider; // 默认 trial
@@ -90,6 +92,7 @@ export async function getSettings() {
     model_summarize,
     output_lang: d.output_lang || DEFAULTS.output_lang,
     extract_mode,
+    local_mode: d.local_mode || DEFAULTS.local_mode,
     system_prompt_preset: d.system_prompt_preset || DEFAULTS.system_prompt_preset,
     system_prompt_custom: d.system_prompt_custom || DEFAULTS.system_prompt_custom
   };

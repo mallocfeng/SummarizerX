@@ -59,7 +59,10 @@ const I18N = {
       trialConsentPrompt: "当前未勾选试用模式同意。是否切换为 OpenAI 模式并继续保存？",
       saveCancelled: "已取消保存。",
       confirmOverride: "自定义提示词已有内容，是否覆盖？",
-      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？"
+      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？",
+      localMode: "本地模式（不上传内容）",
+      localModeHint: "启用后，摘要和翻译功能将禁用，页面内容不会上传。",
+      privacyPolicy: "隐私政策 / Privacy Policy"
     },
     // 浮窗面板
     floatPanel: {
@@ -149,7 +152,10 @@ const I18N = {
       trialConsentPrompt: "Trial consent is not checked. Switch to OpenAI mode and continue saving?",
       saveCancelled: "Save cancelled.",
       confirmOverride: "Custom prompt has content, override?",
-      confirmLangOverride: "Custom prompt has content, override based on new language?"
+      confirmLangOverride: "Custom prompt has content, override based on new language?",
+      localMode: "Local mode (no data upload)",
+      localModeHint: "When enabled, summaries and translations are disabled and page content won't be uploaded.",
+      privacyPolicy: "Privacy Policy"
     },
     // Float panel
     floatPanel: {

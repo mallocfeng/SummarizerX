@@ -120,6 +120,14 @@ function textToMarkdown(t = "") {
 // ---- 主流程
 async function runForTab(tabId) {
   const cfg = await getSettings(); // ← 改动 2：统一从 settings.js 取（含 trial 默认）
+  const { data_consent = false, local_mode = false } = await chrome.storage.sync.get({ data_consent: false, local_mode: false });
+  if (!data_consent) {
+    try { await chrome.runtime.openOptionsPage(); } catch {}
+    throw new Error("请先在设置中同意隐私条款。");
+  }
+  if (local_mode) {
+    throw new Error("已启用本地模式：摘要与翻译功能不可用。");
+  }
   // 允许 trial 无 apiKey；非 trial 仍需 key
   const isTrial = (cfg.aiProvider === "trial");
   if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
@@ -504,6 +512,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // 实际的翻译实现：读取设置，选模型/基址/Key，然后 Chat Completions
 async function doTranslate(text) {
+  const { data_consent = false, local_mode = false } = await chrome.storage.sync.get({ data_consent: false, local_mode: false });
+  if (!data_consent) {
+    try { await chrome.runtime.openOptionsPage(); } catch {}
+    throw new Error('请先在设置中同意隐私条款。');
+  }
+  if (local_mode) {
+    throw new Error('已启用本地模式，无法调用翻译服务。');
+  }
   const all = await chrome.storage.sync.get(null);
 
   // 平台与凭据
