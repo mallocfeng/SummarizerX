@@ -330,31 +330,57 @@
       ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.10)' : '#e6eaf2';
       ctx.stroke(path);
       ctx.restore();
-      // Header bar with left title and right domain
-      // Morandi palette — solid header color (no gradient)
-      const hdrColor = !isDark ? '#C8CCD6' /* muted blue‑grey */ : '#505A68';
-      // clip header to rounded card path to avoid square corners showing
+      // Hero header (Morandi blue): gradient + abstract wave + big title + domain badge
       ctx.save();
       ctx.clip(path);
-      ctx.fillStyle = hdrColor;
-      ctx.fillRect(cardX, cardY, cardW, hdrH);
-      // bottom divider shadow for aesthetics
+      const heroGrad = ctx.createLinearGradient(cardX, cardY, cardX, cardY+hdrH);
+      if (!isDark){ heroGrad.addColorStop(0,'#C9D3E4'); heroGrad.addColorStop(1,'#B6C4DB'); }
+      else { heroGrad.addColorStop(0,'#33435F'); heroGrad.addColorStop(1,'#2A3B59'); }
+      ctx.fillStyle = heroGrad; ctx.fillRect(cardX, cardY, cardW, hdrH);
+      // abstract wave
+      ctx.globalAlpha = isDark ? 0.18 : 0.22;
+      ctx.fillStyle = isDark ? '#8FB0FF' : '#8FA6C8';
+      const waveY = cardY + Math.round(hdrH*0.46);
+      ctx.beginPath();
+      ctx.moveTo(cardX - 40*scale, waveY);
+      ctx.bezierCurveTo(cardX + cardW*0.25, waveY-36*scale, cardX + cardW*0.55, waveY+24*scale, cardX + cardW + 40*scale, waveY-8*scale);
+      ctx.lineTo(cardX + cardW + 40*scale, cardY + hdrH);
+      ctx.lineTo(cardX - 40*scale, cardY + hdrH);
+      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      // big title: page title (2 lines)
+      const heroPadX = cardX + innerP;
+      // Use a concise label in the hero header to avoid overflow
+      const title = headerTitle;
+      const titleSize = Math.round(baseFont*1.35); // smaller hero title
+      ctx.font = `800 ${titleSize}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
+      ctx.fillStyle = isDark? '#ECF2FF' : '#0f172a';
+      drawWrappedText(ctx, title, heroPadX, cardY + Math.round(baseFont*1.8), cardW - innerP*2, Math.round(titleSize*1.2), 2);
+      // domain badge
+      if (mainDomain){
+        const pad = Math.round(8*scale); const rx = Math.round(10*scale);
+        ctx.font = `700 ${Math.round(baseFont*0.9)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
+        const tw = ctx.measureText(mainDomain).width;
+        const bx = cardX + cardW - tw - pad*2 - Math.round(12*scale);
+        const badgeH = Math.round(baseFont*1.4);
+        const by = cardY + Math.round(baseFont*0.7); // move badge up
+        const badge = new Path2D();
+        badge.moveTo(bx+rx, by);
+        badge.arcTo(bx+tw+pad*2, by, bx+tw+pad*2, by+rx, rx);
+        badge.arcTo(bx+tw+pad*2, by+badgeH, bx+tw+pad*2-rx, by+badgeH, rx);
+        badge.arcTo(bx, by+badgeH, bx, by+badgeH-rx, rx);
+        badge.arcTo(bx, by, bx+rx, by, rx);
+        ctx.fillStyle = isDark? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.08)';
+        ctx.fill(badge);
+        ctx.fillStyle = isDark? '#E5EDFF' : '#334155';
+        ctx.fillText(mainDomain, bx+pad, by+Math.round(badgeH*0.74));
+      }
+      // divider under hero
       const lineY = cardY + hdrH;
-      const divGrad = ctx.createLinearGradient(0, lineY, 0, lineY + Math.round(6*scale));
-      if (!isDark){ divGrad.addColorStop(0,'rgba(15,23,42,0.08)'); divGrad.addColorStop(1,'rgba(15,23,42,0.0)'); }
-      else { divGrad.addColorStop(0,'rgba(0,0,0,0.22)'); divGrad.addColorStop(1,'rgba(0,0,0,0.0)'); }
-      ctx.fillStyle = divGrad; ctx.fillRect(cardX, lineY, cardW, Math.round(6*scale));
+      const divGrad = ctx.createLinearGradient(0, lineY, 0, lineY + Math.round(8*scale));
+      if (!isDark){ divGrad.addColorStop(0,'rgba(15,23,42,0.10)'); divGrad.addColorStop(1,'rgba(15,23,42,0)'); }
+      else { divGrad.addColorStop(0,'rgba(0,0,0,0.25)'); divGrad.addColorStop(1,'rgba(0,0,0,0)'); }
+      ctx.fillStyle = divGrad; ctx.fillRect(cardX, lineY, cardW, Math.round(8*scale));
       ctx.restore();
-      const hdrPadX = innerP;
-      const hdrPadRight = innerP + extraRight + Math.round(20*scale); // extra right padding for domain text
-      const hdrBaseline = cardY + Math.round(hdrH*0.68);
-      ctx.font = `800 ${Math.round(baseFont*1.05)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
-      ctx.fillStyle = isDark? '#e6eefc' : '#0f172a';
-      ctx.fillText(headerTitle, cardX + hdrPadX, hdrBaseline);
-      ctx.font = `600 ${Math.round(baseFont*0.95)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
-      ctx.fillStyle = isDark? '#b8c2d8' : '#475569';
-      const domainW = ctx.measureText(mainDomain).width;
-      ctx.fillText(mainDomain, cardX + cardW - hdrPadRight - domainW, hdrBaseline);
       // Summary body (styled by block)
       let drawY = cardY + innerP + hdrH + headerSpacer;
       prevWasTightTitle = false;
