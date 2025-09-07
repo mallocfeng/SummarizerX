@@ -755,6 +755,51 @@ async function updateUIText() {
     b.setAttribute('aria-label', syncAllText);
     b.dataset.tip = syncAllText;
   }
+
+  // 状态行多语言同步（已存在的“同步成功/失败/同步中…”）
+  try {
+    const okText = await t('adblock.syncOk');
+    const failText = await t('adblock.syncFail');
+    const syncingText = await t('adblock.syncing');
+    document.querySelectorAll('.adbl-status').forEach(el => {
+      const e = el;
+      const prev = (e.textContent || '').trim();
+      // 保留 HTTP 细节（例如 "(HTTP 404)"）
+      const m = prev.match(/\(HTTP\s+\d+\)/i);
+      const httpDetail = m ? ` ${m[0]}` : '';
+      if (e.classList.contains('ok')) {
+        e.textContent = okText; // 成功
+      } else if (e.classList.contains('err')) {
+        e.textContent = `${failText}${httpDetail}`; // 失败 + 细节
+      } else {
+        // 无状态类时视为进行中
+        if (prev) e.textContent = syncingText;
+      }
+    });
+  } catch {}
+
+  // 汇总提示多语言同步（“成功 x · 失败 y”/“没有可更新的规则”）
+  try {
+    const okLabel = await t('adblock.resultOkLabel');
+    const failLabel = await t('adblock.resultFailLabel');
+    const noTasks = await t('adblock.noTasks');
+    const ids = ['adblock_global_summary_inline','adblock_regional_summary_inline','adblock_cookie_summary_inline'];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const prev = (el.textContent || '').trim();
+      if (!prev) continue;
+      // 情况1：没有任务
+      if (/^没有可更新的规则$|^Nothing to update$/i.test(prev)) { el.textContent = noTasks; continue; }
+      // 情况2：解析两个数字，重组本地化文案
+      const nums = prev.match(/(\d+)\D+(\d+)/);
+      if (nums) {
+        const ok = nums[1];
+        const fail = nums[2];
+        el.textContent = `${okLabel} ${ok} · ${failLabel} ${fail}`;
+      }
+    }
+  } catch {}
 }
 
 function updateElementText(elementId, text) {
