@@ -1012,7 +1012,15 @@ function initAdblockUI(){
       const name = btn.dataset.name || id;
       const url = btn.dataset.url || '';
       if (!id) return;
-      await syncOneList(btn, id, name, url);
+      const ok = await syncOneList(btn, id, name, url);
+      // 若是手动点“同步”且之前被禁用，成功后恢复可勾选
+      try {
+        if (ok) {
+          const row = btn.closest('label');
+          const cb = row?.querySelector('input[type="checkbox"]');
+          if (cb && cb.disabled) { cb.disabled = false; cb.title = ''; }
+        }
+      } catch {}
     });
 
     // 勾选后自动同步（仅当开启了广告过滤时）
@@ -1028,7 +1036,24 @@ function initAdblockUI(){
       const name = btn.dataset.name || id;
       const url = btn.dataset.url || '';
       if (!id) return;
-      try { await syncOneList(btn, id, name, url); } catch {}
+      try {
+        const ok = await syncOneList(btn, id, name, url);
+        if (!ok) {
+          // 同步失败：取消勾选并禁用该项，提醒用户
+          cb.checked = false;
+          cb.disabled = true;
+          const st = document.getElementById(`adbl_status_${id}`);
+          if (st) {
+            st.textContent = `${await t('adblock.syncFail')} · ${await t('adblock.cannotSelect')}`;
+            st.classList.add('err'); st.classList.remove('ok');
+            st.title = `${await t('adblock.cannotSelect')}`;
+          }
+        } else {
+          // 成功：确保状态为 ok
+          const st = document.getElementById(`adbl_status_${id}`);
+          if (st) { st.classList.add('ok'); st.classList.remove('err'); st.title=''; }
+        }
+      } catch {}
     });
   });
 

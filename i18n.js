@@ -82,7 +82,8 @@ const I18N = {
       resultFailLabel: "失败",
       syncing: "同步中…",
       syncOk: "同步成功",
-      syncFail: "同步失败"
+      syncFail: "同步失败",
+      cannotSelect: "无法获取规则，已禁用此项；成功同步后可再勾选。"
     },
     // 浮窗面板
     floatPanel: {
@@ -195,7 +196,8 @@ const I18N = {
       resultFailLabel: "Fail",
       syncing: "Syncing…",
       syncOk: "Synced",
-      syncFail: "Sync failed"
+      syncFail: "Sync failed",
+      cannotSelect: "Cannot fetch rules; disabled. Re-enable after a successful sync."
     },
     // Float panel
     floatPanel: {
