@@ -131,31 +131,31 @@
 
     <!-- 广告过滤 -->
     <section class="section card">
-      <h2 class="section-title"><span class="dot"></span> 广告过滤</h2>
+      <h2 class="section-title"><span class="dot"></span> <span id="adblock-title">广告过滤</span></h2>
       <div class="adblock-row">
         <div class="field">
-          <label class="label">启用广告过滤</label>
+          <label class="label" id="adblock-enable-label">启用广告过滤</label>
           <div class="row" style="display:flex; align-items:center; gap:12px;">
             <label class="switch">
               <input id="adblock_enabled" type="checkbox" />
               <span class="switch-slider"></span>
             </label>
-            <span class="hint">打开后自动下载所选规则</span>
+            <span class="hint" id="adblock-enable-hint">打开后自动下载所选规则</span>
           </div>
         </div>
         <div class="field">
-          <label class="label">弹窗拦截</label>
+          <label class="label" id="adblock-block-popups-label">弹窗拦截</label>
           <div class="row" style="display:flex; align-items:center; gap:12px;">
             <label class="switch">
               <input id="adblock_block_popups" type="checkbox" />
               <span class="switch-slider"></span>
             </label>
-            <span class="hint">阻止“/pop?url=…”等骚扰弹窗</span>
+            <span class="hint" id="adblock-block-popups-hint">阻止“/pop?url=…”等骚扰弹窗</span>
           </div>
         </div>
 
         <div class="field">
-          <label class="label">过滤强度</label>
+          <label class="label" id="adblock-strength-label">过滤强度</label>
           <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
             <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
             <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
@@ -165,7 +165,7 @@
       </div>
 
       <div class="field">
-        <label class="label">全球性广告过滤列表
+        <label class="label" id="adblock-global-lists-label">全球性广告过滤列表
           <button id="sync_all_global" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
@@ -177,7 +177,7 @@
       </div>
 
       <div class="field" style="margin-top:12px;">
-        <label class="label">区域性广告过滤列表
+        <label class="label" id="adblock-regional-lists-label">区域性广告过滤列表
           <button id="sync_all_regional" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
@@ -189,7 +189,7 @@
       </div>
 
       <div class="field" style="margin-top:12px;">
-        <label class="label">Cookie 提示隐藏
+        <label class="label" id="adblock-cookie-lists-label">Cookie 提示隐藏
           <button id="sync_all_cookie" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
@@ -200,7 +200,7 @@
         <div id="adblock_cookie_lists" class="checklist"></div>
       </div>
 
-      <p class="hint">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>
+      <p class="hint" id="adblock-tip">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>
     </section>
 
     <!-- System Prompt -->

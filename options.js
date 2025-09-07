@@ -717,6 +717,44 @@ async function updateUIText() {
     else if (mode === 'light') btn.title = await t('settings.lightTheme');
     else if (mode === 'dark') btn.title = await t('settings.darkTheme');
   }
+
+  // ====== 广告过滤卡片多语言 ======
+  updateElementText('adblock-title', await t('adblock.title'));
+  updateElementText('adblock-enable-label', await t('adblock.enable'));
+  updateElementText('adblock-enable-hint', await t('adblock.enableHint'));
+  updateElementText('adblock-block-popups-label', await t('adblock.blockPopups'));
+  updateElementText('adblock-block-popups-hint', await t('adblock.blockPopupsHint'));
+  updateElementText('adblock-strength-label', await t('adblock.strength'));
+  // 强度按钮文字
+  try {
+    const seg = document.getElementById('adblock-strength-seg');
+    if (seg) {
+      const low = seg.querySelector('[data-strength="low"]');
+      const med = seg.querySelector('[data-strength="medium"]');
+      const high = seg.querySelector('[data-strength="high"]');
+      if (low) low.textContent = await t('adblock.low');
+      if (med) med.textContent = await t('adblock.medium');
+      if (high) high.textContent = await t('adblock.high');
+      seg.setAttribute('aria-label', await t('adblock.strength'));
+    }
+  } catch {}
+  updateElementText('adblock-global-lists-label', await t('adblock.globalLists'));
+  updateElementText('adblock-regional-lists-label', await t('adblock.regionalLists'));
+  updateElementText('adblock-cookie-lists-label', await t('adblock.cookieLists'));
+  updateElementText('adblock-tip', await t('adblock.tip'));
+  // 同步按钮提示
+  const syncAllText = await t('adblock.syncAll');
+  const syncAllBtns = [
+    document.getElementById('sync_all_global'),
+    document.getElementById('sync_all_regional'),
+    document.getElementById('sync_all_cookie')
+  ];
+  for (const b of syncAllBtns) {
+    if (!b) continue;
+    b.title = syncAllText;
+    b.setAttribute('aria-label', syncAllText);
+    b.dataset.tip = syncAllText;
+  }
 }
 
 function updateElementText(elementId, text) {
@@ -1009,25 +1047,25 @@ async function syncOneList(btn, id, name, url){
     btn.dataset.loading = '1';
     btn.disabled = true;
     const st = document.getElementById(`adbl_status_${id}`);
-    if (st) { st.textContent = '同步中…'; st.classList.remove('ok','err'); }
+    if (st) { st.textContent = await t('adblock.syncing'); st.classList.remove('ok','err'); }
     const payload = { type: 'ADBLOCK_DOWNLOAD_ONE', id };
     if (url) payload.url = url;
     if (name) payload.name = name;
     const resp = await chrome.runtime.sendMessage(payload);
     if (resp?.ok) {
-      if (st) { st.textContent = '同步成功'; st.classList.add('ok'); st.classList.remove('err'); }
+      if (st) { st.textContent = await t('adblock.syncOk'); st.classList.add('ok'); st.classList.remove('err'); }
       return true;
     } else {
       if (st) {
-        const detail = resp?.status ? `（HTTP ${resp.status}）` : '';
-        st.textContent = `同步失败${detail}`;
+        const detail = resp?.status ? ` (HTTP ${resp.status})` : '';
+        st.textContent = `${await t('adblock.syncFail')}${detail}`;
         st.classList.add('err'); st.classList.remove('ok');
       }
       return false;
     }
   } catch (e) {
     const st = document.getElementById(`adbl_status_${id}`);
-    if (st) { st.textContent = '同步失败'; st.classList.add('err'); st.classList.remove('ok'); }
+    if (st) { st.textContent = await t('adblock.syncFail'); st.classList.add('err'); st.classList.remove('ok'); }
     return false;
   } finally {
     // small delay to let user see result
@@ -1070,8 +1108,8 @@ async function syncAllInSection(section){
     // 总结提示
     const summary = document.getElementById(section === 'global' ? 'adblock_global_summary_inline' : section === 'regional' ? 'adblock_regional_summary_inline' : 'adblock_cookie_summary_inline');
     if (summary) {
-      if (tasks.length === 0) summary.textContent = '没有可更新的规则';
-      else summary.textContent = `成功 ${ok} · 失败 ${fail}`;
+      if (tasks.length === 0) summary.textContent = await t('adblock.noTasks');
+      else summary.textContent = `${await t('adblock.resultOkLabel')} ${ok} · ${await t('adblock.resultFailLabel')} ${fail}`;
     }
   } finally {
     try { btnAll.dataset.loading = '0'; btnAll.disabled = false; } catch {}

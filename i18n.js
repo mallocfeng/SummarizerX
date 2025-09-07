@@ -61,6 +61,29 @@ const I18N = {
       confirmOverride: "自定义提示词已有内容，是否覆盖？",
       confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？"
     },
+    // 广告过滤
+    adblock: {
+      title: "广告过滤",
+      enable: "启用广告过滤",
+      enableHint: "打开后自动下载所选规则",
+      blockPopups: "弹窗拦截",
+      blockPopupsHint: "阻止“/pop?url=…”等骚扰弹窗",
+      strength: "过滤强度",
+      low: "低",
+      medium: "中",
+      high: "高",
+      globalLists: "全球性广告过滤列表",
+      regionalLists: "区域性广告过滤列表",
+      cookieLists: "Cookie 提示隐藏",
+      tip: "提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。",
+      syncAll: "全部更新",
+      noTasks: "没有可更新的规则",
+      resultOkLabel: "成功",
+      resultFailLabel: "失败",
+      syncing: "同步中…",
+      syncOk: "同步成功",
+      syncFail: "同步失败"
+    },
     // 浮窗面板
     floatPanel: {
       summary: "摘要",
@@ -150,6 +173,29 @@ const I18N = {
       saveCancelled: "Save cancelled.",
       confirmOverride: "Custom prompt has content, override?",
       confirmLangOverride: "Custom prompt has content, override based on new language?"
+    },
+    // Adblock
+    adblock: {
+      title: "Ad Filtering",
+      enable: "Enable ad filtering",
+      enableHint: "Automatically download selected lists when enabled",
+      blockPopups: "Popup blocking",
+      blockPopupsHint: "Block annoying popups like '/pop?url=…'",
+      strength: "Filter strength",
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      globalLists: "Global Ad Filter Lists",
+      regionalLists: "Regional Ad Filter Lists",
+      cookieLists: "Cookie Notice Hiding",
+      tip: "Tip: selections will download in background and be stored locally, used only by this extension's ad filtering.",
+      syncAll: "Update All",
+      noTasks: "Nothing to update",
+      resultOkLabel: "OK",
+      resultFailLabel: "Fail",
+      syncing: "Syncing…",
+      syncOk: "Synced",
+      syncFail: "Sync failed"
     },
     // Float panel
     floatPanel: {
