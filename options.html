@@ -132,7 +132,7 @@
     <!-- 广告过滤 -->
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> 广告过滤</h2>
-      <div class="grid">
+      <div class="adblock-row">
         <div class="field">
           <label class="label">启用广告过滤</label>
           <div class="row" style="display:flex; align-items:center; gap:12px;">
@@ -144,6 +144,17 @@
           </div>
         </div>
         <div class="field">
+          <label class="label">弹窗拦截</label>
+          <div class="row" style="display:flex; align-items:center; gap:12px;">
+            <label class="switch">
+              <input id="adblock_block_popups" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="hint">阻止“/pop?url=…”等骚扰弹窗</span>
+          </div>
+        </div>
+
+        <div class="field">
           <label class="label">过滤强度</label>
           <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
             <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
@@ -154,12 +165,26 @@
       </div>
 
       <div class="field">
-        <label class="label">全球性广告过滤列表</label>
+        <label class="label">全球性广告过滤列表
+          <button id="sync_all_global" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_global_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
         <div id="adblock_global_lists" class="checklist"></div>
       </div>
 
       <div class="field">
-        <label class="label">区域性广告过滤列表</label>
+        <label class="label">区域性广告过滤列表
+          <button id="sync_all_regional" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_regional_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
         <div id="adblock_regional_lists" class="checklist"></div>
       </div>
 

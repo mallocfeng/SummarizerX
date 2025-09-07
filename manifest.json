@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX AI Reader",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
   "host_permissions": [
     "https://easylist.to/*",
-    "https://easylist-downloads.adblockplus.org/*"
+    "https://easylist-downloads.adblockplus.org/*",
+    "https://filters.adtidy.org/*",
+    "https://raw.githubusercontent.com/*",
+    "https://pgl.yoyo.org/*",
+    "https://ublockorigin.github.io/*",
+    "https://adguardteam.github.io/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
@@ -14,7 +19,8 @@
       "resources": [
         "i18n.js",
         "vendor/petite-vue.iife.js",
-        "adblock_engine.js"
+        "adblock_engine.js",
+        "block_pop.js"
       ],
       "matches": ["<all_urls>"]
     }

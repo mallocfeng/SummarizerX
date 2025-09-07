@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.1
+
+### English
+- Fix: Remove persistent bottom-corner floating ads on missav.* with a targeted, safe heuristic (detect fixed/sticky, corner-anchored, overlay-ish elements containing ad-like media/text/classes) and collapse trivial wrappers.
+- Robustness: Run floater collapse even when no cosmetic CSS is produced (ensures site-specific cleanup still applies if lists are disabled or not yet synced).
+
+### 中文
+- 修复：针对 missav.* 右下角顽固浮动广告，新增更强但安全的启发式清理（检测固定/粘性、贴边的覆盖元素，且包含广告类媒体/文本/类名），并尝试合并空壳父容器。
+- 稳健性：即使未生成规则 CSS（例如未选择列表或列表未同步），也会执行浮窗折叠，确保站点专用清理生效。
+
 ## v2.0.0
 
 ### English

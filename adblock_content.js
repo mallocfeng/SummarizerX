@@ -3,6 +3,17 @@
   // Early preload: inject last-compiled CSS from sessionStorage to reduce flash
   try { preInjectFromSession(); } catch {}
 
+  // Conditionally inject page-world script to patch window.open and block nuisance popups
+  try {
+    const { adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_block_popups: true });
+    if (adblock_block_popups) {
+      const s = document.createElement('script');
+      s.src = chrome.runtime.getURL('block_pop.js');
+      s.defer = false; s.async = false; s.type = 'text/javascript';
+      (document.documentElement || document.head || document.body).appendChild(s);
+    }
+  } catch {}
+
   // Lazy import engine as module (MV3-compatible)
   let parseCosmetic, compileForHost, buildCSS;
   try {
@@ -21,6 +32,25 @@
           try { clearSessionCacheForHost(); } catch {}
         }
         await reapply();
+      }
+      if (changes.adblock_block_popups) {
+        const on = !!changes.adblock_block_popups.newValue;
+        if (on) {
+          try {
+            const s = document.createElement('script');
+            s.src = chrome.runtime.getURL('block_pop.js');
+            s.defer = false; s.async = false; s.type = 'text/javascript';
+            (document.documentElement || document.head || document.body).appendChild(s);
+          } catch {}
+        } else {
+          // disable patched window.open by setting page flag
+          try {
+            const s = document.createElement('script');
+            s.textContent = 'try{window.__sx_allow_popups=true;}catch{}';
+            (document.documentElement || document.head || document.body).appendChild(s);
+            s.remove();
+          } catch {}
+        }
       }
     } else if (area === 'local') {
       if (changes.adblock_rules) await reapply();
@@ -44,7 +74,14 @@
       const struct = mergeStructs(collected.map(parseCosmetic));
       const selectors = compileForHost(struct, location.hostname || '', adblock_strength);
       const css = buildCSS(selectors);
-      if (!css) { if (style) style.remove(); disconnectRemover(); clearSessionCacheForHost(); return; }
+      if (!css) {
+        if (style) style.remove();
+        disconnectRemover();
+        clearSessionCacheForHost();
+        // Still try to collapse obvious floaters for specific troublesome hosts
+        try { if (/\bmissav\./i.test(location.hostname || '')) schedulePlaceholderSweep(); } catch {}
+        return;
+      }
       injectStyle(css);
       // Also remove simple matched nodes to "directly remove" instead of only hiding
       setupRemover(selectors, adblock_strength);
@@ -70,6 +107,8 @@ function setupRemover(selectors, strength){
   if (__adblMO) { try { __adblMO.disconnect(); } catch {} }
   __adblMO = new MutationObserver(() => { try { sweepRemove(true); } catch {} });
   __adblMO.observe(document.documentElement || document, { childList: true, subtree: true });
+  // Also collapse leftover placeholders/labels
+  try { schedulePlaceholderSweep(); } catch {}
 }
 
 function sweepRemove(incremental){
@@ -84,6 +123,8 @@ function sweepRemove(incremental){
       try { if (n && n.parentNode) n.parentNode.removeChild(n); } catch {}
     });
   }
+  // After removals, try collapsing empty ad placeholders
+  try { schedulePlaceholderSweep(); } catch {}
 }
 
 function isRemovalSafe(sel){
@@ -97,6 +138,213 @@ function isRemovalSafe(sel){
   if(/^\.[a-zA-Z0-9_-]+$/.test(s)) return true;
   if(/^[a-zA-Z][a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]+$/.test(s)) return true;
   return false;
+}
+
+// ----- Collapse ad placeholders (labels like "Advertisement") -----
+let __adblPHTimeout = null;
+function schedulePlaceholderSweep(){
+  if (__adblPHTimeout) cancelAnimationFrame(__adblPHTimeout);
+  __adblPHTimeout = requestAnimationFrame(() => { try { collapseAdPlaceholders(); collapseNYTPlaceholders(); collapseFloatingOverlays(); } finally { __adblPHTimeout = null; } });
+}
+
+function collapseAdPlaceholders(){
+  const candidates = document.querySelectorAll([
+    'div[class*="ad"]',
+    'section[class*="ad"]',
+    'aside[class*="ad"]',
+    '[id*="ad"]',
+    '[data-ad]', '[data-ads]', '[data-ad-slot]', '[data-test*="ad"]', '[data-testid*="ad"]',
+    '[aria-label*="advert"]', '[aria-label*="Advertisement"]', '[aria-label*="广告"]',
+    'ins.adsbygoogle',
+  ].join(','));
+  const labelRe = /^(advertisement|广告|廣告|реклама|anuncio|pubblicità|werbung)$/i;
+  candidates.forEach(el => {
+    try {
+      if (!el || !el.isConnected) return;
+      if (hasMedia(el)) return; // still holds an ad resource
+      const txt = (el.textContent || '').trim();
+      const short = txt && txt.length <= 24;
+      const labelOnly = !txt || labelRe.test(txt);
+      if (labelOnly || short) {
+        hardHide(el);
+        // Try to also collapse one safe parent if it's now empty or very small
+        const p = el.parentElement;
+        if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+      }
+    } catch {}
+  });
+}
+
+function hasMedia(root){
+  try { return !!root.querySelector('iframe, img, video, object, embed'); } catch { return false; }
+}
+function isTriviallyEmpty(el){
+  const txt = (el.textContent || '').replace(/\s+/g,'').trim();
+  if (txt.length > 0) return false;
+  const rect = el.getBoundingClientRect();
+  return (rect.height <= 8) || (el.children.length === 0);
+}
+function hardHide(el){
+  try {
+    el.style.setProperty('display','none','important');
+    el.style.setProperty('height','0','important');
+    el.style.setProperty('min-height','0','important');
+    el.style.setProperty('margin','0','important');
+    el.style.setProperty('padding','0','important');
+    // If grid/flex gaps remain, parent layout will close as children disappear
+  } catch {}
+}
+
+// Site-specific: aggressively collapse NYTimes ad wrappers and labels
+function collapseNYTPlaceholders(){
+  const host = location.hostname || '';
+  if (!/nytimes\.com$/.test(host)) return;
+
+  // Hide common labels and skip links
+  const isAdLabel = (el) => {
+    try { return /^(advertisement|skip\s+advertisement|skip\s+ad)$/i.test((el.textContent || '').trim()); } catch { return false; }
+  };
+  document.querySelectorAll('p,div,span,a,header,section').forEach(el => { if (isAdLabel(el)) hardHide(el); });
+
+  // Known wrapper ids and slot containers
+  const targets = [
+    '#top-wrapper', '#bottom-wrapper', '#sponsor-wrapper',
+    '#top-slug', '#bottom-slug', '#sponsor-slug',
+    '#top', '#bottom', '#sponsor',
+    '.place-ad', '.ad.top-wrapper', '.ad.bottom-wrapper', '.ad'
+  ];
+  try {
+    document.querySelectorAll(targets.join(',')).forEach(el => {
+      if (!el) return;
+      const txt = (el.textContent || '').trim();
+      const slotish = el.matches('.place-ad, [data-size-key], [data-position]') || /advert/i.test(txt);
+      const anyMedia = hasMedia(el);
+      if (slotish && !anyMedia) {
+        hardHide(el);
+        const p = el.parentElement;
+        if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+      }
+    });
+  } catch {}
+
+  // Any generic wrapper named *-wrapper that only holds ad elements
+  try {
+    document.querySelectorAll('div[id$="-wrapper"]').forEach(box => {
+      const hasSlot = box.querySelector('.place-ad, .ad, [data-size-key], [data-position]');
+      const anyMedia = box.querySelector('iframe, img, video, object, embed');
+      if (hasSlot && !anyMedia) hardHide(box);
+    });
+  } catch {}
+}
+
+// ----- Generic floating overlay (bottom-right ads) remover -----
+function collapseFloatingOverlays(){
+  try {
+    // Site-specific: MISSAV corner floating ads are persistent; apply stronger sweep.
+    try { if (/\bmissav\./i.test(location.hostname || '')) collapseMissavCornerAds(); } catch {}
+
+    const candidates = document.querySelectorAll([
+      '[style*="position:fixed"], [style*="position: sticky"],',
+      '[class*="float" i], [id*="float" i],',
+      '[class*="sticky" i], [id*="sticky" i],',
+      '[class*="fix" i], [id*="fix" i]'
+    ].join(' '));
+
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+    candidates.forEach(el => {
+      try {
+        if (!el || !el.isConnected) return;
+        // compute style
+        const cs = getComputedStyle(el);
+        const pos = (cs.position || '').toLowerCase();
+        if (pos !== 'fixed' && pos !== 'sticky') return;
+        const rect = el.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return;
+        // close to viewport edges (bottom-right / bottom-left areas)
+        const EDGE = 96; // be a bit more tolerant on edge distance
+        const nearRight = (vw - rect.right) <= EDGE;
+        const nearLeft = rect.left <= EDGE;
+        const nearBottom = (vh - rect.bottom) <= EDGE;
+        const nearTop = rect.top <= EDGE;
+        // size heuristic: still ignore huge overlays but allow a bit larger
+        const smallish = rect.width <= 640 && rect.height <= 640;
+        // z-index high (overlay-ish)
+        const z = parseInt(cs.zIndex || '0', 10);
+        const overlayish = isNaN(z) ? true : z >= 9; // many overlays use z-index >= 10
+
+        // Must contain something ad-like: iframe/img or obvious ad text/class
+        const containsMedia = hasMedia(el);
+        const txt = (el.textContent || '').toLowerCase();
+        const looksAd = /ad|广告|廣告|promotion|sponsored|close\s*ad/.test(txt) || /ad|pop|promo|sponsor/i.test((el.className||'')+ ' ' + (el.id||''));
+        const hasLink = !!el.querySelector('a[href]');
+
+        const anchored = (nearBottom && (nearRight || nearLeft)) || (nearTop && (nearRight || nearLeft));
+        // Heuristic:
+        // - anchored corner overlay OR contains explicit 'close ad' text
+        // - size reasonable
+        // - overlay-ish and content looks ad-like
+        if (((anchored && smallish) || /close\s*ad/.test(txt)) && overlayish && (containsMedia || hasLink || looksAd)) {
+          hardHide(el);
+          // also try hide parent if trivial wrapper
+          const p = el.parentElement;
+          if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+        }
+      } catch {}
+    });
+  } catch {}
+}
+
+// Stronger heuristic just for missav.* to catch dynamic corner floaters
+function collapseMissavCornerAds(){
+  const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+  const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+  // Limit how many nodes we inspect to avoid jank
+  const MAX_NODES = 1500;
+  let inspected = 0;
+  const iter = (root) => {
+    if (!root) return;
+    const all = root.querySelectorAll('div,section,aside,iframe,a');
+    for (const el of all) {
+      if (inspected++ > MAX_NODES) break;
+      try {
+        if (!el.isConnected) continue;
+        const cs = getComputedStyle(el);
+        const pos = (cs.position || '').toLowerCase();
+        if (pos !== 'fixed' && pos !== 'sticky') continue;
+        const rect = el.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+        // anchored very close to a corner
+        const EDGE = Math.max(12, Math.floor(Math.min(vw, vh) * 0.02));
+        const nearRight = (vw - rect.right) <= EDGE;
+        const nearLeft = rect.left <= EDGE;
+        const nearBottom = (vh - rect.bottom) <= EDGE;
+        const nearTop = rect.top <= EDGE;
+        const anchored = (nearBottom && (nearRight || nearLeft)) || (nearTop && (nearRight || nearLeft));
+        if (!anchored) continue;
+        // avoid hiding large layout elements
+        const smallish = rect.width <= 560 && rect.height <= 560;
+        if (!smallish) continue;
+        // z-index overlay-ish or auto
+        const z = parseInt(cs.zIndex || '0', 10);
+        const overlayish = isNaN(z) ? true : z >= 5;
+        if (!overlayish) continue;
+        // Must look like an ad container
+        const containsMedia = hasMedia(el);
+        const txt = (el.textContent || '').toLowerCase();
+        const looksAd = /ad|广告|廣告|sponsor|promo|close\s*ad/.test(txt) || /ad|promo|sponsor|float|sticky|fix/i.test(((el.className||'')+' '+(el.id||'')));
+        const hasLink = !!el.querySelector('a[href]');
+        if (containsMedia || hasLink || looksAd) {
+          hardHide(el);
+          const p = el.parentElement;
+          if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+        }
+      } catch {}
+    }
+  };
+  try { iter(document.body || document.documentElement); } catch {}
 }
 
 function mergeStructs(arr){

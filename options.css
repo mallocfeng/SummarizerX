@@ -711,6 +711,12 @@ html[data-theme="dark"] #adblock-strength-seg .seg-btn:hover{ background: rgba(2
 html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
 html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
 
+/* ---- Adblock first row layout (three controls in one line) ---- */
+.adblock-row{ display:flex; gap:16px; align-items:end; flex-wrap:wrap; margin-bottom:14px; }
+.adblock-row .field{ margin: 0; min-width: 220px; }
+.adblock-row .field .label{ margin-bottom: 6px; }
+.adblock-row .switch{ transform: translateY(1px); }
+
 /* Per-rule sync button */
 .sync-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:6px; }
 .sync-btn:hover{ background: rgba(0,0,0,.05); color:#1f2937; }
@@ -720,7 +726,7 @@ html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(-
 .sync-btn[data-loading="1"] svg{ animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.adbl-status{ font-size:12px; color:#64748b; margin-left:6px; }
+.adbl-status{ font-size:12px; color:#64748b; margin-left:2px; }
 .adbl-status.ok{ color:#059669; }
 .adbl-status.err{ color:#b91c1c; }
 html[data-theme="dark"] .sync-btn:hover{ background: rgba(255,255,255,.06); color:#e6ebf5; }
@@ -728,13 +734,29 @@ html[data-theme="dark"] .adbl-status{ color:#9fb0c6; }
 html[data-theme="dark"] .adbl-status.ok{ color:#7dd3a7; }
 html[data-theme="dark"] .adbl-status.err{ color:#fb7185; }
 
-/* Preview modal for rule first-10-lines */
-.adbl-preview-backdrop{ position: fixed; inset:0; background: rgba(0,0,0,.45); z-index: 100000; display:flex; align-items:center; justify-content:center; padding: 20px; }
-.adbl-preview-panel{ width:min(920px, 92vw); max-height: 80vh; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 48px rgba(0,0,0,.25); display:flex; flex-direction: column; overflow:hidden; }
-.adbl-preview-head{ font-weight:700; padding: 10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-.adbl-preview-close{ appearance:none; border:0; background:transparent; font-size:20px; line-height:1; width:28px; height:28px; border-radius:6px; cursor:pointer; color: inherit; }
-.adbl-preview-close:hover{ background: rgba(0,0,0,.06); }
-.adbl-preview-pre{ margin:0; padding: 12px 14px; white-space: pre-wrap; overflow:auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-html[data-theme="dark"] .adbl-preview-panel{ background: #0f172a; color:#e7ebf3; border-color:#253554; }
-html[data-theme="dark"] .adbl-preview-head{ border-color:#253554; }
-html[data-theme="dark"] .adbl-preview-close:hover{ background: rgba(255,255,255,.06); }
+/* Keep per-row layout stable when status appears */
+.checklist label{ display:inline-flex; align-items:center; gap:8px; flex-wrap:nowrap; }
+.checklist .adbl-name{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.checklist .sync-btn{ flex:0 0 24px; }
+.checklist .adbl-status{ flex:0 0 84px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left; min-height:1.2em; }
+
+/* Batch summary below each section */
+.adbl-summary{ margin-top:6px; font-size:12px; color:#64748b; min-height:1.2em; }
+html[data-theme="dark"] .adbl-summary{ color:#9fb0c6; }
+/* Sync-all buttons next to section labels */
+.sync-all-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:8px; vertical-align:middle; }
+.sync-all-btn{ position: relative; }
+.sync-all-btn:hover{ background: rgba(0,0,0,.05); color:#1f2937; }
+.sync-all-btn:focus-visible{ outline:none; box-shadow: var(--ring); }
+.sync-all-btn[disabled]{ opacity:.45; cursor:not-allowed; }
+.sync-all-btn svg{ width:16px; height:16px; stroke: currentColor; fill:none; }
+.sync-all-btn[data-loading="1"] svg{ animation: spin 1s linear infinite; }
+html[data-theme="dark"] .sync-all-btn:hover{ background: rgba(255,255,255,.06); color:#e6ebf5; }
+
+/* Custom tooltip for sync-all */
+.sync-all-btn:hover::after{ content: attr(data-tip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); background: rgba(17,24,39,.92); color: #f8fafc; padding: 4px 6px; border-radius: 6px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 10; }
+html[data-theme="light"] .sync-all-btn:hover::after{ background: rgba(0,0,0,.82); color:#fff; }
+
+/* Inline summary near the label button */
+.adbl-summary-inline{ margin-left:8px; font-size:12px; color:#64748b; }
+html[data-theme="dark"] .adbl-summary-inline{ color:#9fb0c6; }

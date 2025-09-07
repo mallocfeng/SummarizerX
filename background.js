@@ -292,9 +292,15 @@ function listMap() {
 }
 
 async function downloadText(url) {
-  const res = await fetch(url, { method: 'GET' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.text();
+  const res = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache', credentials: 'omit' });
+  const text = await safeReadText(res);
+  if (!res.ok) {
+    const e = new Error(`HTTP ${res.status}`);
+    e.status = res.status;
+    e.body = text?.slice(0, 300) || '';
+    throw e;
+  }
+  return text;
 }
 
 async function downloadAdblockRules(selectedIds = []) {
@@ -368,7 +374,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       await chrome.storage.local.set({ adblock_rules, adblock_last_update: now });
       sendResponse?.({ ok: true, id, size: txt.length, updatedAt: now });
     } catch (e) {
-      sendResponse?.({ ok: false, error: e?.message || String(e) });
+      sendResponse?.({ ok: false, error: e?.message || String(e), status: e?.status || null, body: e?.body || '' });
     }
   })();
 

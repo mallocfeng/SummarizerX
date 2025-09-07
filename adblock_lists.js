@@ -3,11 +3,16 @@
 export const FILTER_LISTS = [
   // 全球性
   { id: 'easylist',                group: 'global',  name: 'EasyList',                         url: 'https://easylist.to/easylist/easylist.txt' },
-  { id: 'easyprivacy',             group: 'global',  name: 'EasyPrivacy',                      url: 'https://easylist.to/easyprivacy/easyprivacy.txt' },
-  { id: 'easylist_cookie',         group: 'global',  name: 'EasyList Cookie List',             url: 'https://easylist.to/easylist/easylist-cookie.txt' },
-  { id: 'fanboy_annoyance',        group: 'global',  name: 'Fanboy’s Annoyance List',          url: 'https://easylist-downloads.adblockplus.org/fanboy-annoyance.txt' },
+  { id: 'easyprivacy',             group: 'global',  name: 'EasyPrivacy',                      url: 'https://easylist-downloads.adblockplus.org/easyprivacy.txt' },
   { id: 'fanboy_social',           group: 'global',  name: 'Fanboy’s Social Blocking List',    url: 'https://easylist-downloads.adblockplus.org/fanboy-social.txt' },
-  { id: 'anti_circumvention',      group: 'global',  name: 'AdBlock Anti-Circumvention List',  url: 'https://easylist-downloads.adblockplus.org/antiadblock.txt' },
+  { id: 'fanboy_annoyance',        group: 'global',  name: 'Fanboy’s Annoyance List',          url: 'https://easylist.to/easylist/fanboy-annoyance.txt' },
+  { id: 'peter_lowe',              group: 'global',  name: "Peter Lowe’s Ad & Tracking",       url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext' },
+  { id: 'ubo_ads',                 group: 'global',  name: 'uBlock filters – Ads',             url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt' },
+  { id: 'ubo_privacy',             group: 'global',  name: 'uBlock filters – Privacy',         url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt' },
+  { id: 'ubo_resource',            group: 'global',  name: 'uBlock filters – Resource abuse',  url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/resource-abuse.txt' },
+  { id: 'ubo_unbreak',             group: 'global',  name: 'uBlock filters – Unbreak',         url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt' },
+  { id: 'ubo_quickfix',            group: 'global',  name: 'uBlock filters – Quick fixes',     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt' },
+  { id: 'adguard_url_tracking',    group: 'global',  name: 'AdGuard URL Tracking Protection',  url: 'https://filters.adtidy.org/extension/ublock/filters/17.txt' },
 
   // 区域性
   { id: 'de',                      group: 'regional', name: 'Germany (EasyList Germany)',                           url: 'https://easylist.to/easylistgermany/easylistgermany.txt' },
@@ -28,4 +33,3 @@ export function splitLists(){
     regional: FILTER_LISTS.filter(x => x.group === 'regional')
   };
 }
-
