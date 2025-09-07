@@ -712,10 +712,10 @@ html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
 html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
 
 /* ---- Adblock first row layout (three controls in one line) ---- */
-.adblock-row{ display:flex; gap:16px; align-items:end; flex-wrap:wrap; margin-bottom:14px; }
+.adblock-row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
 .adblock-row .field{ margin: 0; min-width: 220px; }
 .adblock-row .field .label{ margin-bottom: 6px; }
-.adblock-row .switch{ transform: translateY(1px); }
+.adblock-row .switch{ transform: none; }
 
 /* Per-rule sync button */
 .sync-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:6px; }
