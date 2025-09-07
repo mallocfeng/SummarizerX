@@ -738,9 +738,9 @@ async function updateUIText() {
       seg.setAttribute('aria-label', await t('adblock.strength'));
     }
   } catch {}
-  updateElementText('adblock-global-lists-label', await t('adblock.globalLists'));
-  updateElementText('adblock-regional-lists-label', await t('adblock.regionalLists'));
-  updateElementText('adblock-cookie-lists-label', await t('adblock.cookieLists'));
+  updateElementText('adblock-global-lists-text', await t('adblock.globalLists'));
+  updateElementText('adblock-regional-lists-text', await t('adblock.regionalLists'));
+  updateElementText('adblock-cookie-lists-text', await t('adblock.cookieLists'));
   updateElementText('adblock-tip', await t('adblock.tip'));
   // 同步按钮提示
   const syncAllText = await t('adblock.syncAll');
