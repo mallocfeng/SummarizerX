@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.3
+
+### English
+- Tighten heuristics: Remove risky substring selectors from placeholder collapsing; only consider explicit ad attributes (`data-ad*`, `aria-label*=advert`, `ins.adsbygoogle`, Google ads ids). Added token-based matching with denylist (e.g., `masthead`, `header`, `badge`) to prevent false positives.
+- Strength-aware: When strength is Low, skip placeholder collapsing entirely (keep safe direct removals and floating overlay cleanup).
+
+### 中文
+- 收紧启发式：占位符折叠不再使用高风险的 `[id*="ad"]`/`[class*="ad"]` 模糊匹配，仅依据明确属性（`data-ad*`、`aria-label*=advert`、`ins.adsbygoogle`、Google 广告 id 前缀）。并加入基于 token 的判断和常见误伤词拒绝列表（如 `masthead`、`header`、`badge`）。
+- 强度感知：在“低”强度时，完全跳过占位符折叠（保留安全 DOM 删除与浮动层清理）。
+
 ## v2.0.2
 
 ### English

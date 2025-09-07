@@ -98,11 +98,13 @@
 // ----- Removal of simple matches (performance-safe) -----
 let __adblMO = null;
 let __adblRemovable = [];
+let __adblStrength = 'medium';
 
 function disconnectRemover(){ try { __adblMO && __adblMO.disconnect(); } catch {} __adblMO = null; __adblRemovable = []; }
 
 function setupRemover(selectors, strength){
   // Build a safe subset for removal
+  __adblStrength = String(strength || 'medium');
   __adblRemovable = (selectors || []).filter(isRemovalSafe);
   if (__adblRemovable.length === 0) { disconnectRemover(); return; }
   // Initial sweep
@@ -153,7 +155,8 @@ function schedulePlaceholderSweep(){
       const host = location.hostname || '';
       const isYouTube = /(^|\.)youtube\.com$/i.test(host) || /^youtu\.be$/i.test(host);
       if (isYouTube) return; // do not run generic collapsers on YouTube
-      collapseAdPlaceholders();
+      // Tightened heuristic: skip placeholder collapsing on low strength
+      if (__adblStrength !== 'low') collapseAdPlaceholders();
       collapseNYTPlaceholders();
       collapseFloatingOverlays();
     } finally { __adblPHTimeout = null; }
@@ -162,30 +165,50 @@ function schedulePlaceholderSweep(){
 
 function collapseAdPlaceholders(){
   const candidates = document.querySelectorAll([
-    'div[class*="ad"]',
-    'section[class*="ad"]',
-    'aside[class*="ad"]',
-    '[id*="ad"]',
-    '[data-ad]', '[data-ads]', '[data-ad-slot]', '[data-test*="ad"]', '[data-testid*="ad"]',
-    '[aria-label*="advert"]', '[aria-label*="Advertisement"]', '[aria-label*="广告"]',
+    // Safer explicit indicators only
+    '[data-ad]', '[data-ads]', '[data-ad-slot]',
+    '[aria-label*="advert" i]', '[aria-label*="Advertisement" i]', '[aria-label*="广告"]',
     'ins.adsbygoogle',
+    // Common vendor hooks
+    'div[id^="google_ads"], iframe[id^="google_ads_iframe"]'
   ].join(','));
   const labelRe = /^(advertisement|广告|廣告|реклама|anuncio|pubblicità|werbung)$/i;
+  const denyTokens = new Set(['masthead','header','headers','badge','badges','download','padding','loader','loading','head']);
+  const adTokens = new Set(['ad','ads','advert','advertisement','adunit','ad-slot','adslot','ad_container','adcontainer','sponsor','sponsored','promo','promoted']);
   candidates.forEach(el => {
     try {
       if (!el || !el.isConnected) return;
       if (hasMedia(el)) return; // still holds an ad resource
+      const idCls = ((el.id || '') + ' ' + (el.className || '')).toString().toLowerCase();
+      const tokens = tokenizeIdClass(idCls);
+      if (tokens.some(t => denyTokens.has(t))) return;
+      const hasAdLikeToken = tokens.some(t => adTokens.has(t));
+      const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+      const ariaAdvert = /advert|广告/.test(aria);
       const txt = (el.textContent || '').trim();
       const short = txt && txt.length <= 24;
       const labelOnly = !txt || labelRe.test(txt);
-      if (labelOnly || short) {
+      // Only collapse when there is explicit ad signal
+      if ((ariaAdvert || hasAdLikeToken) && (labelOnly || short)) {
         hardHide(el);
-        // Try to also collapse one safe parent if it's now empty or very small
         const p = el.parentElement;
         if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
       }
     } catch {}
   });
+}
+
+function tokenizeIdClass(s){
+  try {
+    if (!s) return [];
+    // split on camelCase and non-alnum boundaries
+    const parts = String(s)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .filter(Boolean);
+    return parts;
+  } catch { return []; }
 }
 
 function hasMedia(root){
