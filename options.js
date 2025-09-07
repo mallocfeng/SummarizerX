@@ -880,6 +880,7 @@ function renderAdblockLists() {
       btn.setAttribute('aria-label', '同步此规则');
       btn.dataset.listId = item.id;
       btn.dataset.name = item.name;
+      btn.dataset.url = item.url;
       btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/></svg>';
       const status = document.createElement('span');
       status.className = 'adbl-status';
@@ -971,8 +972,9 @@ function initAdblockUI(){
       e.stopPropagation();
       const id = btn.dataset.listId;
       const name = btn.dataset.name || id;
+      const url = btn.dataset.url || '';
       if (!id) return;
-      await syncOneList(btn, id, name);
+      await syncOneList(btn, id, name, url);
     });
   });
 
@@ -985,14 +987,17 @@ function initAdblockUI(){
   if (syncAllCookie) syncAllCookie.addEventListener('click', () => syncAllInSection('cookie'));
 }
 
-async function syncOneList(btn, id, name){
+async function syncOneList(btn, id, name, url){
   try {
     // show loading
     btn.dataset.loading = '1';
     btn.disabled = true;
     const st = document.getElementById(`adbl_status_${id}`);
     if (st) { st.textContent = '同步中…'; st.classList.remove('ok','err'); }
-    const resp = await chrome.runtime.sendMessage({ type: 'ADBLOCK_DOWNLOAD_ONE', id });
+    const payload = { type: 'ADBLOCK_DOWNLOAD_ONE', id };
+    if (url) payload.url = url;
+    if (name) payload.name = name;
+    const resp = await chrome.runtime.sendMessage(payload);
     if (resp?.ok) {
       if (st) { st.textContent = '同步成功'; st.classList.add('ok'); st.classList.remove('err'); }
       return true;

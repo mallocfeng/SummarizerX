@@ -364,8 +364,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     try {
       const id = String(msg.id || '');
       const m = listMap();
-      if (!m.has(id)) throw new Error('Unknown list');
-      const item = m.get(id);
+      let item = m.get(id);
+      // 兼容：若列表未在后台映射（例如新增后未刷新后台），允许使用前端传入的 url/name
+      if (!item) {
+        const url = typeof msg.url === 'string' ? msg.url : '';
+        const name = typeof msg.name === 'string' ? msg.name : id;
+        if (!url) throw new Error('Unknown list');
+        item = { id, url, name };
+      }
       const txt = await downloadText(item.url);
       const now = Date.now();
       // 合并更新 storage.local
