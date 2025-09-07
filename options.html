@@ -129,6 +129,36 @@
       </div>
     </section>
 
+    
+
+    <!-- System Prompt -->
+    <section class="section card note">
+      <h2 class="section-title"><span class="dot"></span> <span id="system-prompt-title">System Prompt（系统提示词）</span></h2>
+
+      <div class="grid">
+        <div class="field">
+          <label class="label" id="presets-label">选择预设（Presets）</label>
+          <select id="system_prompt_preset" class="ctrl">
+            <option value="general_summary" id="general-summary-option">General summarization</option>
+            <option value="faithful_translation" id="faithful-translation-option">Faithful translation</option>
+            <option value="tech_article_translation" id="tech-article-translation-option">Tech article translation</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="help" id="preset-hint">
+            说明：可选预设为英文描述；你也可以在下面输入自定义提示词。<br/>
+            无论选择哪种提示词，系统都会强制追加一句"请将结果输出为目标语言"（根据"输出语言"或自动识别）。
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" id="custom-prompt-label">自定义系统提示词（可留空）</label>
+        <textarea id="system_prompt_custom" class="ctrl mono" placeholder="例如：Be concise and faithful. Keep structure and factual accuracy."></textarea>
+      </div>
+    </section>
+
     <!-- 广告过滤 -->
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> <span id="adblock-title">广告过滤</span></h2>
@@ -201,34 +231,6 @@
       </div>
 
       <p class="hint" id="adblock-tip">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>
-    </section>
-
-    <!-- System Prompt -->
-    <section class="section card note">
-      <h2 class="section-title"><span class="dot"></span> <span id="system-prompt-title">System Prompt（系统提示词）</span></h2>
-
-      <div class="grid">
-        <div class="field">
-          <label class="label" id="presets-label">选择预设（Presets）</label>
-          <select id="system_prompt_preset" class="ctrl">
-            <option value="general_summary" id="general-summary-option">General summarization</option>
-            <option value="faithful_translation" id="faithful-translation-option">Faithful translation</option>
-            <option value="tech_article_translation" id="tech-article-translation-option">Tech article translation</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <div class="help" id="preset-hint">
-            说明：可选预设为英文描述；你也可以在下面输入自定义提示词。<br/>
-            无论选择哪种提示词，系统都会强制追加一句"请将结果输出为目标语言"（根据"输出语言"或自动识别）。
-          </div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="label" id="custom-prompt-label">自定义系统提示词（可留空）</label>
-        <textarea id="system_prompt_custom" class="ctrl mono" placeholder="例如：Be concise and faithful. Keep structure and factual accuracy."></textarea>
-      </div>
     </section>
 
     <!-- 快捷键设置（内容最后一栏） -->
