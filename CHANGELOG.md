@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.4
+
+### English
+- Adblock UI i18n: Localized the entire Ad Filtering card (title, labels, strength buttons, sync text, summaries) for 中文/English.
+- New category: Cookie Notice Hiding with EasyList Cookie General Hide; renders as a third list section with its own “Update All”.
+- Auto-sync on selection: When Ad Filtering is enabled, checking a list immediately triggers a one-time sync for that list.
+- Robust sync: Allow front-end to pass list URL/name to background for single-item sync, avoiding “Unknown list” before the service worker reloads.
+- UI polish: Center-aligned the first-row controls and adjusted spacing; moved the Ad Filtering card below System Prompt.
+
+### 中文
+- 广告过滤多语言化：卡片标题、标签、强度按钮、同步状态与汇总均支持中英双语。
+- 新增分类：Cookie 提示隐藏，内置 EasyList Cookie General Hide；独立显示并支持“一键全部更新”。
+- 勾选自动同步：启用广告过滤时，勾选任意规则会自动执行一次同步，无需手动再点“同步”。
+- 同步更稳健：支持前端在单项同步时传递 URL/名称，避免后台 Service Worker 未刷新时提示“Unknown list”。
+- 交互与排版：第一行控件居中对齐，微调间距；将“广告过滤”卡片移动到“系统提示词”下方。
+
 ## v2.0.3
 
 ### English
