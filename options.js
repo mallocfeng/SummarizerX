@@ -976,6 +976,22 @@ function initAdblockUI(){
       if (!id) return;
       await syncOneList(btn, id, name, url);
     });
+
+    // 勾选后自动同步（仅当开启了广告过滤时）
+    wrap.addEventListener('change', async (e) => {
+      const cb = e.target && e.target.matches ? (e.target.matches('input[type="checkbox"]') ? e.target : null) : null;
+      if (!cb || !cb.checked) return;
+      const enabled = !!document.getElementById('adblock_enabled')?.checked;
+      if (!enabled) return;
+      const row = cb.closest('label');
+      const btn = row?.querySelector('.sync-btn');
+      if (!btn || btn.disabled) return;
+      const id = cb.dataset.listId;
+      const name = btn.dataset.name || id;
+      const url = btn.dataset.url || '';
+      if (!id) return;
+      try { await syncOneList(btn, id, name, url); } catch {}
+    });
   });
 
   // 全部更新（全球/区域）
