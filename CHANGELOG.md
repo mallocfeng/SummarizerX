@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.9.2
+## v2.0.0
 
 ### English
 - Ad Filtering (ABP 2.0 cosmetic): New Settings section “广告过滤” with on/off switch.
