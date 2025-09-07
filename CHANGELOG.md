@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.2
+
+### English
+- Safety: Disabled cosmetic element hiding and generic DOM removal on YouTube domains to prevent UI breakage. Popup blocking remains active.
+- Note: A per-site allowlist UI will be considered; this is a safe default hotfix.
+
+### 中文
+- 安全：在 YouTube 域名上禁用元素隐藏与通用 DOM 清理，避免界面异常。保留弹窗拦截功能。
+- 说明：后续考虑加入站点白名单设置；当前为安全默认修复。
+
 ## v2.0.1
 
 ### English

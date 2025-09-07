@@ -63,6 +63,10 @@
     try {
       const { adblock_enabled = false, adblock_strength = 'medium', adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled:false, adblock_strength:'medium', adblock_selected: [] });
       const style = document.getElementById('sx-adblock-style');
+      // Safeguard: avoid cosmetic filtering on YouTube by default (prevents UI regressions)
+      const host = location.hostname || '';
+      const isYouTube = /(^|\.)youtube\.com$/i.test(host) || /^youtu\.be$/i.test(host);
+      if (isYouTube) { if (style) style.remove(); disconnectRemover(); return; }
       if (!adblock_enabled) { if (style) style.remove(); return; }
       const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
       const collected = [];
@@ -144,7 +148,16 @@ function isRemovalSafe(sel){
 let __adblPHTimeout = null;
 function schedulePlaceholderSweep(){
   if (__adblPHTimeout) cancelAnimationFrame(__adblPHTimeout);
-  __adblPHTimeout = requestAnimationFrame(() => { try { collapseAdPlaceholders(); collapseNYTPlaceholders(); collapseFloatingOverlays(); } finally { __adblPHTimeout = null; } });
+  __adblPHTimeout = requestAnimationFrame(() => {
+    try {
+      const host = location.hostname || '';
+      const isYouTube = /(^|\.)youtube\.com$/i.test(host) || /^youtu\.be$/i.test(host);
+      if (isYouTube) return; // do not run generic collapsers on YouTube
+      collapseAdPlaceholders();
+      collapseNYTPlaceholders();
+      collapseFloatingOverlays();
+    } finally { __adblPHTimeout = null; }
+  });
 }
 
 function collapseAdPlaceholders(){
