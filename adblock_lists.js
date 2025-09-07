@@ -21,7 +21,10 @@ export const FILTER_LISTS = [
   { id: 'es',                      group: 'regional', name: 'Spanish (EasyList Spanish)',                           url: 'https://easylist-downloads.adblockplus.org/easylistspanish.txt' },
   { id: 'it',                      group: 'regional', name: 'Italy (EasyList Italy)',                                url: 'https://easylist-downloads.adblockplus.org/easylistitaly.txt' },
   { id: 'cn',                      group: 'regional', name: 'China (EasyList China)',                                url: 'https://easylist-downloads.adblockplus.org/easylistchina.txt' },
-  { id: 'ru',                      group: 'regional', name: 'Russia (RU Counters / RU AdList)',                      url: 'https://easylist-downloads.adblockplus.org/cntblock.txt' }
+  { id: 'ru',                      group: 'regional', name: 'Russia (RU Counters / RU AdList)',                      url: 'https://easylist-downloads.adblockplus.org/cntblock.txt' },
+
+  // Cookie 提示隐藏
+  { id: 'easylist_cookie_general_hide', group: 'cookie', name: 'EasyList Cookie (General Hide)', url: 'https://raw.githubusercontent.com/easylist/easylist/refs/heads/master/easylist_cookie/easylist_cookie_general_hide.txt' }
 ];
 
 export const FILTER_DEFAULT_STRENGTH = 'medium'; // 'low' | 'medium' | 'high'
@@ -30,6 +33,7 @@ export function getListById(id){ return FILTER_LISTS.find(x => x.id === id); }
 export function splitLists(){
   return {
     global: FILTER_LISTS.filter(x => x.group === 'global'),
-    regional: FILTER_LISTS.filter(x => x.group === 'regional')
+    regional: FILTER_LISTS.filter(x => x.group === 'regional'),
+    cookie: FILTER_LISTS.filter(x => x.group === 'cookie')
   };
 }

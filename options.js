@@ -857,7 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * 广告过滤（UI 渲染与状态）
  * ========================= */
 function renderAdblockLists() {
-  const { global, regional } = splitLists();
+  const { global, regional, cookie } = splitLists();
   const mount = (wrapId, items) => {
     const wrap = document.getElementById(wrapId);
     if (!wrap) return;
@@ -893,18 +893,19 @@ function renderAdblockLists() {
   };
   mount('adblock_global_lists', global);
   mount('adblock_regional_lists', regional);
+  mount('adblock_cookie_lists', cookie);
 }
 
 function getAdblockSelectedSet() {
   const sel = new Set();
-  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
     if (cb.checked) sel.add(cb.dataset.listId);
   });
   return sel;
 }
 
 function applyAdblockSelections(set) {
-  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
     const id = cb.dataset.listId;
     cb.checked = set.has(id);
   });
@@ -935,10 +936,11 @@ function updateAdblockSectionEnabledState(){
     document.getElementById('adblock-strength-seg'),
     document.getElementById('adblock_global_lists'),
     document.getElementById('adblock_regional_lists'),
+    document.getElementById('adblock_cookie_lists'),
     document.getElementById('adblock_block_popups')
   ];
   controls.forEach(el => { if (el) el.closest('.field')?.classList.toggle('disabled', !enabled); });
-  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input, #adblock_cookie_lists input').forEach(el => { el.disabled = !enabled; });
   document.querySelectorAll('#adblock-strength-seg .seg-btn').forEach(el => { el.disabled = !enabled; });
   document.querySelectorAll('.sync-btn').forEach(el => { el.disabled = !enabled; });
   const popCb = document.getElementById('adblock_block_popups');
@@ -959,7 +961,7 @@ function initAdblockUI(){
     });
   }
   // 规则的“同步”点击（事件委托）
-  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists')];
+  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists'), document.getElementById('adblock_cookie_lists')];
   listWraps.forEach(wrap => {
     if (!wrap) return;
     wrap.addEventListener('click', async (e) => {
@@ -977,8 +979,10 @@ function initAdblockUI(){
   // 全部更新（全球/区域）
   const syncAllGlobal = document.getElementById('sync_all_global');
   const syncAllRegional = document.getElementById('sync_all_regional');
+  const syncAllCookie = document.getElementById('sync_all_cookie');
   if (syncAllGlobal) syncAllGlobal.addEventListener('click', () => syncAllInSection('global'));
   if (syncAllRegional) syncAllRegional.addEventListener('click', () => syncAllInSection('regional'));
+  if (syncAllCookie) syncAllCookie.addEventListener('click', () => syncAllInSection('cookie'));
 }
 
 async function syncOneList(btn, id, name){
@@ -1015,8 +1019,8 @@ async function syncOneList(btn, id, name){
 async function syncAllInSection(section){
   const enabled = !!document.getElementById('adblock_enabled')?.checked;
   if (!enabled) return;
-  const btnAll = document.getElementById(section === 'global' ? 'sync_all_global' : 'sync_all_regional');
-  const wrapId = section === 'global' ? 'adblock_global_lists' : 'adblock_regional_lists';
+  const btnAll = document.getElementById(section === 'global' ? 'sync_all_global' : section === 'regional' ? 'sync_all_regional' : 'sync_all_cookie');
+  const wrapId = section === 'global' ? 'adblock_global_lists' : section === 'regional' ? 'adblock_regional_lists' : 'adblock_cookie_lists';
   const wrap = document.getElementById(wrapId);
   if (!wrap || !btnAll) return;
   try {
@@ -1043,7 +1047,7 @@ async function syncAllInSection(section){
       await new Promise(r => setTimeout(r, 80));
     }
     // 总结提示
-    const summary = document.getElementById(section === 'global' ? 'adblock_global_summary_inline' : 'adblock_regional_summary_inline');
+    const summary = document.getElementById(section === 'global' ? 'adblock_global_summary_inline' : section === 'regional' ? 'adblock_regional_summary_inline' : 'adblock_cookie_summary_inline');
     if (summary) {
       if (tasks.length === 0) summary.textContent = '没有可更新的规则';
       else summary.textContent = `成功 ${ok} · 失败 ${fail}`;
