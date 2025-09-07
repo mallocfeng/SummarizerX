@@ -866,11 +866,6 @@ function renderAdblockLists() {
       const id = `adbl_${item.id}`;
       const row = document.createElement('label');
       row.className = 'adbl-row';
-      row.style.display = 'inline-flex';
-      row.style.alignItems = 'center';
-      row.style.gap = '8px';
-      row.style.marginRight = '14px';
-      row.style.marginBottom = '10px';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.id = id;

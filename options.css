@@ -735,10 +735,16 @@ html[data-theme="dark"] .adbl-status.ok{ color:#7dd3a7; }
 html[data-theme="dark"] .adbl-status.err{ color:#fb7185; }
 
 /* Keep per-row layout stable when status appears */
-.checklist label{ display:inline-flex; align-items:center; gap:8px; flex-wrap:nowrap; }
-.checklist .adbl-name{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.checklist .sync-btn{ flex:0 0 24px; }
-.checklist .adbl-status{ flex:0 0 84px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left; min-height:1.2em; }
+/* Adblock lists — aligned grid rows */
+.checklist{ display:block; }
+.checklist label.adbl-row{
+  display:grid; grid-template-columns: 20px 1fr 28px 120px; align-items:center; column-gap:10px;
+  margin: 6px 0; padding: 0;
+}
+.checklist label.adbl-row input[type="checkbox"]{ width:16px; height:16px; }
+.checklist .adbl-name{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.checklist .sync-btn{ width:24px; height:24px; justify-self:start; }
+.checklist .adbl-status{ width:120px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left; min-height:1.2em; }
 
 /* Batch summary below each section */
 .adbl-summary{ margin-top:6px; font-size:12px; color:#64748b; min-height:1.2em; }
