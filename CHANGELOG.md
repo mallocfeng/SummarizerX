@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.9.2
+
+### English
+- Ad Filtering (ABP 2.0 cosmetic): New Settings section “广告过滤” with on/off switch.
+- Lists: Choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s Annoyance/Social, Germany/Poland/Spain/Italy/China/Russia, etc.).
+- Per‑list Sync: Click the circular arrows to download the latest TXT; a preview dialog shows the first 10 lines to verify content.
+- Rule Storage: Rules are downloaded and stored locally; preferences sync across devices.
+- Engine: Applies Adblock Plus 2.0 element‑hiding rules (##, ###, #@#; domain and negated domains). Safe subset compiled per host.
+- Strength: Low/Medium/High selector to control aggressiveness and selector complexity.
+- Page Apply: Injects CSS at document_start and also removes simple matches from DOM to “directly” eliminate ad nodes.
+- Flash Reduction: Session cache of compiled CSS to minimize first‑paint flashing on reload.
+- UI/Theme: Improved toggle visibility in light mode; segmented strength control with clear active/hover states; full dark‑mode support.
+
+### 中文
+- 广告过滤（ABP 2.0 元素隐藏）：设置新增“广告过滤”开关。
+- 规则列表：支持选择全球/区域列表（EasyList、EasyPrivacy、Fanboy’s 烦扰/社交、德国/波兰/西班牙/意大利/中国/俄罗斯等）。
+- 单条同步：点击每条规则后的循环箭头即可下载最新 TXT；弹窗预览前 10 行以核对内容。
+- 存储：规则内容保存在本地（storage.local），勾选与强度等偏好同步（storage.sync）。
+- 引擎：按站点编译并应用 Adblock Plus 2.0 的元素隐藏规则（##、###、#@#，支持域名与否定域名）；采用安全子集。
+- 强度：提供低/中/高三档，控制选择器复杂度与拦截激进程度。
+- 页面应用：在 document_start 注入 CSS，同时对简单匹配进行 DOM 删除，实现“直接去除”。
+- 闪烁优化：会话级 CSS 预缓存，减少页面刷新时广告短暂露出的闪现。
+- 界面/主题：亮色模式下开关更显眼；强度分段按钮高亮/悬停更清晰；完整适配暗色主题。
+
 ## v1.9.1
 
 ### English

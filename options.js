@@ -1,6 +1,7 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
 import { DEFAULTS, PROVIDER_PRESETS, getSettings } from "./settings.js";
 import { getCurrentLanguage, t, tSync, updatePageLanguage } from "./i18n.js";
+import { FILTER_LISTS, splitLists, FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -211,6 +212,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初始化国际化
   await initI18n();
+
+  // 初始化广告过滤 UI（渲染列表并回填状态）
+  try { initAdblockUI(); } catch (e) { console.warn('initAdblockUI failed:', e); }
+
+  // 渲染完列表与控件后再加载设置回填勾选状态，避免顺序问题
+  try { await loadSettings(); } catch (e) { console.warn('loadSettings after UI init failed:', e); }
 });
 
 function reflectGuideLink(){
@@ -260,6 +267,7 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
   const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
+  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [] });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -307,6 +315,15 @@ async function loadSettings() {
   reflectGuideLink();
   updateBuyHelp(aiProvider);
   toggleBuyHelpInline(aiProvider);
+
+  // —— 广告过滤 回填 ——
+  try {
+    const enabledEl = $("adblock_enabled");
+    if (enabledEl) enabledEl.checked = !!adblock_enabled;
+    setSelectedStrength(String(adblock_strength || FILTER_DEFAULT_STRENGTH));
+    applyAdblockSelections(new Set((adblock_selected || []).filter(Boolean)));
+    updateAdblockSectionEnabledState();
+  } catch {}
 }
 
 async function saveSettings() {
@@ -336,7 +353,13 @@ async function saveSettings() {
     extract_mode: $("extract_mode").value,
     system_prompt_preset: $("system_prompt_preset").value,
     system_prompt_custom: $("system_prompt_custom").value.trim(),
-    trial_consent: !!($("trial_consent")?.checked)
+    trial_consent: !!($("trial_consent")?.checked),
+    // 广告过滤设置（存 sync 里用于跨设备同步；规则内容会存 local）
+    adblock_enabled: !!($("adblock_enabled")?.checked),
+    adblock_strength: getSelectedStrength(),
+    adblock_selected: (function(){
+      return Array.from(getAdblockSelectedSet());
+    })()
   };
 
   // 同步保存平台专用 key（便于切换回填）
@@ -828,6 +851,196 @@ document.addEventListener('DOMContentLoaded', () => {
 // })();
 
 /* =========================
+ * 广告过滤（UI 渲染与状态）
+ * ========================= */
+function renderAdblockLists() {
+  const { global, regional } = splitLists();
+  const mount = (wrapId, items) => {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    items.forEach(item => {
+      const id = `adbl_${item.id}`;
+      const row = document.createElement('label');
+      row.style.display = 'inline-flex';
+      row.style.alignItems = 'center';
+      row.style.gap = '8px';
+      row.style.marginRight = '14px';
+      row.style.marginBottom = '10px';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.dataset.listId = item.id;
+      const span = document.createElement('span');
+      span.textContent = item.name;
+      // sync button (two arrows)
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sync-btn';
+      btn.setAttribute('aria-label', '同步此规则');
+      btn.dataset.listId = item.id;
+      btn.dataset.name = item.name;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/></svg>';
+      const status = document.createElement('span');
+      status.className = 'adbl-status';
+      status.id = `adbl_status_${item.id}`;
+      row.appendChild(cb);
+      row.appendChild(span);
+      row.appendChild(btn);
+      row.appendChild(status);
+      wrap.appendChild(row);
+    });
+  };
+  mount('adblock_global_lists', global);
+  mount('adblock_regional_lists', regional);
+}
+
+function getAdblockSelectedSet() {
+  const sel = new Set();
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"]').forEach(cb => {
+    if (cb.checked) sel.add(cb.dataset.listId);
+  });
+  return sel;
+}
+
+function applyAdblockSelections(set) {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"]').forEach(cb => {
+    const id = cb.dataset.listId;
+    cb.checked = set.has(id);
+  });
+}
+
+function getSelectedStrength(){
+  const wrap = document.getElementById('adblock-strength-seg');
+  if (!wrap) return 'medium';
+  const cur = wrap.querySelector('.seg-btn[aria-selected="true"]');
+  const v = cur?.dataset?.strength || 'medium';
+  return ['low','medium','high'].includes(v) ? v : 'medium';
+}
+function setSelectedStrength(v){
+  const wrap = document.getElementById('adblock-strength-seg');
+  if (!wrap) return;
+  const vs = ['low','medium','high'];
+  const target = vs.includes(v) ? v : 'medium';
+  wrap.querySelectorAll('.seg-btn').forEach(btn => {
+    const on = btn.dataset.strength === target;
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    btn.classList.toggle('active', on);
+  });
+}
+
+function updateAdblockSectionEnabledState(){
+  const enabled = !!document.getElementById('adblock_enabled')?.checked;
+  const controls = [
+    document.getElementById('adblock-strength-seg'),
+    document.getElementById('adblock_global_lists'),
+    document.getElementById('adblock_regional_lists')
+  ];
+  controls.forEach(el => { if (el) el.closest('.field')?.classList.toggle('disabled', !enabled); });
+  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('#adblock-strength-seg .seg-btn').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('.sync-btn').forEach(el => { el.disabled = !enabled; });
+}
+
+function initAdblockUI(){
+  renderAdblockLists();
+  // 回填由 loadSettings() 完成，这里只绑定事件
+  const enabledEl = document.getElementById('adblock_enabled');
+  if (enabledEl) enabledEl.addEventListener('change', updateAdblockSectionEnabledState);
+  const seg = document.getElementById('adblock-strength-seg');
+  if (seg) {
+    seg.addEventListener('click', (e) => {
+      const btn = e.target.closest('#adblock-strength-seg .seg-btn');
+      if (!btn || btn.disabled) return;
+      setSelectedStrength(btn.dataset.strength);
+    });
+  }
+  // 规则的“同步”点击（事件委托）
+  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists')];
+  listWraps.forEach(wrap => {
+    if (!wrap) return;
+    wrap.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.sync-btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.listId;
+      const name = btn.dataset.name || id;
+      if (!id) return;
+      await syncOneList(btn, id, name);
+    });
+  });
+}
+
+async function syncOneList(btn, id, name){
+  try {
+    // show loading
+    btn.dataset.loading = '1';
+    btn.disabled = true;
+    const st = document.getElementById(`adbl_status_${id}`);
+    if (st) { st.textContent = '同步中…'; st.classList.remove('ok','err'); }
+    const resp = await chrome.runtime.sendMessage({ type: 'ADBLOCK_DOWNLOAD_ONE', id });
+    if (resp?.ok) {
+      if (st) { st.textContent = '同步成功'; st.classList.add('ok'); st.classList.remove('err'); }
+      // 读取本地内容并弹出前十行预览
+      try {
+        const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
+        const rec = adblock_rules[id];
+        const content = rec?.content || '';
+        if (content && content.length) {
+          const lines = content.split(/\r?\n/).slice(0, 10).join('\n');
+          showAdblockPreviewModal(`${name} · 前十行`, lines);
+        } else {
+          showAdblockPreviewModal(`${name} · 预览`, '未找到已下载内容。');
+        }
+      } catch (e) {
+        showAdblockPreviewModal(`${name} · 预览`, '读取本地内容失败。');
+      }
+    } else {
+      if (st) { st.textContent = '同步失败'; st.classList.add('err'); st.classList.remove('ok'); }
+    }
+  } catch (e) {
+    const st = document.getElementById(`adbl_status_${id}`);
+    if (st) { st.textContent = '同步失败'; st.classList.add('err'); st.classList.remove('ok'); }
+  } finally {
+    // small delay to let user see result
+    setTimeout(() => {
+      try { btn.dataset.loading = '0'; btn.disabled = false; } catch {}
+    }, 200);
+  }
+}
+
+function showAdblockPreviewModal(title, text){
+  // Backdrop
+  const old = document.getElementById('adbl-preview-backdrop');
+  if (old) try { old.remove(); } catch {}
+  const bd = document.createElement('div');
+  bd.id = 'adbl-preview-backdrop';
+  bd.className = 'adbl-preview-backdrop';
+  bd.addEventListener('click', (e)=>{ if (e.target === bd) try{ bd.remove(); }catch{} });
+
+  const panel = document.createElement('div');
+  panel.className = 'adbl-preview-panel';
+  const h = document.createElement('div');
+  h.className = 'adbl-preview-head';
+  h.textContent = title || '预览';
+  const close = document.createElement('button');
+  close.className = 'adbl-preview-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', '关闭');
+  close.innerHTML = '&times;';
+  close.addEventListener('click', ()=>{ try{ bd.remove(); }catch{} });
+  h.appendChild(close);
+  const pre = document.createElement('pre');
+  pre.className = 'adbl-preview-pre';
+  pre.textContent = String(text || '');
+  panel.appendChild(h);
+  panel.appendChild(pre);
+  bd.appendChild(panel);
+  document.body.appendChild(bd);
+}
+
+/* =========================
  * 事件绑定
  * ========================= */
 const $openShortcut = document.getElementById("open-shortcut");
@@ -847,5 +1060,4 @@ $("baseURL").addEventListener("input", markCustomIfManualChange);
 $("model_extract").addEventListener("input", markCustomIfManualChange);
 $("model_summarize").addEventListener("input", markCustomIfManualChange);
 
-// 初始加载
-loadSettings();
+// 初始加载移至 DOMContentLoaded 里，确保先渲染广告列表再回填

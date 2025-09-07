@@ -4,10 +4,18 @@
   "version": "1.9.2",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
+  "host_permissions": [
+    "https://easylist.to/*",
+    "https://easylist-downloads.adblockplus.org/*"
+  ],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
     {
-      "resources": ["i18n.js", "vendor/petite-vue.iife.js"],
+      "resources": [
+        "i18n.js",
+        "vendor/petite-vue.iife.js",
+        "adblock_engine.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
@@ -31,6 +39,12 @@
       "matches": ["<all_urls>"],
       "js": ["selection_translate.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["adblock_content.js"],
+      "run_at": "document_start",
+      "all_frames": true
     }
   ]
 }

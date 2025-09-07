@@ -129,6 +129,43 @@
       </div>
     </section>
 
+    <!-- 广告过滤 -->
+    <section class="section card">
+      <h2 class="section-title"><span class="dot"></span> 广告过滤</h2>
+      <div class="grid">
+        <div class="field">
+          <label class="label">启用广告过滤</label>
+          <div class="row" style="display:flex; align-items:center; gap:12px;">
+            <label class="switch">
+              <input id="adblock_enabled" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="hint">打开后自动下载所选规则</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">过滤强度</label>
+          <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
+            <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
+            <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
+            <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">全球性广告过滤列表</label>
+        <div id="adblock_global_lists" class="checklist"></div>
+      </div>
+
+      <div class="field">
+        <label class="label">区域性广告过滤列表</label>
+        <div id="adblock_regional_lists" class="checklist"></div>
+      </div>
+
+      <p class="hint">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>
+    </section>
+
     <!-- System Prompt -->
     <section class="section card note">
       <h2 class="section-title"><span class="dot"></span> <span id="system-prompt-title">System Prompt（系统提示词）</span></h2>

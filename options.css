@@ -670,3 +670,71 @@ html[data-theme="light"] #trial-consent-wrap.consent-ok .help:focus-within{
   outline-offset: 2px;
 }
 html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }
+/* ---- Toggle Switch (拨码开关) ---- */
+.switch{ position:relative; display:inline-block; width:46px; height:26px; }
+.switch input{ opacity:0; width:0; height:0; }
+.switch-slider{ position:absolute; cursor:pointer; inset:0; background:var(--surface-2); border-radius:999px; transition:.2s ease; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.switch-slider::before{ content:""; position:absolute; width:22px; height:22px; left:2px; top:2px; background:#fff; border-radius:50%; transition:.2s ease; box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.switch input:checked + .switch-slider{ background: var(--primary); }
+.switch input:checked + .switch-slider::before{ transform:translateX(20px); }
+.switch input:disabled + .switch-slider{ opacity:.5; cursor:not-allowed; }
+.switch input:focus-visible + .switch-slider{ box-shadow: var(--ring); }
+
+/* Improve OFF contrast in light theme */
+html[data-theme="light"] .switch .switch-slider{ background:#e5e7eb; box-shadow: inset 0 0 0 1px #cbd5e1; }
+html[data-theme="light"] .switch:hover .switch-slider{ background:#e2e8f0; box-shadow: inset 0 0 0 1px #cbd5e1; }
+html[data-theme="light"] .switch input:checked + .switch-slider{
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-600) 100%);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.24), 0 0 0 1px rgba(37,99,235,.35);
+}
+html[data-theme="light"] .switch input:checked + .switch-slider::before{
+  background:#fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+
+/* ---- Disabled field visual ---- */
+.field.disabled{ opacity:.6; pointer-events:none; }
+
+/* ---- Segmented buttons reuse (for 强度) ---- */
+#adblock-strength-seg{ display:inline-flex; gap:4px; border-radius:10px; padding:4px; background: var(--surface-2); border:1px solid var(--border); }
+#adblock-strength-seg .seg-btn{ appearance:none; border:0; background:transparent; padding:6px 12px; font:inherit; color: var(--muted); cursor:pointer; border-radius:8px; transition: background .15s, color .15s, box-shadow .15s; }
+#adblock-strength-seg .seg-btn:hover{ background: rgba(0,0,0,.04); color:#0f172a; }
+#adblock-strength-seg .seg-btn[aria-selected="true"],
+#adblock-strength-seg .seg-btn.active{ background: var(--primary); color:#fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+#adblock-strength-seg .seg-btn:focus-visible{ outline: none; box-shadow: var(--ring); }
+#adblock-strength-seg .seg-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+/* Dark theme adaptations for adblock strength */
+html[data-theme="dark"] #adblock-strength-seg{ background:#1a2333; border-color: var(--border); }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn{ color:#d7dde7; }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn:hover{ background: rgba(255,255,255,.06); color:#fff; }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
+html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
+
+/* Per-rule sync button */
+.sync-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:6px; }
+.sync-btn:hover{ background: rgba(0,0,0,.05); color:#1f2937; }
+.sync-btn:focus-visible{ outline:none; box-shadow: var(--ring); }
+.sync-btn[disabled]{ opacity:.45; cursor:not-allowed; }
+.sync-btn svg{ width:16px; height:16px; stroke: currentColor; fill:none; }
+.sync-btn[data-loading="1"] svg{ animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.adbl-status{ font-size:12px; color:#64748b; margin-left:6px; }
+.adbl-status.ok{ color:#059669; }
+.adbl-status.err{ color:#b91c1c; }
+html[data-theme="dark"] .sync-btn:hover{ background: rgba(255,255,255,.06); color:#e6ebf5; }
+html[data-theme="dark"] .adbl-status{ color:#9fb0c6; }
+html[data-theme="dark"] .adbl-status.ok{ color:#7dd3a7; }
+html[data-theme="dark"] .adbl-status.err{ color:#fb7185; }
+
+/* Preview modal for rule first-10-lines */
+.adbl-preview-backdrop{ position: fixed; inset:0; background: rgba(0,0,0,.45); z-index: 100000; display:flex; align-items:center; justify-content:center; padding: 20px; }
+.adbl-preview-panel{ width:min(920px, 92vw); max-height: 80vh; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 48px rgba(0,0,0,.25); display:flex; flex-direction: column; overflow:hidden; }
+.adbl-preview-head{ font-weight:700; padding: 10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.adbl-preview-close{ appearance:none; border:0; background:transparent; font-size:20px; line-height:1; width:28px; height:28px; border-radius:6px; cursor:pointer; color: inherit; }
+.adbl-preview-close:hover{ background: rgba(0,0,0,.06); }
+.adbl-preview-pre{ margin:0; padding: 12px 14px; white-space: pre-wrap; overflow:auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+html[data-theme="dark"] .adbl-preview-panel{ background: #0f172a; color:#e7ebf3; border-color:#253554; }
+html[data-theme="dark"] .adbl-preview-head{ border-color:#253554; }
+html[data-theme="dark"] .adbl-preview-close:hover{ background: rgba(255,255,255,.06); }

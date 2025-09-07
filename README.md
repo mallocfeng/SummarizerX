@@ -32,6 +32,7 @@ Current beta: v1.9.1 (dev/next branch)
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
  - ✅ Consistent Consent Pulse: Trial consent attention “breathing” animation now behaves the same in light and dark themes
+ - 🛡️ Ad Filtering (ABP 2.0 cosmetic): Enable in Settings → 广告过滤; choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s, etc.), per‑list sync, and Low/Medium/High strength. Rules are downloaded locally and applied per‑host to hide/remove ad elements.
 
 ### 🖼 Screenshots
 
@@ -125,6 +126,7 @@ All processing happens locally or via your configured AI API key. No data is sen
  - 🎯 智能布局对齐：全文翻译智能定位，适配复杂网站布局（CSS Grid、响应式设计）
 - 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性
  - ✅ 试用同意提示一致：需要同意时的“呼吸”动画在明亮/暗黑主题下表现一致
+ - 🛡️ 广告过滤（ABP 2.0 元素隐藏）：在设置 → 广告过滤 开启；可选全球/区域列表（EasyList、EasyPrivacy、Fanboy’s等），支持单条规则“同步更新”与高/中/低强度；规则本地保存，并按站点应用以隐藏/去除广告元素。
 
 ### 🖼 软件截图
 

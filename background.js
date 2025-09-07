@@ -3,6 +3,7 @@
 
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
 import { getSettings } from "./settings.js";
+import { FILTER_LISTS } from "./adblock_lists.js";
 
 
 // ⬇️ 保留系统预设（可继续由本文件维护；若你也想统一到 settings.js，也可一起挪过去）
@@ -234,47 +235,144 @@ async function runForTab(tabId) {
 
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // 告诉 Chrome：这是异步响应
+  // 仅对本监听器支持的消息返回 true（异步），避免阻塞其他监听器的响应
   let responded = false;
   const safeReply = (payload) => { if (!responded) { sendResponse(payload); responded = true; } };
 
-  (async () => {
-    if (msg?.type === "PANEL_GET_STATE" && typeof msg.tabId === "number") {
+  if (msg?.type === "PANEL_GET_STATE" && typeof msg.tabId === "number") {
+    (async () => {
       const st = await getState(msg.tabId);
       safeReply({ ok: true, data: st });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
-      // 🚀 关键：立刻回复 ok，然后“后台异步”跑两阶段任务
-      await setState(msg.tabId, { status: "running" }); // 抢先置 running
+  if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
+    (async () => {
+      await setState(msg.tabId, { status: "running" });
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
       });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "GET_ACTIVE_TAB_ID") {
+  if (msg?.type === "GET_ACTIVE_TAB_ID") {
+    (async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         safeReply({ ok: true, tabId: tab?.id ?? null });
       } catch (e) {
         safeReply({ ok: false, error: String(e) });
       }
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "OPEN_OPTIONS") {
+  if (msg?.type === "OPEN_OPTIONS") {
+    (async () => {
       try { await chrome.runtime.openOptionsPage(); } catch {}
       safeReply({ ok: true });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    // 移除空分支：GET_MODEL_INFO 未使用
+  // 未处理的消息：让其它监听器接管（返回 false）
+  return false;
+});
+
+/* ====================== 广告过滤：规则下载与缓存 ====================== */
+let adblockUpdateTimer = null;
+
+function listMap() {
+  const m = new Map();
+  FILTER_LISTS.forEach(x => m.set(x.id, x));
+  return m;
+}
+
+async function downloadText(url) {
+  const res = await fetch(url, { method: 'GET' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.text();
+}
+
+async function downloadAdblockRules(selectedIds = []) {
+  const idSet = new Set((selectedIds || []).filter(Boolean));
+  if (idSet.size === 0) {
+    await chrome.storage.local.set({ adblock_rules: {}, adblock_last_update: Date.now(), adblock_error: null });
+    return;
+  }
+  const map = listMap();
+  const results = {};
+  const errors = [];
+  for (const id of idSet) {
+    const item = map.get(id);
+    if (!item) continue;
+    try {
+      const txt = await downloadText(item.url);
+      results[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: Date.now(), content: txt };
+    } catch (e) {
+      errors.push(`${id}: ${e?.message || e}`);
+    }
+  }
+  await chrome.storage.local.set({ adblock_rules: results, adblock_last_update: Date.now(), adblock_error: errors.length ? errors.join('\n') : null });
+}
+
+function scheduleAdblockUpdate(reason) {
+  if (adblockUpdateTimer) { clearTimeout(adblockUpdateTimer); }
+  adblockUpdateTimer = setTimeout(async () => {
+    try {
+      const { adblock_enabled = false, adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_selected: [] });
+      if (!adblock_enabled) return;
+      await downloadAdblockRules(adblock_selected);
+    } catch (e) {
+      try { await chrome.storage.local.set({ adblock_error: e?.message || String(e) }); } catch {}
+    }
+  }, 500); // 简单防抖
+}
+
+// 存储变化时触发下载
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'sync') return;
+    if (changes.adblock_enabled || changes.adblock_selected) {
+      scheduleAdblockUpdate('storage_changed');
+    }
+  });
+} catch {}
+
+// 启动时若启用则刷新一次
+(async () => {
+  try {
+    const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+    if (adblock_enabled) scheduleAdblockUpdate('startup');
+  } catch {}
+})();
+
+// 单条规则下载（供设置页点击“同步”）
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type !== 'ADBLOCK_DOWNLOAD_ONE') return; // 其他消息不处理
+
+  (async () => {
+    try {
+      const id = String(msg.id || '');
+      const m = listMap();
+      if (!m.has(id)) throw new Error('Unknown list');
+      const item = m.get(id);
+      const txt = await downloadText(item.url);
+      const now = Date.now();
+      // 合并更新 storage.local
+      const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
+      adblock_rules[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: now, content: txt };
+      await chrome.storage.local.set({ adblock_rules, adblock_last_update: now });
+      sendResponse?.({ ok: true, id, size: txt.length, updatedAt: now });
+    } catch (e) {
+      sendResponse?.({ ok: false, error: e?.message || String(e) });
+    }
   })();
 
-  return true; // 保持消息通道
+  return true; // 异步
 });
 
 /* ====================== 浮动面板注入与关闭 ====================== */
@@ -554,9 +652,9 @@ async function safeReadText(res){ try { return await res.text(); } catch { retur
 // 1) 尝试关闭该 tab 的 Side Panel（如果有）
 // 2) 通知该 tab 的内容脚本移除“浮动面板”DOM（不动翻译气泡）
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  (async () => {
-    if (msg?.type !== 'SX_FLOATPANEL_CLOSE') return;
+  if (msg?.type !== 'SX_FLOATPANEL_CLOSE') return false; // 非本消息交给其他监听器
 
+  (async () => {
     try {
       // 优先用消息来源 tabId；否则取当前活动 tab
       let tabId = sender?.tab?.id;
@@ -581,5 +679,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   })();
 
-  return true; // 异步
+  return true; // 异步，仅处理本类型
 });
