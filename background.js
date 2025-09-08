@@ -254,6 +254,19 @@ async function setupVideoAdDNRRules() {
         initiatorDomains: ["www.nytimes.com","nytimes.com"]
       }
     },
+    // ---- Pornhub: block primary ad network (TrafficJunky) ----
+    {
+      id: 2201,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?trafficjunky\\.net/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: [
+          'www.pornhub.com','cn.pornhub.com','m.pornhub.com','www.pornhubpremium.com','pornhub.com'
+        ]
+      }
+    },
     // Block GPT library when loaded from nytimes pages
     {
       id: 2002,
@@ -389,7 +402,115 @@ async function setupVideoAdDNRRules() {
   } catch (e) {
     console.warn('DNR setup failed:', e);
   }
+
+  // Optional: enable IMA3 redirect on Pornhub if user toggles it in storage
+  try {
+    const { adblock_ima_stub_pornhub = false } = await chrome.storage.sync.get({ adblock_ima_stub_pornhub: false });
+    const imaRule = {
+      id: 2202,
+      priority: 1,
+      action: { type: 'redirect', redirect: { extensionPath: '/stubs/ima3-empty.js' } },
+      condition: {
+        regexFilter: '^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js',
+        resourceTypes: ['script'],
+        initiatorDomains: ['www.pornhub.com','cn.pornhub.com','m.pornhub.com','www.pornhubpremium.com','pornhub.com']
+      }
+    };
+    const existing2 = await chrome.declarativeNetRequest.getDynamicRules();
+    const has = existing2.some(r => r.id === 2202);
+    if (adblock_ima_stub_pornhub && !has) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ addRules: [imaRule], removeRuleIds: [] });
+    } else if (!adblock_ima_stub_pornhub && has) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ addRules: [], removeRuleIds: [2202] });
+    }
+  } catch (e) { console.warn('DNR optional IMA rule update failed:', e); }
 }
+
+/* ====================== SpankBang session rules (site pack) ====================== */
+const SPANKBANG_DOMAINS = ['spankbang.com','www.spankbang.com'];
+
+function isSpankbangHost(h){
+  if (!h) return false;
+  return h === 'spankbang.com' || h === 'www.spankbang.com' || h.endsWith('.spankbang.com');
+}
+
+function spankbangInitiators(){ return SPANKBANG_DOMAINS; }
+
+async function buildSpankbangRules() {
+  const initiators = spankbangInitiators();
+  const { adblock_ima_stub_spankbang = false } = await chrome.storage.sync.get({ adblock_ima_stub_spankbang: false });
+  const out = [
+    // Block ExoClick / ExoSrv (common ad network on spankbang)
+    {
+      id: 2301,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?exoclick\\.com/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    },
+    {
+      id: 2302,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?exosrv\\.com/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    }
+  ];
+  if (adblock_ima_stub_spankbang) {
+    out.push({
+      id: 2303,
+      priority: 1,
+      action: { type: 'redirect', redirect: { extensionPath: '/stubs/ima3-empty.js' } },
+      condition: {
+        regexFilter: '^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js',
+        resourceTypes: ['script'],
+        initiatorDomains: initiators
+      }
+    });
+  }
+  return out;
+}
+
+async function refreshSpankbangSessionRules(){
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch {}
+  let hasSB = false;
+  for (const t of tabs) {
+    try {
+      const h = new URL(t.url || '').hostname;
+      if (isSpankbangHost(h)) { hasSB = true; break; }
+    } catch {}
+  }
+  try {
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managedIds = existing.filter(r => r.id === 2301 || r.id === 2302 || r.id === 2303).map(r => r.id);
+    if (!hasSB) {
+      if (managedIds.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managedIds, addRules: [] });
+      return;
+    }
+    const desired = await buildSpankbangRules();
+    const desiredIds = desired.map(r => r.id);
+    const toRemove = managedIds.filter(id => !desiredIds.includes(id));
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: toRemove, addRules: desired });
+  } catch (e) { console.warn('refreshSpankbangSessionRules failed:', e); }
+}
+
+// Hook session rules refresh on lifecycle and tab events
+try {
+  chrome.runtime.onInstalled.addListener(() => { refreshSpankbangSessionRules(); });
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { refreshSpankbangSessionRules(); });
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) refreshSpankbangSessionRules();
+  });
+  chrome.tabs.onRemoved.addListener(() => { refreshSpankbangSessionRules(); });
+  chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); });
+} catch {}
 
 chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
