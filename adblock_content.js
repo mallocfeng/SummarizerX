@@ -156,7 +156,7 @@ let __adblPHTimeout = null;
 function schedulePlaceholderSweep(){
   if (__adblPHTimeout) cancelAnimationFrame(__adblPHTimeout);
   __adblPHTimeout = requestAnimationFrame(() => {
-    try {
+  try {
       const host = location.hostname || '';
       const isYouTube = /(^|\.)youtube\.com$/i.test(host) || /^youtu\.be$/i.test(host);
       if (isYouTube) return; // do not run generic collapsers on YouTube
@@ -164,6 +164,10 @@ function schedulePlaceholderSweep(){
       if (__adblStrength !== 'low') collapseAdPlaceholders();
       collapseNYTPlaceholders();
       collapseFloatingOverlays();
+      // Site specific inline ad containers
+      try { if (/\bmissav\./i.test(host)) collapseMissavInlineAds(); } catch {}
+      // Site-specific tweaks
+      try { collapseSpankbangAds(); } catch {}
     } finally { __adblPHTimeout = null; }
   });
 }
@@ -429,6 +433,107 @@ function collapseMissavCornerAds(){
     }
   };
   try { iter(document.body || document.documentElement); } catch {}
+}
+
+// Site-specific: remove known inline ad containers on missav.* pages
+function collapseMissavInlineAds(){
+  try {
+    const targets = [
+      'div[id^="ts_ad_video_"]', // TSOutstreamVideo placeholder
+      '#ts_ad_video_aes67',
+      '#html-ads',
+      '#inpage',
+      // Common third-party injected iframes/scripts
+      'iframe[src*="myavlive.com"]',
+      'iframe[src*="stripchat" i]',
+      'iframe[src*="tsyndicate" i]',
+      'script#SCSpotScript',
+      'script[src*="cdn.tsyndicate.com"]',
+      'script[src*="sunnycloudstone.com"]'
+    ];
+    const hardRemove = (n) => { try { hardHide(n); if (n.parentNode) n.parentNode.removeChild(n); } catch {} };
+    document.querySelectorAll(targets.join(',')).forEach(el => {
+      try {
+        // remove the node
+        hardRemove(el);
+        // also collapse trivial parents to avoid leftover gaps
+        let p = el.parentElement;
+        for (let i = 0; i < 3 && p; i++) {
+          if (!hasMedia(p) && isTriviallyEmpty(p)) { hardHide(p); }
+          p = p.parentElement;
+        }
+      } catch {}
+    });
+  } catch {}
+}
+
+// ----- Site-specific: spankbang.com top banner/affiliate removal -----
+let __sbObs = null;
+function collapseSpankbangAds(){
+  const host = (location.hostname || '').toLowerCase();
+  if (!/(^|\.)spankbang\.(com|party)$/.test(host)) return;
+
+  // Direct removals for known ad containers
+  const selectors = [
+    // Top/inline banners injected as <ins class="18ad69c2"> ...
+    'ins[class="18ad69c2"]',
+    // ptgncdn static holders
+    'ins.ptgncdn_holder', 'ins.ptgncdn_holder_footer',
+    // Header affiliate button (e.g., 🔥 AI JERK OFF)
+    'header.main-header a[href*="deliver.ptgncdn.com"]',
+    // Any other ptgncdn clickouts in header/nav
+    'header a[href*="deliver.ptgncdn.com"], nav a[href*="deliver.ptgncdn.com"]',
+    // Some buttons use onclick window.open to ptgncdn
+    'a[onclick*="deliver.ptgncdn.com"], a[onclick*="ptgncdn.com"]',
+    // Fallback: any script nodes from the ad CDN
+    'script[src*="deliver.ptgncdn.com"]'
+  ];
+
+  const hardRemove = (n) => { try { hardHide(n); if (n.parentNode) n.parentNode.removeChild(n); } catch {} };
+
+  try {
+    document.querySelectorAll(selectors.join(',')).forEach(hardRemove);
+  } catch {}
+
+  // Also collapse trivial wrappers around the removed <ins>
+  try {
+    document.querySelectorAll('ins[class="18ad69c2"]').forEach(ins => {
+      try {
+        const p = ins.parentElement;
+        if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+        const gp = p?.parentElement;
+        if (gp && !hasMedia(gp) && isTriviallyEmpty(gp)) hardHide(gp);
+      } catch {}
+    });
+  } catch {}
+
+  // Mutation observer to catch dynamically injected banners
+  if (!__sbObs) {
+    try {
+      __sbObs = new MutationObserver((muts) => {
+        let needsSweep = false;
+        for (const m of muts) {
+          if (!m.addedNodes || m.addedNodes.length === 0) continue;
+          for (const node of m.addedNodes) {
+            try {
+              if (!(node instanceof Element)) continue;
+              // Fast-path checks
+              if (node.matches && selectors.some(sel => { try { return node.matches(sel); } catch { return false; } })) {
+                hardRemove(node);
+                needsSweep = true;
+                continue;
+              }
+              // Scan a small subtree for known nodes
+              const found = node.querySelectorAll ? node.querySelectorAll(selectors.join(',')) : [];
+              if (found && found.length) { found.forEach(hardRemove); needsSweep = true; }
+            } catch {}
+          }
+        }
+        if (needsSweep) schedulePlaceholderSweep();
+      });
+      __sbObs.observe(document.documentElement || document.body, { childList: true, subtree: true });
+    } catch {}
+  }
 }
 
 function mergeStructs(arr){
