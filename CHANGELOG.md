@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.0.6
+
+### English
+- Settings UI: Added top tabs (AI Summary / Ad Filtering) with i18n text; the page now separates AI configuration (Basic, System Prompt, Shortcuts) from Ad Filtering for clearer navigation.
+- Tab polish: Converted to three‑sided rounded boxes (top/left/right), subtle tint, low‑contrast border, and a gentle glow for the active tab.
+- Active underline: Kept a center‑strong gradient line that fades to the edges; it now moves in sync with the first card’s hover lift for a more natural connection.
+- Visual alignment: Eliminated the gap between header and first card; unified header/card background to remove color shift; softened top‑left highlight.
+- Accessibility: Increased tab label size/weight; i18n for tab titles (English/中文); maintained focus and reduced motion compatibility.
+
+### 中文
+- 设置页：新增顶部标签（AI 摘要 / 广告过滤），并支持中英双语；将“基础配置 + 系统提示词 + 快捷键”与“广告过滤”分栏展示，结构更清晰。
+- 标签样式：三面边框（上/左/右）圆角小方框；激活态为浅色微底纹、低对比度描边和轻微发光，低调不刺眼。
+- 渐变下划线：保留“中间最亮，两侧渐隐”的蓝色横线，并与第一张卡片上浮联动，上下同步更自然。
+- 视觉统一：去除标题栏与首卡片的缝隙；统一标题栏/卡片背景，减轻色差；左上高光过渡更柔和。
+- 可读性：提升标签字号与字重；标签标题支持 i18n；保留键盘焦点样式与“减少动态效果”兼容。
+
+## v2.0.5
+
+### English
+- Video ads filtering (site packs, session rules):
+  - Added NYTimes Betamax ads module redirection to a safe stub; keep player intact.
+  - Added first batch of news/portal site packs (CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET):
+    - Redirect Google IMA3 loader to a minimal no‑op module to avoid player breakage.
+    - Block FreeWheel (fwmrm.net), GPT, Amazon A9, and Media.net per site, with initiator scoping.
+  - Session rules: rules are installed only when a tab of the target site is open, and removed automatically when leaving, minimizing side effects.
+  - Prepared no‑op stubs for common ad plugins: IMA3, videojs-contrib-ads, videojs-ima (not used by default unless needed for a specific site).
+
+### 中文
+- 视频广告过滤（站点包 + 会话规则）：
+  - NYTimes：将 Betamax 广告模块重定向到安全空实现，确保播放器不受影响。
+  - 第一批新闻/门户站点包（CNN/路透/彭博/卫报/Yahoo/CNET）：
+    - 将 Google IMA3 加载器重定向到最小空模块，避免播放器因缺少对象报错。
+    - 按站点限定阻断 FreeWheel（fwmrm.net）、GPT、Amazon A9、Media.net（仅在这些站点发起时生效）。
+  - 会话规则：仅在打开相应站点页面时装载规则，离开时自动卸载，最大程度降低副作用。
+  - 预置常见广告插件的空实现：IMA3、videojs-contrib-ads、videojs-ima（默认不启用，仅在特定站点需要时使用）。
+
 ## v2.0.4
 
 ### English

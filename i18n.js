@@ -59,7 +59,10 @@ const I18N = {
       trialConsentPrompt: "当前未勾选试用模式同意。是否切换为 OpenAI 模式并继续保存？",
       saveCancelled: "已取消保存。",
       confirmOverride: "自定义提示词已有内容，是否覆盖？",
-      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？"
+      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？",
+      // Tabs
+      tabAI: "AI 摘要",
+      tabAdblock: "广告过滤"
     },
     // 广告过滤
     adblock: {
@@ -173,7 +176,10 @@ const I18N = {
       trialConsentPrompt: "Trial consent is not checked. Switch to OpenAI mode and continue saving?",
       saveCancelled: "Save cancelled.",
       confirmOverride: "Custom prompt has content, override?",
-      confirmLangOverride: "Custom prompt has content, override based on new language?"
+      confirmLangOverride: "Custom prompt has content, override based on new language?",
+      // Tabs
+      tabAI: "AI Summary",
+      tabAdblock: "Ad Filtering"
     },
     // Adblock
     adblock: {

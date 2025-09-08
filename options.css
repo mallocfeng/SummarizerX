@@ -108,16 +108,19 @@ html.lang-anim.lang-out .save-dock{
  * ========================= */
 .hero{
   position: relative;
+  /* Unify hero background with cards to remove color shift */
   background:
-    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
-    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
-  backdrop-filter: blur(12px) saturate(1.05);
+    /* soften the top-left highlight: larger radius, lower opacity, longer fade */
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
   border: 1px solid var(--border);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  padding: 20px 0 16px;
-  margin: 0 0 16px;
+  padding: 20px 0 0; /* remove space under tabs */
+  margin: 0;         /* eliminate gap above first card */
+  border-bottom: 0; /* separator will be drawn by the first card so it can float together */
   box-shadow: 0 2px 10px rgba(16,24,40,.06);
 }
 
@@ -142,6 +145,91 @@ html.lang-anim.lang-out .save-dock{
   font-size:12px; color:#3730a3; background:#eef2ff; border:1px solid #c7d2fe;
   padding:3px 8px; border-radius:999px;
 }
+
+/* Top tabs under header — tab look */
+.top-tabs{ display:flex; gap:8px; margin-top:10px; margin-bottom:0; /* small gap between tab boxes */ }
+.top-tabs .top-tab:first-child{ margin-left: 1px; } /* nudge first tab 1px to the right */
+.top-tab{
+  appearance:none; background: var(--surface-2); color:#5b667a;
+  padding:10px 14px 8px; margin:0;
+  border:1px solid var(--border); border-bottom:none; /* three-sided box */
+  border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-left-radius:0; border-bottom-right-radius:0;
+  font-size:14px; font-weight:800; cursor:pointer;
+  position: relative; /* for underline pseudo-element */
+}
+.top-tab:hover{ color:#0f172a; background:#eef1f7; }
+.top-tab.active,
+.top-tab[aria-selected="true"]{
+  color: var(--text); /* light mode: use regular text color (black-ish) */
+  background: rgba(37,99,235,.04);            /* lighter tint */
+  border-color: rgba(37,99,235,.22);          /* lower-contrast border */
+  box-shadow: 0 0 0 1px rgba(37,99,235,.04) inset,
+              0 0 6px rgba(37,99,235,.05);    /* softer glow */
+}
+/* Draw active underline with pseudo so it can move when card floats */
+.top-tab.active::after,
+.top-tab[aria-selected="true"]::after{
+  content: "";
+  position: absolute;
+  left: -2px; right: -2px; height: 2px;
+  bottom: 0; /* move down by 2px for better alignment */
+  z-index: 1;  /* ensure it renders above surrounding borders */
+  /* Center-strong gradient: opaque in middle, fade to transparent at edges */
+  background: linear-gradient(90deg,
+    rgba(37,99,235,0) 0%,      /* transparent left edge */
+    rgba(37,99,235,1) 50%,     /* peak at center */
+    rgba(37,99,235,0) 100%     /* transparent right edge */
+  );
+  border-radius: 2px;
+  transition: transform .15s ease;
+}
+html[data-theme="dark"] .top-tabs{ border-bottom-color: var(--border); }
+html[data-theme="dark"] .top-tab{ color:#a3adc2; background:#1a2333; border-color: var(--border); }
+html[data-theme="dark"] .top-tab:hover{ color:#e7ebf3; background:#24324a; }
+html[data-theme="dark"] .top-tab.active,
+html[data-theme="dark"] .top-tab[aria-selected="true"]{
+  color:#fff; /* white label on dark active tab */
+  background: rgba(123,140,255,.06);          /* lighter tint on dark */
+  border-color: rgba(123,140,255,.25);         /* lower-contrast border */
+  box-shadow: 0 0 0 1px rgba(123,140,255,.04) inset,
+              0 0 6px rgba(123,140,255,.06);   /* softer glow */
+}
+html[data-theme="dark"] .top-tab.active::after,
+html[data-theme="dark"] .top-tab[aria-selected="true"]::after{
+  background: linear-gradient(90deg,
+    rgba(123,140,255,0) 0%,     /* transparent left */
+    rgba(123,140,255,1) 50%,    /* center peak */
+    rgba(123,140,255,0) 100%    /* transparent right */
+  );
+}
+.top-tab:focus-visible{ outline:none; box-shadow: 0 2px 0 0 var(--primary) inset; }
+
+/* Connect first card with active tab: remove top border/radius for seamless feel */
+.tab-pane .section.card:first-of-type{
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+  position: relative; /* allow pseudo separator line */
+}
+
+/* Draw the separator line on the first card, so it "floats" with the card hover */
+.tab-pane .section.card:first-of-type::before{
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: -1px; height: 1px;
+  background: var(--border);
+}
+
+/* When first card floats up, move the active tab underline up the same amount */
+.hero.tabs-float .top-tab.active::after,
+.hero.tabs-float .top-tab[aria-selected="true"]::after{
+  transform: translateY(-2px);
+}
+
+/* Tab panes */
+.tab-pane{ display:block; }
+.tab-pane.is-hidden{ display:none; }
 
 /* Language switcher — segmented */
 .language-switcher{ display:flex; gap:4px; background: var(--surface-2); border:1px solid var(--border); border-radius: 8px; padding: 2px; }
@@ -564,7 +652,15 @@ html[data-theme="light"]{
 
 /* Surfaces: hero & dock 使用与卡片一致的淡蓝配色（更和谐） */
 /* Light theme uses glass backgrounds defined above; keep borders if needed */
-html[data-theme="light"] .hero,
+/* Light theme: keep hero visually same as cards (add subtle candy tint like cards) */
+html[data-theme="light"] .hero{
+  background:
+    /* match softened highlight in light mode as well */
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  border-color: var(--card-br);
+}
 html[data-theme="light"] .save-dock{ border-color: var(--card-br); }
 html[data-theme="light"] .section.card{ border-color: var(--card-br); }
 

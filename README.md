@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.0.4 (dev/next branch)
+Current beta: v2.0.6 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -33,6 +33,8 @@ Current beta: v2.0.4 (dev/next branch)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
  - ✅ Consistent Consent Pulse: Trial consent attention “breathing” animation now behaves the same in light and dark themes
 - 🛡️ Ad Filtering (ABP 2.0 cosmetic): Enable in Settings → 广告过滤 (now below System Prompt). Choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s, etc.) and the new Cookie Notice Hiding category (EasyList Cookie General Hide). Per‑list sync, Low/Medium/High strength, and auto-sync on selection (checked lists download immediately). Rules are stored locally and applied per‑host.
+  - ▶️ Video ads (beta, site packs): NYTimes + CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET — use session-scoped DNR to redirect specific ad modules (e.g., Betamax ads, IMA3) to safe stubs and block FreeWheel/GPT/Amazon/Media.net with initiator scoping to avoid side effects. Rules load only while a tab of the site is open.
+  - 🗂 Settings tabs: Top tabs (AI Summary / Ad Filtering) for clearer navigation; polished tab visuals, gradient underline, and unified header/card background.
 
 ### 🖼 Screenshots
 
@@ -108,7 +110,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 ## 中文简介
 
 当前稳定版：v1.9.1 (main分支)
-当前测试版：v2.0.4 (dev/next分支)
+当前测试版：v2.0.6 (dev/next分支)
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 
@@ -127,6 +129,8 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性
  - ✅ 试用同意提示一致：需要同意时的“呼吸”动画在明亮/暗黑主题下表现一致
 - 🛡️ 广告过滤（ABP 2.0 元素隐藏）：在设置 → 广告过滤（现位于“系统提示词”下方）开启；可选全球/区域列表（EasyList、EasyPrivacy、Fanboy’s等）和“Cookie 提示隐藏”分类（内置 EasyList Cookie General Hide）。支持单条规则“同步更新”、勾选后自动同步、高/中/低强度；规则本地保存，并按站点应用以隐藏/去除广告元素。
+  - ▶️ 视频广告（测试版，站点包）：NYTimes + CNN/路透/彭博/卫报/Yahoo/CNET — 使用“会话规则（DNR）”在仅打开目标站点时重定向特定广告模块（如 Betamax ads、IMA3）到安全空实现，并按站点限定阻断 FreeWheel/GPT/Amazon/Media.net，降低副作用。
+  - 🗂 设置页标签：新增顶部标签（AI 摘要 / 广告过滤）与样式优化；保留渐变下划线并与首张卡片上浮联动；统一标题栏/卡片色调，视觉更自然。
 
 ### 🖼 软件截图
 

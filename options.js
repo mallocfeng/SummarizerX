@@ -213,12 +213,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 初始化国际化
   await initI18n();
 
+  // 初始化 Tab 切换（AI 摘要 / 广告过滤）
+  try { initTopTabs(); } catch(e) { console.warn('initTopTabs failed:', e); }
+  // 初始化“卡片上浮时让 active tab 下划线同步上浮”
+  try { initTabsFloatHover(); } catch(e) { console.warn('initTabsFloatHover failed:', e); }
+
   // 初始化广告过滤 UI（渲染列表并回填状态）
   try { initAdblockUI(); } catch (e) { console.warn('initAdblockUI failed:', e); }
 
   // 渲染完列表与控件后再加载设置回填勾选状态，避免顺序问题
   try { await loadSettings(); } catch (e) { console.warn('loadSettings after UI init failed:', e); }
 });
+
+// ---- 顶部 tabs ----
+const ACTIVE_TAB_KEY = 'options_active_tab';
+function setActiveTab(name){
+  const aiBtn = document.getElementById('tab-ai-btn');
+  const adBtn = document.getElementById('tab-adblock-btn');
+  const aiPane = document.getElementById('tab-ai');
+  const adPane = document.getElementById('tab-adblock');
+  const isAI = (name === 'ai');
+  [aiBtn, adBtn].forEach(b => b && b.classList.remove('active'));
+  if (aiBtn) { aiBtn.classList.toggle('active', isAI); aiBtn.setAttribute('aria-selected', isAI ? 'true':'false'); }
+  if (adBtn) { adBtn.classList.toggle('active', !isAI); adBtn.setAttribute('aria-selected', !isAI ? 'true':'false'); }
+  if (aiPane) aiPane.classList.toggle('is-hidden', !isAI);
+  if (adPane) adPane.classList.toggle('is-hidden', isAI);
+}
+function initTopTabs(){
+  const aiBtn = document.getElementById('tab-ai-btn');
+  const adBtn = document.getElementById('tab-adblock-btn');
+  if (!aiBtn || !adBtn) return;
+  // 读取存储，默认 AI
+  chrome.storage.sync.get([ACTIVE_TAB_KEY]).then(all => {
+    const v = (all[ACTIVE_TAB_KEY] === 'adblock') ? 'adblock' : 'ai';
+    setActiveTab(v);
+  }).catch(()=> setActiveTab('ai'));
+  const onClick = (e) => {
+    const b = e.currentTarget;
+    const tab = b && b.getAttribute('data-tab');
+    if (!tab) return;
+    setActiveTab(tab);
+    chrome.storage.sync.set({ [ACTIVE_TAB_KEY]: tab }).catch(()=>{});
+  };
+  aiBtn.addEventListener('click', onClick);
+  adBtn.addEventListener('click', onClick);
+}
+
+// ---- 让 active tab 下划线跟随第一张卡片上浮 ----
+function initTabsFloatHover(){
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const bind = (paneId) => {
+    const pane = document.getElementById(paneId);
+    if (!pane) return;
+    const firstCard = pane.querySelector('.section.card');
+    if (!firstCard) return;
+    const enter = () => hero.classList.add('tabs-float');
+    const leave = () => hero.classList.remove('tabs-float');
+    firstCard.addEventListener('mouseenter', enter);
+    firstCard.addEventListener('mouseleave', leave);
+    firstCard.addEventListener('focusin', enter);
+    firstCard.addEventListener('focusout', leave);
+  };
+  // 绑定两个面板
+  bind('tab-ai');
+  bind('tab-adblock');
+}
 
 function reflectGuideLink(){
   const p = $("aiProvider").value;
@@ -659,6 +719,9 @@ async function updateUIText() {
   // 更新标题和副标题
   updateElementText('settings-title', await t('settings.title'));
   updateElementText('settings-subtitle', await t('settings.subtitle'));
+  // 更新顶部 tabs 文案（i18n）
+  updateElementText('tab-ai-btn', await t('settings.tabAI'));
+  updateElementText('tab-adblock-btn', await t('settings.tabAdblock'));
   
   // 更新基础配置
   updateElementText('basic-config', await t('settings.basicConfig'));
