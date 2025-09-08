@@ -156,6 +156,7 @@ html.lang-anim.lang-out .save-dock{
   border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-left-radius:0; border-bottom-right-radius:0;
   font-size:14px; font-weight:800; cursor:pointer;
   position: relative; /* for underline pseudo-element */
+  transition: transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
 }
 .top-tab:hover{ color:#0f172a; background:#eef1f7; }
 .top-tab.active,
@@ -224,6 +225,12 @@ html[data-theme="dark"] .top-tab[aria-selected="true"]::after{
 /* When first card floats up, move the active tab underline up the same amount */
 .hero.tabs-float .top-tab.active::after,
 .hero.tabs-float .top-tab[aria-selected="true"]::after{
+  transform: translateY(0); /* rely on tab's own -2px lift so underline matches card exactly */
+}
+
+/* Lift the active tab box along with the first card hover for a unified motion */
+.hero.tabs-float .top-tab.active,
+.hero.tabs-float .top-tab[aria-selected="true"]{
   transform: translateY(-2px);
 }
 
