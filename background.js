@@ -234,11 +234,11 @@ async function runForTab(tabId) {
 }
 
 /* --------------------------------------------------------------- */
-// uBO-style network redirection/blocking for NYTimes Betamax pre-roll
+// uBO-style network redirection/blocking for video ads on news/portal sites
 // We use MV3 Declarative Net Request to:
-// 1) Redirect Betamax ads module to a local empty stub
-// 2) Block GPT/Amazon/Media.net ad libraries when initiator is nytimes.com
-async function setupNYTVideoAdDNRRules() {
+// 1) Redirect certain ad SDKs/modules to local no-op stubs (to avoid breaking players)
+// 2) Block ad SDKs/ad servers when initiator is a known site (site packages)
+async function setupVideoAdDNRRules() {
   const rules = [
     // Redirect Betamax ads module to an empty stub to avoid ad initialization
     {
@@ -286,6 +286,97 @@ async function setupNYTVideoAdDNRRules() {
         resourceTypes: ["script"],
         initiatorDomains: ["www.nytimes.com","nytimes.com"]
       }
+    },
+
+    // ---- Generic site packages: CNN, Reuters, Bloomberg, Guardian, Yahoo, CNET ----
+    // Redirect IMA3 SDK to no-op stub (safer than outright blocking) for these sites
+    {
+      id: 2101,
+      priority: 1,
+      action: {
+        type: "redirect",
+        redirect: { extensionPath: "/stubs/ima3-empty.js" }
+      },
+      condition: {
+        regexFilter: "^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block FreeWheel SDK/requests for these sites
+    {
+      id: 2102,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://[a-z0-9.-]*fwmrm\\.net/",
+        resourceTypes: ["script","xmlhttprequest","media"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block GPT on these sites (optional; can reduce pre-roll triggers)
+    {
+      id: 2103,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://(securepubads\\.g\\.doubleclick\\.net|pagead2\\.googlesyndication\\.com)/",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block Amazon A9 on these sites
+    {
+      id: 2104,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://c\\.amazon-adsystem\\.com/aax2/apstag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block Media.net on these sites (seen on some portals)
+    {
+      id: 2105,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://warp\\.media\\.net/js/tags/clientag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
     }
   ];
 
@@ -300,8 +391,8 @@ async function setupNYTVideoAdDNRRules() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => { setupNYTVideoAdDNRRules(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupNYTVideoAdDNRRules(); });
+chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
 
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

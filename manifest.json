@@ -23,7 +23,15 @@
     "https://static01.nyt.com/*",
     "https://securepubads.g.doubleclick.net/*",
     "https://c.amazon-adsystem.com/*",
-    "https://warp.media.net/*"
+    "https://warp.media.net/*",
+    "https://imasdk.googleapis.com/*",
+    "https://*.fwmrm.net/*",
+    "https://*.cnn.com/*",
+    "https://*.reuters.com/*",
+    "https://*.bloomberg.com/*",
+    "https://*.theguardian.com/*",
+    "https://*.yahoo.com/*",
+    "https://*.cnet.com/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
@@ -33,7 +41,8 @@
         "vendor/petite-vue.iife.js",
         "adblock_engine.js",
         "block_pop.js",
-        "stubs/nyt-betamax-ads-stub.js"
+        "stubs/nyt-betamax-ads-stub.js",
+        "stubs/ima3-empty.js"
       ],
       "matches": ["<all_urls>"]
     }
