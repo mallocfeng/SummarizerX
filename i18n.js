@@ -4,7 +4,7 @@ const I18N = {
     // 设置页面
     settings: {
       title: "麦乐可 AI 摘要阅读器 · 设置",
-      subtitle: "配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的\"保存全部设置\"。",
+      subtitle: "使用顶部标签在「AI 摘要」与「广告过滤」间切换；点击底部的“保存全部设置”将一次性保存所有设置。",
       basicConfig: "基础配置",
       aiPlatform: "AI 平台",
       trial: "试用（推荐体验）",
@@ -121,7 +121,7 @@ const I18N = {
     // Settings page
     settings: {
       title: "SummarizerX AI Reader · Settings",
-      subtitle: "Configure API / Model / Output Language and System Prompt presets; unified 'Save All Settings' at the bottom.",
+      subtitle: "Use the top tabs to switch between AI Summary and Ad Filtering. Click 'Save All Settings' at the bottom to save everything at once.",
       basicConfig: "Basic Configuration",
       aiPlatform: "AI Platform",
       trial: "Trial (Recommended for Experience)",
