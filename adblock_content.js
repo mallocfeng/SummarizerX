@@ -3,6 +3,11 @@
   // Early preload: inject last-compiled CSS from sessionStorage to reduce flash
   try { preInjectFromSession(); } catch {}
 
+  // For NYTimes specifically, inject an early in-page shim to tell their ad
+  // utilities that ads are disabled. This avoids loading GPT/Betamax ad modules
+  // and prevents pre-roll without breaking the video player.
+  try { earlyInjectNYTNoAdsShim(); } catch {}
+
   // Conditionally inject page-world script to patch window.open and block nuisance popups
   try {
     const { adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_block_popups: true });
@@ -270,6 +275,49 @@ function collapseNYTPlaceholders(){
       const anyMedia = box.querySelector('iframe, img, video, object, embed');
       if (hasSlot && !anyMedia) hardHide(box);
     });
+  } catch {}
+
+  // Ensure the NYT ad shim is in place (idempotent)
+  try { neutralizeNYTBetamaxAds(); } catch {}
+}
+
+// NYTimes ad neutralization (non-destructive):
+// - Page-world shim to force adClientUtils to report ads disabled
+// - Avoid removing player components that could break playback
+function neutralizeNYTBetamaxAds(){
+  earlyInjectNYTNoAdsShim();
+}
+
+// Inject as early as possible so NYT ad layers see "no-ads" and skip ad setup
+function earlyInjectNYTNoAdsShim(){
+  try {
+    const host = location.hostname || '';
+    if (!/nytimes\.com$/.test(host)) return;
+    if (document.getElementById('sx-nyt-noads-shim')) return; // idempotent
+    const s = document.createElement('script');
+    s.id = 'sx-nyt-noads-shim';
+    s.type = 'text/javascript';
+    s.textContent = `
+      (function(){
+        try{
+          // Patch adClientUtils so site believes ads are disabled
+          var u = window.adClientUtils = window.adClientUtils || {};
+          var origHas = u.hasActiveToggle;
+          u.hasActiveToggle = function(name){
+            try{
+              var n = String(name||'');
+              if (/(^|_)dfp|geoedge|medianet|amazon|als_toggle|als|adslot|ads?/i.test(n)) return false;
+            }catch{}
+            return origHas ? origHas.apply(this, arguments) : false;
+          };
+          var origGet = u.getAdsPurrDirective;
+          u.getAdsPurrDirective = function(){ return 'no-ads'; };
+          // Optional: mark as opted-out flag consumed by some layers
+          try{ document.documentElement.dataset.optedOutOfAds = 'true'; }catch{}
+        }catch(e){}
+      })();
+    `;
+    (document.documentElement || document.head || document.body).appendChild(s);
   } catch {}
 }
 

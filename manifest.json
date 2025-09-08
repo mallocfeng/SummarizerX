@@ -3,7 +3,14 @@
   "name": "SummarizerX AI Reader",
   "version": "2.0.4",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
-  "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "contextMenus",
+    "declarativeNetRequest"
+  ],
   "host_permissions": [
     "https://easylist.to/*",
     "https://easylist-downloads.adblockplus.org/*",
@@ -11,7 +18,12 @@
     "https://raw.githubusercontent.com/*",
     "https://pgl.yoyo.org/*",
     "https://ublockorigin.github.io/*",
-    "https://adguardteam.github.io/*"
+    "https://adguardteam.github.io/*",
+    "https://*.nytimes.com/*",
+    "https://static01.nyt.com/*",
+    "https://securepubads.g.doubleclick.net/*",
+    "https://c.amazon-adsystem.com/*",
+    "https://warp.media.net/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
@@ -20,7 +32,8 @@
         "i18n.js",
         "vendor/petite-vue.iife.js",
         "adblock_engine.js",
-        "block_pop.js"
+        "block_pop.js",
+        "stubs/nyt-betamax-ads-stub.js"
       ],
       "matches": ["<all_urls>"]
     }

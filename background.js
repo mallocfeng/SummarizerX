@@ -233,6 +233,76 @@ async function runForTab(tabId) {
   });
 }
 
+/* --------------------------------------------------------------- */
+// uBO-style network redirection/blocking for NYTimes Betamax pre-roll
+// We use MV3 Declarative Net Request to:
+// 1) Redirect Betamax ads module to a local empty stub
+// 2) Block GPT/Amazon/Media.net ad libraries when initiator is nytimes.com
+async function setupNYTVideoAdDNRRules() {
+  const rules = [
+    // Redirect Betamax ads module to an empty stub to avoid ad initialization
+    {
+      id: 2001,
+      priority: 1,
+      action: {
+        type: "redirect",
+        redirect: { extensionPath: "/stubs/nyt-betamax-ads-stub.js" }
+      },
+      condition: {
+        regexFilter: "^https://static01\\.nyt\\.com/video-static/betamax/ads-.*\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // Block GPT library when loaded from nytimes pages
+    {
+      id: 2002,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://(securepubads\\.g\\.doubleclick\\.net|pagead2\\.googlesyndication\\.com)/",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // Block Amazon A9 apstag from nytimes pages
+    {
+      id: 2003,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://c\\.amazon-adsystem\\.com/aax2/apstag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // Block Media.net client script from nytimes pages
+    {
+      id: 2004,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://warp\\.media\\.net/js/tags/clientag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    }
+  ];
+
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const targetIds = rules.map(r => r.id);
+    const toRemove = existing.filter(r => targetIds.includes(r.id)).map(r => r.id);
+    if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules, removeRuleIds: [] });
+  } catch (e) {
+    console.warn('DNR setup failed:', e);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => { setupNYTVideoAdDNRRules(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupNYTVideoAdDNRRules(); });
+
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // 仅对本监听器支持的消息返回 true（异步），避免阻塞其他监听器的响应
