@@ -245,7 +245,13 @@ function initTopTabs(){
   if (!aiBtn || !adBtn) return;
   // 读取存储，默认 AI
   chrome.storage.sync.get([ACTIVE_TAB_KEY]).then(all => {
-    const v = (all[ACTIVE_TAB_KEY] === 'adblock') ? 'adblock' : 'ai';
+    let v = 'ai';
+    if (all && typeof all[ACTIVE_TAB_KEY] === 'string') {
+      v = (all[ACTIVE_TAB_KEY] === 'adblock') ? 'adblock' : 'ai';
+    } else {
+      // First run: persist default to ensure consistent initial behavior
+      chrome.storage.sync.set({ [ACTIVE_TAB_KEY]: 'ai' }).catch(()=>{});
+    }
     setActiveTab(v);
   }).catch(()=> setActiveTab('ai'));
   const onClick = (e) => {
