@@ -501,19 +501,110 @@ async function refreshSpankbangSessionRules(){
   } catch (e) { console.warn('refreshSpankbangSessionRules failed:', e); }
 }
 
-// Hook session rules refresh on lifecycle and tab events
-try {
-  chrome.runtime.onInstalled.addListener(() => { refreshSpankbangSessionRules(); });
-  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { refreshSpankbangSessionRules(); });
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' || changeInfo.url) refreshSpankbangSessionRules();
-  });
-  chrome.tabs.onRemoved.addListener(() => { refreshSpankbangSessionRules(); });
-  chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); });
-} catch {}
+// ===== Stricter but safe ad network blocks for common adult sites =====
+const ADULT_SETS = {
+  xvideos: ['xvideos.com','www.xvideos.com','es.xvideos.com','de.xvideos.com','fr.xvideos.com'],
+  xnxx:    ['xnxx.com','www.xnxx.com','m.xnxx.com'],
+  youporn: ['youporn.com','www.youporn.com','m.youporn.com'],
+  redtube: ['redtube.com','www.redtube.com','m.redtube.com'],
+  missav:  ['missav.ws','www.missav.ws','missav.com','www.missav.com'],
+  spankbang: ['spankbang.com','www.spankbang.com','spankbang.party','www.spankbang.party'],
+  supjav:  ['supjav.com','www.supjav.com'],
+  njav:    ['njav.tv','www.njav.tv','njav.co','www.njav.co'],
+  av123:   ['123av.com','www.123av.com']
+};
 
-chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
+function adultInitiators(){
+  const out = [];
+  for (const k of Object.keys(ADULT_SETS)) out.push(...ADULT_SETS[k]);
+  return out;
+}
+
+function isAdultInitiatorHost(h){
+  if (!h) return false;
+  const set = new Set(adultInitiators());
+  if (set.has(h)) return true;
+  // also allow matching subdomains
+  return Array.from(set).some(d => h === d || h.endsWith(`.${d.replace(/^www\./,'')}`));
+}
+
+async function buildAdultRules(){
+  const initiators = adultInitiators();
+  const rules = [];
+  let id = 2401;
+  const addBlock = (regexFilter) => {
+    rules.push({
+      id: id++,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter,
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    });
+  };
+
+  // Common adult ad networks (safe to block; do not affect core players/CDNs)
+  addBlock('^https?://([a-z0-9.-]*\\.)?exoclick\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?exosrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?exdynsrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?oclasrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?juicyads\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?tsyndicate\\.com/'); // TrafficStars CDN
+  addBlock('^https?://([a-z0-9.-]*\\.)?popads\\.net/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?propellerads\\.com/');
+  // Extra strict for xvideos ecosystem and similar tubes (safe):
+  addBlock('^https?://([a-z0-9.-]*\\.)?trafficfactory\\.biz/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?popcash\\.net/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?adsterra\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?hilltopads\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?clickaine\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?adtng\\.com/'); // Adtelligent
+  addBlock('^https?://([a-z0-9.-]*\\.)?adtelligent\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?mgid\\.com/');
+
+  return rules;
+}
+
+async function refreshAdultSiteSessionRules(){
+  // Check if any tab is one of our adult initiators
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch {}
+  let hasAdult = false;
+  for (const t of tabs) {
+    try {
+      const h = new URL(t.url || '').hostname;
+      if (isAdultInitiatorHost(h)) { hasAdult = true; break; }
+    } catch {}
+  }
+  try {
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managed = existing.filter(r => r.id >= 2401 && r.id <= 2499).map(r => r.id);
+    if (!hasAdult) {
+      if (managed.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managed, addRules: [] });
+      return;
+    }
+    const desired = await buildAdultRules();
+    const desiredIds = desired.map(r => r.id);
+    const toRemove = managed.filter(id => !desiredIds.includes(id));
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: toRemove, addRules: desired });
+  } catch (e) { console.warn('refreshAdultSiteSessionRules failed:', e); }
+}
+
+// Hook session rules refresh on lifecycle and tab events
+  try {
+    chrome.runtime.onInstalled.addListener(() => { refreshSpankbangSessionRules(); });
+    if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { refreshSpankbangSessionRules(); });
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); }
+    });
+    chrome.tabs.onRemoved.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
+    chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
+  } catch {}
+
+  chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
 
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

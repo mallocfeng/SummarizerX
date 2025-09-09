@@ -168,6 +168,8 @@ function schedulePlaceholderSweep(){
       try { if (/\bmissav\./i.test(host)) collapseMissavInlineAds(); } catch {}
       // Site-specific tweaks
       try { collapseSpankbangAds(); } catch {}
+      // Xvideos: hide bottom ad above comments and related blocks
+      try { collapseXVideosAds(); } catch {}
     } finally { __adblPHTimeout = null; }
   });
 }
@@ -457,6 +459,42 @@ function collapseMissavInlineAds(){
         // remove the node
         hardRemove(el);
         // also collapse trivial parents to avoid leftover gaps
+        let p = el.parentElement;
+        for (let i = 0; i < 3 && p; i++) {
+          if (!hasMedia(p) && isTriviallyEmpty(p)) { hardHide(p); }
+          p = p.parentElement;
+        }
+      } catch {}
+    });
+  } catch {}
+}
+
+// ----- Site-specific: xvideos.* bottom/inline ad containers -----
+function collapseXVideosAds(){
+  const host = (location.hostname || '').toLowerCase();
+  // Match common xvideos host variants
+  if (!(/xvideos\./i.test(host) || /(^|\.)xv-ru\.com$/.test(host))) return;
+
+  const selectors = [
+    // Bottom ad just above comments
+    '#ad-footer',
+    // Mobile footer ad placeholder
+    '#ad-footer2',
+    // Header mobile ad placeholder (sometimes inserted)
+    '#ad-header-mobile-contener', '#ad-header-mobile-container',
+    // Right of player rectangle ad
+    '#video-right',
+    // Upgrade/Remove-ads promo block
+    'div.remove-ads'
+  ];
+
+  const hardRemove = (n) => { try { hardHide(n); if (n.parentNode) n.parentNode.removeChild(n); } catch {} };
+  try {
+    document.querySelectorAll(selectors.join(',')).forEach(el => {
+      try {
+        // Remove node
+        hardRemove(el);
+        // Collapse trivial wrappers to avoid leftover gap
         let p = el.parentElement;
         for (let i = 0; i < 3 && p; i++) {
           if (!hasMedia(p) && isTriviallyEmpty(p)) { hardHide(p); }
