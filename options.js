@@ -1,6 +1,7 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
 import { DEFAULTS, PROVIDER_PRESETS, getSettings } from "./settings.js";
 import { getCurrentLanguage, t, tSync, updatePageLanguage } from "./i18n.js";
+import { FILTER_LISTS, splitLists, FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -211,7 +212,79 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初始化国际化
   await initI18n();
+
+  // 初始化 Tab 切换（AI 摘要 / 广告过滤）
+  try { initTopTabs(); } catch(e) { console.warn('initTopTabs failed:', e); }
+  // 初始化“卡片上浮时让 active tab 下划线同步上浮”
+  try { initTabsFloatHover(); } catch(e) { console.warn('initTabsFloatHover failed:', e); }
+
+  // 初始化广告过滤 UI（渲染列表并回填状态）
+  try { initAdblockUI(); } catch (e) { console.warn('initAdblockUI failed:', e); }
+
+  // 渲染完列表与控件后再加载设置回填勾选状态，避免顺序问题
+  try { await loadSettings(); } catch (e) { console.warn('loadSettings after UI init failed:', e); }
 });
+
+// ---- 顶部 tabs ----
+const ACTIVE_TAB_KEY = 'options_active_tab';
+function setActiveTab(name){
+  const aiBtn = document.getElementById('tab-ai-btn');
+  const adBtn = document.getElementById('tab-adblock-btn');
+  const aiPane = document.getElementById('tab-ai');
+  const adPane = document.getElementById('tab-adblock');
+  const isAI = (name === 'ai');
+  [aiBtn, adBtn].forEach(b => b && b.classList.remove('active'));
+  if (aiBtn) { aiBtn.classList.toggle('active', isAI); aiBtn.setAttribute('aria-selected', isAI ? 'true':'false'); }
+  if (adBtn) { adBtn.classList.toggle('active', !isAI); adBtn.setAttribute('aria-selected', !isAI ? 'true':'false'); }
+  if (aiPane) aiPane.classList.toggle('is-hidden', !isAI);
+  if (adPane) adPane.classList.toggle('is-hidden', isAI);
+}
+function initTopTabs(){
+  const aiBtn = document.getElementById('tab-ai-btn');
+  const adBtn = document.getElementById('tab-adblock-btn');
+  if (!aiBtn || !adBtn) return;
+  // 读取存储，默认 AI
+  chrome.storage.sync.get([ACTIVE_TAB_KEY]).then(all => {
+    let v = 'ai';
+    if (all && typeof all[ACTIVE_TAB_KEY] === 'string') {
+      v = (all[ACTIVE_TAB_KEY] === 'adblock') ? 'adblock' : 'ai';
+    } else {
+      // First run: persist default to ensure consistent initial behavior
+      chrome.storage.sync.set({ [ACTIVE_TAB_KEY]: 'ai' }).catch(()=>{});
+    }
+    setActiveTab(v);
+  }).catch(()=> setActiveTab('ai'));
+  const onClick = (e) => {
+    const b = e.currentTarget;
+    const tab = b && b.getAttribute('data-tab');
+    if (!tab) return;
+    setActiveTab(tab);
+    chrome.storage.sync.set({ [ACTIVE_TAB_KEY]: tab }).catch(()=>{});
+  };
+  aiBtn.addEventListener('click', onClick);
+  adBtn.addEventListener('click', onClick);
+}
+
+// ---- 让 active tab 下划线跟随第一张卡片上浮 ----
+function initTabsFloatHover(){
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const bind = (paneId) => {
+    const pane = document.getElementById(paneId);
+    if (!pane) return;
+    const firstCard = pane.querySelector('.section.card');
+    if (!firstCard) return;
+    const enter = () => hero.classList.add('tabs-float');
+    const leave = () => hero.classList.remove('tabs-float');
+    firstCard.addEventListener('mouseenter', enter);
+    firstCard.addEventListener('mouseleave', leave);
+    firstCard.addEventListener('focusin', enter);
+    firstCard.addEventListener('focusout', leave);
+  };
+  // 绑定两个面板
+  bind('tab-ai');
+  bind('tab-adblock');
+}
 
 function reflectGuideLink(){
   const p = $("aiProvider").value;
@@ -260,6 +333,7 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
   const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
+  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: true });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -307,6 +381,17 @@ async function loadSettings() {
   reflectGuideLink();
   updateBuyHelp(aiProvider);
   toggleBuyHelpInline(aiProvider);
+
+  // —— 广告过滤 回填 ——
+  try {
+    const enabledEl = $("adblock_enabled");
+    if (enabledEl) enabledEl.checked = !!adblock_enabled;
+    setSelectedStrength(String(adblock_strength || FILTER_DEFAULT_STRENGTH));
+    applyAdblockSelections(new Set((adblock_selected || []).filter(Boolean)));
+    updateAdblockSectionEnabledState();
+    const popCb = document.getElementById('adblock_block_popups');
+    if (popCb) popCb.checked = !!adblock_block_popups;
+  } catch {}
 }
 
 async function saveSettings() {
@@ -336,7 +421,14 @@ async function saveSettings() {
     extract_mode: $("extract_mode").value,
     system_prompt_preset: $("system_prompt_preset").value,
     system_prompt_custom: $("system_prompt_custom").value.trim(),
-    trial_consent: !!($("trial_consent")?.checked)
+    trial_consent: !!($("trial_consent")?.checked),
+    // 广告过滤设置（存 sync 里用于跨设备同步；规则内容会存 local）
+    adblock_enabled: !!($("adblock_enabled")?.checked),
+    adblock_strength: getSelectedStrength(),
+    adblock_selected: (function(){
+      return Array.from(getAdblockSelectedSet());
+    })(),
+    adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked)
   };
 
   // 同步保存平台专用 key（便于切换回填）
@@ -633,6 +725,9 @@ async function updateUIText() {
   // 更新标题和副标题
   updateElementText('settings-title', await t('settings.title'));
   updateElementText('settings-subtitle', await t('settings.subtitle'));
+  // 更新顶部 tabs 文案（i18n）
+  updateElementText('tab-ai-btn', await t('settings.tabAI'));
+  updateElementText('tab-adblock-btn', await t('settings.tabAdblock'));
   
   // 更新基础配置
   updateElementText('basic-config', await t('settings.basicConfig'));
@@ -691,6 +786,89 @@ async function updateUIText() {
     else if (mode === 'light') btn.title = await t('settings.lightTheme');
     else if (mode === 'dark') btn.title = await t('settings.darkTheme');
   }
+
+  // ====== 广告过滤卡片多语言 ======
+  updateElementText('adblock-title', await t('adblock.title'));
+  updateElementText('adblock-enable-label', await t('adblock.enable'));
+  updateElementText('adblock-enable-hint', await t('adblock.enableHint'));
+  updateElementText('adblock-block-popups-label', await t('adblock.blockPopups'));
+  updateElementText('adblock-block-popups-hint', await t('adblock.blockPopupsHint'));
+  updateElementText('adblock-strength-label', await t('adblock.strength'));
+  // 强度按钮文字
+  try {
+    const seg = document.getElementById('adblock-strength-seg');
+    if (seg) {
+      const low = seg.querySelector('[data-strength="low"]');
+      const med = seg.querySelector('[data-strength="medium"]');
+      const high = seg.querySelector('[data-strength="high"]');
+      if (low) low.textContent = await t('adblock.low');
+      if (med) med.textContent = await t('adblock.medium');
+      if (high) high.textContent = await t('adblock.high');
+      seg.setAttribute('aria-label', await t('adblock.strength'));
+    }
+  } catch {}
+  updateElementText('adblock-global-lists-text', await t('adblock.globalLists'));
+  updateElementText('adblock-regional-lists-text', await t('adblock.regionalLists'));
+  updateElementText('adblock-cookie-lists-text', await t('adblock.cookieLists'));
+  updateElementText('adblock-tip', await t('adblock.tip'));
+  // 同步按钮提示
+  const syncAllText = await t('adblock.syncAll');
+  const syncAllBtns = [
+    document.getElementById('sync_all_global'),
+    document.getElementById('sync_all_regional'),
+    document.getElementById('sync_all_cookie')
+  ];
+  for (const b of syncAllBtns) {
+    if (!b) continue;
+    b.title = syncAllText;
+    b.setAttribute('aria-label', syncAllText);
+    b.dataset.tip = syncAllText;
+  }
+
+  // 状态行多语言同步（已存在的“同步成功/失败/同步中…”）
+  try {
+    const okText = await t('adblock.syncOk');
+    const failText = await t('adblock.syncFail');
+    const syncingText = await t('adblock.syncing');
+    document.querySelectorAll('.adbl-status').forEach(el => {
+      const e = el;
+      const prev = (e.textContent || '').trim();
+      // 保留 HTTP 细节（例如 "(HTTP 404)"）
+      const m = prev.match(/\(HTTP\s+\d+\)/i);
+      const httpDetail = m ? ` ${m[0]}` : '';
+      if (e.classList.contains('ok')) {
+        e.textContent = okText; // 成功
+      } else if (e.classList.contains('err')) {
+        e.textContent = `${failText}${httpDetail}`; // 失败 + 细节
+      } else {
+        // 无状态类时视为进行中
+        if (prev) e.textContent = syncingText;
+      }
+    });
+  } catch {}
+
+  // 汇总提示多语言同步（“成功 x · 失败 y”/“没有可更新的规则”）
+  try {
+    const okLabel = await t('adblock.resultOkLabel');
+    const failLabel = await t('adblock.resultFailLabel');
+    const noTasks = await t('adblock.noTasks');
+    const ids = ['adblock_global_summary_inline','adblock_regional_summary_inline','adblock_cookie_summary_inline'];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const prev = (el.textContent || '').trim();
+      if (!prev) continue;
+      // 情况1：没有任务
+      if (/^没有可更新的规则$|^Nothing to update$/i.test(prev)) { el.textContent = noTasks; continue; }
+      // 情况2：解析两个数字，重组本地化文案
+      const nums = prev.match(/(\d+)\D+(\d+)/);
+      if (nums) {
+        const ok = nums[1];
+        const fail = nums[2];
+        el.textContent = `${okLabel} ${ok} · ${failLabel} ${fail}`;
+      }
+    }
+  } catch {}
 }
 
 function updateElementText(elementId, text) {
@@ -828,6 +1006,257 @@ document.addEventListener('DOMContentLoaded', () => {
 // })();
 
 /* =========================
+ * 广告过滤（UI 渲染与状态）
+ * ========================= */
+function renderAdblockLists() {
+  const { global, regional, cookie } = splitLists();
+  const mount = (wrapId, items) => {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    items.forEach(item => {
+      const id = `adbl_${item.id}`;
+      const row = document.createElement('label');
+      row.className = 'adbl-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.dataset.listId = item.id;
+      const span = document.createElement('span');
+      span.textContent = item.name;
+      span.className = 'adbl-name';
+      // sync button (two arrows)
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sync-btn';
+      btn.setAttribute('aria-label', '同步此规则');
+      btn.dataset.listId = item.id;
+      btn.dataset.name = item.name;
+      btn.dataset.url = item.url;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/></svg>';
+      const status = document.createElement('span');
+      status.className = 'adbl-status';
+      status.id = `adbl_status_${item.id}`;
+      row.appendChild(cb);
+      row.appendChild(span);
+      row.appendChild(btn);
+      row.appendChild(status);
+      wrap.appendChild(row);
+    });
+  };
+  mount('adblock_global_lists', global);
+  mount('adblock_regional_lists', regional);
+  mount('adblock_cookie_lists', cookie);
+}
+
+function getAdblockSelectedSet() {
+  const sel = new Set();
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
+    if (cb.checked) sel.add(cb.dataset.listId);
+  });
+  return sel;
+}
+
+function applyAdblockSelections(set) {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
+    const id = cb.dataset.listId;
+    cb.checked = set.has(id);
+  });
+}
+
+function getSelectedStrength(){
+  const wrap = document.getElementById('adblock-strength-seg');
+  if (!wrap) return 'medium';
+  const cur = wrap.querySelector('.seg-btn[aria-selected="true"]');
+  const v = cur?.dataset?.strength || 'medium';
+  return ['low','medium','high'].includes(v) ? v : 'medium';
+}
+function setSelectedStrength(v){
+  const wrap = document.getElementById('adblock-strength-seg');
+  if (!wrap) return;
+  const vs = ['low','medium','high'];
+  const target = vs.includes(v) ? v : 'medium';
+  wrap.querySelectorAll('.seg-btn').forEach(btn => {
+    const on = btn.dataset.strength === target;
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    btn.classList.toggle('active', on);
+  });
+}
+
+function updateAdblockSectionEnabledState(){
+  const enabled = !!document.getElementById('adblock_enabled')?.checked;
+  const controls = [
+    document.getElementById('adblock-strength-seg'),
+    document.getElementById('adblock_global_lists'),
+    document.getElementById('adblock_regional_lists'),
+    document.getElementById('adblock_cookie_lists'),
+    document.getElementById('adblock_block_popups')
+  ];
+  controls.forEach(el => { if (el) el.closest('.field')?.classList.toggle('disabled', !enabled); });
+  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input, #adblock_cookie_lists input').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('#adblock-strength-seg .seg-btn').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('.sync-btn').forEach(el => { el.disabled = !enabled; });
+  const popCb = document.getElementById('adblock_block_popups');
+  if (popCb) popCb.disabled = !enabled;
+}
+
+function initAdblockUI(){
+  renderAdblockLists();
+  // 回填由 loadSettings() 完成，这里只绑定事件
+  const enabledEl = document.getElementById('adblock_enabled');
+  if (enabledEl) enabledEl.addEventListener('change', updateAdblockSectionEnabledState);
+  const seg = document.getElementById('adblock-strength-seg');
+  if (seg) {
+    seg.addEventListener('click', (e) => {
+      const btn = e.target.closest('#adblock-strength-seg .seg-btn');
+      if (!btn || btn.disabled) return;
+      setSelectedStrength(btn.dataset.strength);
+    });
+  }
+  // 规则的“同步”点击（事件委托）
+  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists'), document.getElementById('adblock_cookie_lists')];
+  listWraps.forEach(wrap => {
+    if (!wrap) return;
+    wrap.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.sync-btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.listId;
+      const name = btn.dataset.name || id;
+      const url = btn.dataset.url || '';
+      if (!id) return;
+      const ok = await syncOneList(btn, id, name, url);
+      // 若是手动点“同步”且之前被禁用，成功后恢复可勾选
+      try {
+        if (ok) {
+          const row = btn.closest('label');
+          const cb = row?.querySelector('input[type="checkbox"]');
+          if (cb && cb.disabled) { cb.disabled = false; cb.title = ''; }
+        }
+      } catch {}
+    });
+
+    // 勾选后自动同步（仅当开启了广告过滤时）
+    wrap.addEventListener('change', async (e) => {
+      const cb = e.target && e.target.matches ? (e.target.matches('input[type="checkbox"]') ? e.target : null) : null;
+      if (!cb || !cb.checked) return;
+      const enabled = !!document.getElementById('adblock_enabled')?.checked;
+      if (!enabled) return;
+      const row = cb.closest('label');
+      const btn = row?.querySelector('.sync-btn');
+      if (!btn || btn.disabled) return;
+      const id = cb.dataset.listId;
+      const name = btn.dataset.name || id;
+      const url = btn.dataset.url || '';
+      if (!id) return;
+      try {
+        const ok = await syncOneList(btn, id, name, url);
+        if (!ok) {
+          // 同步失败：取消勾选并禁用该项，提醒用户
+          cb.checked = false;
+          cb.disabled = true;
+          const st = document.getElementById(`adbl_status_${id}`);
+          if (st) {
+            st.textContent = `${await t('adblock.syncFail')} · ${await t('adblock.cannotSelect')}`;
+            st.classList.add('err'); st.classList.remove('ok');
+            st.title = `${await t('adblock.cannotSelect')}`;
+          }
+        } else {
+          // 成功：确保状态为 ok
+          const st = document.getElementById(`adbl_status_${id}`);
+          if (st) { st.classList.add('ok'); st.classList.remove('err'); st.title=''; }
+        }
+      } catch {}
+    });
+  });
+
+  // 全部更新（全球/区域）
+  const syncAllGlobal = document.getElementById('sync_all_global');
+  const syncAllRegional = document.getElementById('sync_all_regional');
+  const syncAllCookie = document.getElementById('sync_all_cookie');
+  if (syncAllGlobal) syncAllGlobal.addEventListener('click', () => syncAllInSection('global'));
+  if (syncAllRegional) syncAllRegional.addEventListener('click', () => syncAllInSection('regional'));
+  if (syncAllCookie) syncAllCookie.addEventListener('click', () => syncAllInSection('cookie'));
+}
+
+async function syncOneList(btn, id, name, url){
+  try {
+    // show loading
+    btn.dataset.loading = '1';
+    btn.disabled = true;
+    const st = document.getElementById(`adbl_status_${id}`);
+    if (st) { st.textContent = await t('adblock.syncing'); st.classList.remove('ok','err'); }
+    const payload = { type: 'ADBLOCK_DOWNLOAD_ONE', id };
+    if (url) payload.url = url;
+    if (name) payload.name = name;
+    const resp = await chrome.runtime.sendMessage(payload);
+    if (resp?.ok) {
+      if (st) { st.textContent = await t('adblock.syncOk'); st.classList.add('ok'); st.classList.remove('err'); }
+      return true;
+    } else {
+      if (st) {
+        const detail = resp?.status ? ` (HTTP ${resp.status})` : '';
+        st.textContent = `${await t('adblock.syncFail')}${detail}`;
+        st.classList.add('err'); st.classList.remove('ok');
+      }
+      return false;
+    }
+  } catch (e) {
+    const st = document.getElementById(`adbl_status_${id}`);
+    if (st) { st.textContent = await t('adblock.syncFail'); st.classList.add('err'); st.classList.remove('ok'); }
+    return false;
+  } finally {
+    // small delay to let user see result
+    setTimeout(() => {
+      try { btn.dataset.loading = '0'; btn.disabled = false; } catch {}
+    }, 200);
+  }
+}
+
+async function syncAllInSection(section){
+  const enabled = !!document.getElementById('adblock_enabled')?.checked;
+  if (!enabled) return;
+  const btnAll = document.getElementById(section === 'global' ? 'sync_all_global' : section === 'regional' ? 'sync_all_regional' : 'sync_all_cookie');
+  const wrapId = section === 'global' ? 'adblock_global_lists' : section === 'regional' ? 'adblock_regional_lists' : 'adblock_cookie_lists';
+  const wrap = document.getElementById(wrapId);
+  if (!wrap || !btnAll) return;
+  try {
+    btnAll.dataset.loading = '1';
+    btnAll.disabled = true;
+    // 选择器与按钮集合
+    const rows = Array.from(wrap.querySelectorAll('label'));
+    const selectedIds = new Set(Array.from(wrap.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked).map(cb => cb.dataset.listId));
+    // 如果该分区有选择，则仅更新勾选的；否则全部
+    const tasks = [];
+    rows.forEach(row => {
+      const btn = row.querySelector('.sync-btn');
+      const id = btn?.dataset.listId;
+      if (!btn || !id) return;
+      if (selectedIds.size > 0 && !selectedIds.has(id)) return;
+      const name = btn.dataset.name || id;
+      tasks.push({ btn, id, name });
+    });
+    let ok = 0, fail = 0;
+    for (const t of tasks) {
+      const res = await syncOneList(t.btn, t.id, t.name);
+      if (res) ok++; else fail++;
+      // 微小间隔，避免 UI 抖动
+      await new Promise(r => setTimeout(r, 80));
+    }
+    // 总结提示
+    const summary = document.getElementById(section === 'global' ? 'adblock_global_summary_inline' : section === 'regional' ? 'adblock_regional_summary_inline' : 'adblock_cookie_summary_inline');
+    if (summary) {
+      if (tasks.length === 0) summary.textContent = await t('adblock.noTasks');
+      else summary.textContent = `${await t('adblock.resultOkLabel')} ${ok} · ${await t('adblock.resultFailLabel')} ${fail}`;
+    }
+  } finally {
+    try { btnAll.dataset.loading = '0'; btnAll.disabled = false; } catch {}
+  }
+}
+
+
+/* =========================
  * 事件绑定
  * ========================= */
 const $openShortcut = document.getElementById("open-shortcut");
@@ -847,5 +1276,4 @@ $("baseURL").addEventListener("input", markCustomIfManualChange);
 $("model_extract").addEventListener("input", markCustomIfManualChange);
 $("model_summarize").addEventListener("input", markCustomIfManualChange);
 
-// 初始加载
-loadSettings();
+// 初始加载移至 DOMContentLoaded 里，确保先渲染广告列表再回填

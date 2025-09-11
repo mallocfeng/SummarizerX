@@ -3,6 +3,7 @@
 
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
 import { getSettings } from "./settings.js";
+import { FILTER_LISTS } from "./adblock_lists.js";
 
 
 // ⬇️ 保留系统预设（可继续由本文件维护；若你也想统一到 settings.js，也可一起挪过去）
@@ -232,49 +233,531 @@ async function runForTab(tabId) {
   });
 }
 
+/* --------------------------------------------------------------- */
+// uBO-style network redirection/blocking for video ads on news/portal sites
+// We use MV3 Declarative Net Request to:
+// 1) Redirect certain ad SDKs/modules to local no-op stubs (to avoid breaking players)
+// 2) Block ad SDKs/ad servers when initiator is a known site (site packages)
+async function setupVideoAdDNRRules() {
+  const rules = [
+    // Redirect Betamax ads module to an empty stub to avoid ad initialization
+    {
+      id: 2001,
+      priority: 1,
+      action: {
+        type: "redirect",
+        redirect: { extensionPath: "/stubs/nyt-betamax-ads-stub.js" }
+      },
+      condition: {
+        regexFilter: "^https://static01\\.nyt\\.com/video-static/betamax/ads-.*\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // ---- Pornhub: block primary ad network (TrafficJunky) ----
+    {
+      id: 2201,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?trafficjunky\\.net/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: [
+          'www.pornhub.com','cn.pornhub.com','m.pornhub.com','www.pornhubpremium.com','pornhub.com'
+        ]
+      }
+    },
+    // Block GPT library when loaded from nytimes pages
+    {
+      id: 2002,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://(securepubads\\.g\\.doubleclick\\.net|pagead2\\.googlesyndication\\.com)/",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // Block Amazon A9 apstag from nytimes pages
+    {
+      id: 2003,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://c\\.amazon-adsystem\\.com/aax2/apstag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+    // Block Media.net client script from nytimes pages
+    {
+      id: 2004,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://warp\\.media\\.net/js/tags/clientag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: ["www.nytimes.com","nytimes.com"]
+      }
+    },
+
+    // ---- Generic site packages: CNN, Reuters, Bloomberg, Guardian, Yahoo, CNET ----
+    // Redirect IMA3 SDK to no-op stub (safer than outright blocking) for these sites
+    {
+      id: 2101,
+      priority: 1,
+      action: {
+        type: "redirect",
+        redirect: { extensionPath: "/stubs/ima3-empty.js" }
+      },
+      condition: {
+        regexFilter: "^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block FreeWheel SDK/requests for these sites
+    {
+      id: 2102,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://[a-z0-9.-]*fwmrm\\.net/",
+        resourceTypes: ["script","xmlhttprequest","media"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block GPT on these sites (optional; can reduce pre-roll triggers)
+    {
+      id: 2103,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://(securepubads\\.g\\.doubleclick\\.net|pagead2\\.googlesyndication\\.com)/",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block Amazon A9 on these sites
+    {
+      id: 2104,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://c\\.amazon-adsystem\\.com/aax2/apstag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "www.cnn.com","edition.cnn.com","cnn.com",
+          "www.reuters.com","reuters.com",
+          "www.bloomberg.com","bloomberg.com",
+          "www.theguardian.com","theguardian.com",
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    },
+    // Block Media.net on these sites (seen on some portals)
+    {
+      id: 2105,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https://warp\\.media\\.net/js/tags/clientag\\.js",
+        resourceTypes: ["script"],
+        initiatorDomains: [
+          "news.yahoo.com","finance.yahoo.com","www.yahoo.com","yahoo.com",
+          "www.cnet.com","cnet.com"
+        ]
+      }
+    }
+  ];
+
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const targetIds = rules.map(r => r.id);
+    const toRemove = existing.filter(r => targetIds.includes(r.id)).map(r => r.id);
+    if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules, removeRuleIds: [] });
+  } catch (e) {
+    console.warn('DNR setup failed:', e);
+  }
+
+  // Optional: enable IMA3 redirect on Pornhub if user toggles it in storage
+  try {
+    const { adblock_ima_stub_pornhub = false } = await chrome.storage.sync.get({ adblock_ima_stub_pornhub: false });
+    const imaRule = {
+      id: 2202,
+      priority: 1,
+      action: { type: 'redirect', redirect: { extensionPath: '/stubs/ima3-empty.js' } },
+      condition: {
+        regexFilter: '^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js',
+        resourceTypes: ['script'],
+        initiatorDomains: ['www.pornhub.com','cn.pornhub.com','m.pornhub.com','www.pornhubpremium.com','pornhub.com']
+      }
+    };
+    const existing2 = await chrome.declarativeNetRequest.getDynamicRules();
+    const has = existing2.some(r => r.id === 2202);
+    if (adblock_ima_stub_pornhub && !has) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ addRules: [imaRule], removeRuleIds: [] });
+    } else if (!adblock_ima_stub_pornhub && has) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ addRules: [], removeRuleIds: [2202] });
+    }
+  } catch (e) { console.warn('DNR optional IMA rule update failed:', e); }
+}
+
+/* ====================== SpankBang session rules (site pack) ====================== */
+const SPANKBANG_DOMAINS = ['spankbang.com','www.spankbang.com'];
+
+function isSpankbangHost(h){
+  if (!h) return false;
+  return h === 'spankbang.com' || h === 'www.spankbang.com' || h.endsWith('.spankbang.com');
+}
+
+function spankbangInitiators(){ return SPANKBANG_DOMAINS; }
+
+async function buildSpankbangRules() {
+  const initiators = spankbangInitiators();
+  const { adblock_ima_stub_spankbang = false } = await chrome.storage.sync.get({ adblock_ima_stub_spankbang: false });
+  const out = [
+    // Block ExoClick / ExoSrv (common ad network on spankbang)
+    {
+      id: 2301,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?exoclick\\.com/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    },
+    {
+      id: 2302,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter: '^https?://([a-z0-9.-]*\\.)?exosrv\\.com/',
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    }
+  ];
+  if (adblock_ima_stub_spankbang) {
+    out.push({
+      id: 2303,
+      priority: 1,
+      action: { type: 'redirect', redirect: { extensionPath: '/stubs/ima3-empty.js' } },
+      condition: {
+        regexFilter: '^https://imasdk\\.googleapis\\.com/js/sdkloader/ima3\\.js',
+        resourceTypes: ['script'],
+        initiatorDomains: initiators
+      }
+    });
+  }
+  return out;
+}
+
+async function refreshSpankbangSessionRules(){
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch {}
+  let hasSB = false;
+  for (const t of tabs) {
+    try {
+      const h = new URL(t.url || '').hostname;
+      if (isSpankbangHost(h)) { hasSB = true; break; }
+    } catch {}
+  }
+  try {
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managedIds = existing.filter(r => r.id === 2301 || r.id === 2302 || r.id === 2303).map(r => r.id);
+    if (!hasSB) {
+      if (managedIds.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managedIds, addRules: [] });
+      return;
+    }
+    const desired = await buildSpankbangRules();
+    const desiredIds = desired.map(r => r.id);
+    const toRemove = managedIds.filter(id => !desiredIds.includes(id));
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: toRemove, addRules: desired });
+  } catch (e) { console.warn('refreshSpankbangSessionRules failed:', e); }
+}
+
+// ===== Stricter but safe ad network blocks for common adult sites =====
+const ADULT_SETS = {
+  xvideos: ['xvideos.com','www.xvideos.com','es.xvideos.com','de.xvideos.com','fr.xvideos.com'],
+  xnxx:    ['xnxx.com','www.xnxx.com','m.xnxx.com'],
+  youporn: ['youporn.com','www.youporn.com','m.youporn.com'],
+  redtube: ['redtube.com','www.redtube.com','m.redtube.com'],
+  missav:  ['missav.ws','www.missav.ws','missav.com','www.missav.com'],
+  spankbang: ['spankbang.com','www.spankbang.com','spankbang.party','www.spankbang.party'],
+  supjav:  ['supjav.com','www.supjav.com'],
+  njav:    ['njav.tv','www.njav.tv','njav.co','www.njav.co'],
+  av123:   ['123av.com','www.123av.com']
+};
+
+function adultInitiators(){
+  const out = [];
+  for (const k of Object.keys(ADULT_SETS)) out.push(...ADULT_SETS[k]);
+  return out;
+}
+
+function isAdultInitiatorHost(h){
+  if (!h) return false;
+  const set = new Set(adultInitiators());
+  if (set.has(h)) return true;
+  // also allow matching subdomains
+  return Array.from(set).some(d => h === d || h.endsWith(`.${d.replace(/^www\./,'')}`));
+}
+
+async function buildAdultRules(){
+  const initiators = adultInitiators();
+  const rules = [];
+  let id = 2401;
+  const addBlock = (regexFilter) => {
+    rules.push({
+      id: id++,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        regexFilter,
+        resourceTypes: ['script','xmlhttprequest','image','media','sub_frame'],
+        initiatorDomains: initiators
+      }
+    });
+  };
+
+  // Common adult ad networks (safe to block; do not affect core players/CDNs)
+  addBlock('^https?://([a-z0-9.-]*\\.)?exoclick\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?exosrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?exdynsrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?oclasrv\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?juicyads\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?tsyndicate\\.com/'); // TrafficStars CDN
+  addBlock('^https?://([a-z0-9.-]*\\.)?popads\\.net/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?propellerads\\.com/');
+  // Extra strict for xvideos ecosystem and similar tubes (safe):
+  addBlock('^https?://([a-z0-9.-]*\\.)?trafficfactory\\.biz/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?popcash\\.net/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?adsterra\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?hilltopads\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?clickaine\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?adtng\\.com/'); // Adtelligent
+  addBlock('^https?://([a-z0-9.-]*\\.)?adtelligent\\.com/');
+  addBlock('^https?://([a-z0-9.-]*\\.)?mgid\\.com/');
+
+  return rules;
+}
+
+async function refreshAdultSiteSessionRules(){
+  // Check if any tab is one of our adult initiators
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch {}
+  let hasAdult = false;
+  for (const t of tabs) {
+    try {
+      const h = new URL(t.url || '').hostname;
+      if (isAdultInitiatorHost(h)) { hasAdult = true; break; }
+    } catch {}
+  }
+  try {
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managed = existing.filter(r => r.id >= 2401 && r.id <= 2499).map(r => r.id);
+    if (!hasAdult) {
+      if (managed.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managed, addRules: [] });
+      return;
+    }
+    const desired = await buildAdultRules();
+    const desiredIds = desired.map(r => r.id);
+    const toRemove = managed.filter(id => !desiredIds.includes(id));
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: toRemove, addRules: desired });
+  } catch (e) { console.warn('refreshAdultSiteSessionRules failed:', e); }
+}
+
+// Hook session rules refresh on lifecycle and tab events
+  try {
+    chrome.runtime.onInstalled.addListener(() => { refreshSpankbangSessionRules(); });
+    if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { refreshSpankbangSessionRules(); });
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); }
+    });
+    chrome.tabs.onRemoved.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
+    chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
+  } catch {}
+
+  chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
+
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // 告诉 Chrome：这是异步响应
+  // 仅对本监听器支持的消息返回 true（异步），避免阻塞其他监听器的响应
   let responded = false;
   const safeReply = (payload) => { if (!responded) { sendResponse(payload); responded = true; } };
 
-  (async () => {
-    if (msg?.type === "PANEL_GET_STATE" && typeof msg.tabId === "number") {
+  if (msg?.type === "PANEL_GET_STATE" && typeof msg.tabId === "number") {
+    (async () => {
       const st = await getState(msg.tabId);
       safeReply({ ok: true, data: st });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
-      // 🚀 关键：立刻回复 ok，然后“后台异步”跑两阶段任务
-      await setState(msg.tabId, { status: "running" }); // 抢先置 running
+  if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
+    (async () => {
+      await setState(msg.tabId, { status: "running" });
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
       });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "GET_ACTIVE_TAB_ID") {
+  if (msg?.type === "GET_ACTIVE_TAB_ID") {
+    (async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         safeReply({ ok: true, tabId: tab?.id ?? null });
       } catch (e) {
         safeReply({ ok: false, error: String(e) });
       }
-      return;
-    }
+    })();
+    return true;
+  }
 
-    if (msg?.type === "OPEN_OPTIONS") {
+  if (msg?.type === "OPEN_OPTIONS") {
+    (async () => {
       try { await chrome.runtime.openOptionsPage(); } catch {}
       safeReply({ ok: true });
-      return;
-    }
+    })();
+    return true;
+  }
 
-    // 移除空分支：GET_MODEL_INFO 未使用
+  // 未处理的消息：让其它监听器接管（返回 false）
+  return false;
+});
+
+/* ====================== 广告过滤：规则下载与缓存 ====================== */
+let adblockUpdateTimer = null;
+
+function listMap() {
+  const m = new Map();
+  FILTER_LISTS.forEach(x => m.set(x.id, x));
+  return m;
+}
+
+async function downloadText(url) {
+  const res = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache', credentials: 'omit' });
+  const text = await safeReadText(res);
+  if (!res.ok) {
+    const e = new Error(`HTTP ${res.status}`);
+    e.status = res.status;
+    e.body = text?.slice(0, 300) || '';
+    throw e;
+  }
+  return text;
+}
+
+async function downloadAdblockRules(selectedIds = []) {
+  const idSet = new Set((selectedIds || []).filter(Boolean));
+  if (idSet.size === 0) {
+    await chrome.storage.local.set({ adblock_rules: {}, adblock_last_update: Date.now(), adblock_error: null });
+    return;
+  }
+  const map = listMap();
+  const results = {};
+  const errors = [];
+  for (const id of idSet) {
+    const item = map.get(id);
+    if (!item) continue;
+    try {
+      const txt = await downloadText(item.url);
+      results[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: Date.now(), content: txt };
+    } catch (e) {
+      errors.push(`${id}: ${e?.message || e}`);
+    }
+  }
+  await chrome.storage.local.set({ adblock_rules: results, adblock_last_update: Date.now(), adblock_error: errors.length ? errors.join('\n') : null });
+}
+
+function scheduleAdblockUpdate(reason) {
+  if (adblockUpdateTimer) { clearTimeout(adblockUpdateTimer); }
+  adblockUpdateTimer = setTimeout(async () => {
+    try {
+      const { adblock_enabled = false, adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_selected: [] });
+      if (!adblock_enabled) return;
+      await downloadAdblockRules(adblock_selected);
+    } catch (e) {
+      try { await chrome.storage.local.set({ adblock_error: e?.message || String(e) }); } catch {}
+    }
+  }, 500); // 简单防抖
+}
+
+// 存储变化时触发下载
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'sync') return;
+    if (changes.adblock_enabled || changes.adblock_selected) {
+      scheduleAdblockUpdate('storage_changed');
+    }
+  });
+} catch {}
+
+// 启动时若启用则刷新一次
+(async () => {
+  try {
+    const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+    if (adblock_enabled) scheduleAdblockUpdate('startup');
+  } catch {}
+})();
+
+// 单条规则下载（供设置页点击“同步”）
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type !== 'ADBLOCK_DOWNLOAD_ONE') return; // 其他消息不处理
+
+  (async () => {
+    try {
+      const id = String(msg.id || '');
+      const m = listMap();
+      let item = m.get(id);
+      // 兼容：若列表未在后台映射（例如新增后未刷新后台），允许使用前端传入的 url/name
+      if (!item) {
+        const url = typeof msg.url === 'string' ? msg.url : '';
+        const name = typeof msg.name === 'string' ? msg.name : id;
+        if (!url) throw new Error('Unknown list');
+        item = { id, url, name };
+      }
+      const txt = await downloadText(item.url);
+      const now = Date.now();
+      // 合并更新 storage.local
+      const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
+      adblock_rules[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: now, content: txt };
+      await chrome.storage.local.set({ adblock_rules, adblock_last_update: now });
+      sendResponse?.({ ok: true, id, size: txt.length, updatedAt: now });
+    } catch (e) {
+      sendResponse?.({ ok: false, error: e?.message || String(e), status: e?.status || null, body: e?.body || '' });
+    }
   })();
 
-  return true; // 保持消息通道
+  return true; // 异步
 });
 
 /* ====================== 浮动面板注入与关闭 ====================== */
@@ -554,9 +1037,9 @@ async function safeReadText(res){ try { return await res.text(); } catch { retur
 // 1) 尝试关闭该 tab 的 Side Panel（如果有）
 // 2) 通知该 tab 的内容脚本移除“浮动面板”DOM（不动翻译气泡）
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  (async () => {
-    if (msg?.type !== 'SX_FLOATPANEL_CLOSE') return;
+  if (msg?.type !== 'SX_FLOATPANEL_CLOSE') return false; // 非本消息交给其他监听器
 
+  (async () => {
     try {
       // 优先用消息来源 tabId；否则取当前活动 tab
       let tabId = sender?.tab?.id;
@@ -581,5 +1064,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   })();
 
-  return true; // 异步
+  return true; // 异步，仅处理本类型
 });

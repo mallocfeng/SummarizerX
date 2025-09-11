@@ -1,5 +1,115 @@
 # Changelog
 
+## v2.0.6
+
+### English
+- Settings UI: Added top tabs (AI Summary / Ad Filtering) with i18n text; the page now separates AI configuration (Basic, System Prompt, Shortcuts) from Ad Filtering for clearer navigation.
+- Tab polish: Converted to three‑sided rounded boxes (top/left/right), subtle tint, low‑contrast border, and a gentle glow for the active tab.
+- Active underline: Kept a center‑strong gradient line that fades to the edges; it now moves in sync with the first card’s hover lift for a more natural connection.
+- Visual alignment: Eliminated the gap between header and first card; unified header/card background to remove color shift; softened top‑left highlight.
+- Accessibility: Increased tab label size/weight; i18n for tab titles (English/中文); maintained focus and reduced motion compatibility.
+
+- Adblock: NYTimes pre-roll filtering now uses a safer strategy (limit to DoubleClick/Google Ads/gampad; remove IMA override; improved auto-skip); synced related logic.
+
+### 中文
+- 设置页：新增顶部标签（AI 摘要 / 广告过滤），并支持中英双语；将“基础配置 + 系统提示词 + 快捷键”与“广告过滤”分栏展示，结构更清晰。
+- 标签样式：三面边框（上/左/右）圆角小方框；激活态为浅色微底纹、低对比度描边和轻微发光，低调不刺眼。
+- 渐变下划线：保留“中间最亮，两侧渐隐”的蓝色横线，并与第一张卡片上浮联动，上下同步更自然。
+- 视觉统一：去除标题栏与首卡片的缝隙；统一标题栏/卡片背景，减轻色差；左上高光过渡更柔和。
+- 可读性：提升标签字号与字重；标签标题支持 i18n；保留键盘焦点样式与“减少动态效果”兼容。
+
+- 广告过滤：纽约时报预卷广告采用更安全的方案（仅限 DoubleClick/Google Ads/gampad；取消 IMA 覆写；改进自动跳过）；同步相关逻辑。
+
+## v2.0.5
+
+### English
+- Video ads filtering (site packs, session rules):
+  - Added NYTimes Betamax ads module redirection to a safe stub; keep player intact.
+  - Added first batch of news/portal site packs (CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET):
+    - Redirect Google IMA3 loader to a minimal no‑op module to avoid player breakage.
+    - Block FreeWheel (fwmrm.net), GPT, Amazon A9, and Media.net per site, with initiator scoping.
+  - Session rules: rules are installed only when a tab of the target site is open, and removed automatically when leaving, minimizing side effects.
+  - Prepared no‑op stubs for common ad plugins: IMA3, videojs-contrib-ads, videojs-ima (not used by default unless needed for a specific site).
+
+### 中文
+- 视频广告过滤（站点包 + 会话规则）：
+  - NYTimes：将 Betamax 广告模块重定向到安全空实现，确保播放器不受影响。
+  - 第一批新闻/门户站点包（CNN/路透/彭博/卫报/Yahoo/CNET）：
+    - 将 Google IMA3 加载器重定向到最小空模块，避免播放器因缺少对象报错。
+    - 按站点限定阻断 FreeWheel（fwmrm.net）、GPT、Amazon A9、Media.net（仅在这些站点发起时生效）。
+  - 会话规则：仅在打开相应站点页面时装载规则，离开时自动卸载，最大程度降低副作用。
+  - 预置常见广告插件的空实现：IMA3、videojs-contrib-ads、videojs-ima（默认不启用，仅在特定站点需要时使用）。
+
+## v2.0.4
+
+### English
+- Adblock UI i18n: Localized the entire Ad Filtering card (title, labels, strength buttons, sync text, summaries) for 中文/English.
+- New category: Cookie Notice Hiding with EasyList Cookie General Hide; renders as a third list section with its own “Update All”.
+- Auto-sync on selection: When Ad Filtering is enabled, checking a list immediately triggers a one-time sync for that list.
+- Robust sync: Allow front-end to pass list URL/name to background for single-item sync, avoiding “Unknown list” before the service worker reloads.
+- UI polish: Center-aligned the first-row controls and adjusted spacing; moved the Ad Filtering card below System Prompt.
+
+### 中文
+- 广告过滤多语言化：卡片标题、标签、强度按钮、同步状态与汇总均支持中英双语。
+- 新增分类：Cookie 提示隐藏，内置 EasyList Cookie General Hide；独立显示并支持“一键全部更新”。
+- 勾选自动同步：启用广告过滤时，勾选任意规则会自动执行一次同步，无需手动再点“同步”。
+- 同步更稳健：支持前端在单项同步时传递 URL/名称，避免后台 Service Worker 未刷新时提示“Unknown list”。
+- 交互与排版：第一行控件居中对齐，微调间距；将“广告过滤”卡片移动到“系统提示词”下方。
+
+## v2.0.3
+
+### English
+- Tighten heuristics: Remove risky substring selectors from placeholder collapsing; only consider explicit ad attributes (`data-ad*`, `aria-label*=advert`, `ins.adsbygoogle`, Google ads ids). Added token-based matching with denylist (e.g., `masthead`, `header`, `badge`) to prevent false positives.
+- Strength-aware: When strength is Low, skip placeholder collapsing entirely (keep safe direct removals and floating overlay cleanup).
+
+### 中文
+- 收紧启发式：占位符折叠不再使用高风险的 `[id*="ad"]`/`[class*="ad"]` 模糊匹配，仅依据明确属性（`data-ad*`、`aria-label*=advert`、`ins.adsbygoogle`、Google 广告 id 前缀）。并加入基于 token 的判断和常见误伤词拒绝列表（如 `masthead`、`header`、`badge`）。
+- 强度感知：在“低”强度时，完全跳过占位符折叠（保留安全 DOM 删除与浮动层清理）。
+
+## v2.0.2
+
+### English
+- Safety: Disabled cosmetic element hiding and generic DOM removal on YouTube domains to prevent UI breakage. Popup blocking remains active.
+- Note: A per-site allowlist UI will be considered; this is a safe default hotfix.
+
+### 中文
+- 安全：在 YouTube 域名上禁用元素隐藏与通用 DOM 清理，避免界面异常。保留弹窗拦截功能。
+- 说明：后续考虑加入站点白名单设置；当前为安全默认修复。
+
+## v2.0.1
+
+### English
+- Fix: Remove persistent bottom-corner floating ads on missav.* with a targeted, safe heuristic (detect fixed/sticky, corner-anchored, overlay-ish elements containing ad-like media/text/classes) and collapse trivial wrappers.
+- Robustness: Run floater collapse even when no cosmetic CSS is produced (ensures site-specific cleanup still applies if lists are disabled or not yet synced).
+
+### 中文
+- 修复：针对 missav.* 右下角顽固浮动广告，新增更强但安全的启发式清理（检测固定/粘性、贴边的覆盖元素，且包含广告类媒体/文本/类名），并尝试合并空壳父容器。
+- 稳健性：即使未生成规则 CSS（例如未选择列表或列表未同步），也会执行浮窗折叠，确保站点专用清理生效。
+
+## v2.0.0
+
+### English
+- Ad Filtering (ABP 2.0 cosmetic): New Settings section “广告过滤” with on/off switch.
+- Lists: Choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s Annoyance/Social, Germany/Poland/Spain/Italy/China/Russia, etc.).
+- Per‑list Sync: Click the circular arrows to download the latest TXT; a preview dialog shows the first 10 lines to verify content.
+- Rule Storage: Rules are downloaded and stored locally; preferences sync across devices.
+- Engine: Applies Adblock Plus 2.0 element‑hiding rules (##, ###, #@#; domain and negated domains). Safe subset compiled per host.
+- Strength: Low/Medium/High selector to control aggressiveness and selector complexity.
+- Page Apply: Injects CSS at document_start and also removes simple matches from DOM to “directly” eliminate ad nodes.
+- Flash Reduction: Session cache of compiled CSS to minimize first‑paint flashing on reload.
+- UI/Theme: Improved toggle visibility in light mode; segmented strength control with clear active/hover states; full dark‑mode support.
+
+### 中文
+- 广告过滤（ABP 2.0 元素隐藏）：设置新增“广告过滤”开关。
+- 规则列表：支持选择全球/区域列表（EasyList、EasyPrivacy、Fanboy’s 烦扰/社交、德国/波兰/西班牙/意大利/中国/俄罗斯等）。
+- 单条同步：点击每条规则后的循环箭头即可下载最新 TXT；弹窗预览前 10 行以核对内容。
+- 存储：规则内容保存在本地（storage.local），勾选与强度等偏好同步（storage.sync）。
+- 引擎：按站点编译并应用 Adblock Plus 2.0 的元素隐藏规则（##、###、#@#，支持域名与否定域名）；采用安全子集。
+- 强度：提供低/中/高三档，控制选择器复杂度与拦截激进程度。
+- 页面应用：在 document_start 注入 CSS，同时对简单匹配进行 DOM 删除，实现“直接去除”。
+- 闪烁优化：会话级 CSS 预缓存，减少页面刷新时广告短暂露出的闪现。
+- 界面/主题：亮色模式下开关更显眼；强度分段按钮高亮/悬停更清晰；完整适配暗色主题。
+
 ## v1.9.1
 
 ### English

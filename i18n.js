@@ -4,7 +4,7 @@ const I18N = {
     // 设置页面
     settings: {
       title: "麦乐可 AI 摘要阅读器 · 设置",
-      subtitle: "配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的\"保存全部设置\"。",
+      subtitle: "使用顶部标签在「AI 摘要」与「广告过滤」间切换；点击底部的“保存全部设置”将一次性保存所有设置。",
       basicConfig: "基础配置",
       aiPlatform: "AI 平台",
       trial: "试用（推荐体验）",
@@ -59,7 +59,34 @@ const I18N = {
       trialConsentPrompt: "当前未勾选试用模式同意。是否切换为 OpenAI 模式并继续保存？",
       saveCancelled: "已取消保存。",
       confirmOverride: "自定义提示词已有内容，是否覆盖？",
-      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？"
+      confirmLangOverride: "自定义提示词已有内容，是否根据新语言覆盖？",
+      // Tabs
+      tabAI: "AI 摘要",
+      tabAdblock: "广告过滤"
+    },
+    // 广告过滤
+    adblock: {
+      title: "广告过滤",
+      enable: "启用广告过滤",
+      enableHint: "打开后自动下载所选规则",
+      blockPopups: "弹窗拦截",
+      blockPopupsHint: "阻止“/pop?url=…”等骚扰弹窗",
+      strength: "过滤强度",
+      low: "低",
+      medium: "中",
+      high: "高",
+      globalLists: "全球性广告过滤列表",
+      regionalLists: "区域性广告过滤列表",
+      cookieLists: "Cookie 提示隐藏",
+      tip: "提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。",
+      syncAll: "全部更新",
+      noTasks: "没有可更新的规则",
+      resultOkLabel: "成功",
+      resultFailLabel: "失败",
+      syncing: "同步中…",
+      syncOk: "同步成功",
+      syncFail: "同步失败",
+      cannotSelect: "无法获取规则，已禁用此项；成功同步后可再勾选。"
     },
     // 浮窗面板
     floatPanel: {
@@ -94,7 +121,7 @@ const I18N = {
     // Settings page
     settings: {
       title: "SummarizerX AI Reader · Settings",
-      subtitle: "Configure API / Model / Output Language and System Prompt presets; unified 'Save All Settings' at the bottom.",
+      subtitle: "Use the top tabs to switch between AI Summary and Ad Filtering. Click 'Save All Settings' at the bottom to save everything at once.",
       basicConfig: "Basic Configuration",
       aiPlatform: "AI Platform",
       trial: "Trial (Recommended for Experience)",
@@ -149,7 +176,34 @@ const I18N = {
       trialConsentPrompt: "Trial consent is not checked. Switch to OpenAI mode and continue saving?",
       saveCancelled: "Save cancelled.",
       confirmOverride: "Custom prompt has content, override?",
-      confirmLangOverride: "Custom prompt has content, override based on new language?"
+      confirmLangOverride: "Custom prompt has content, override based on new language?",
+      // Tabs
+      tabAI: "AI Summary",
+      tabAdblock: "Ad Filtering"
+    },
+    // Adblock
+    adblock: {
+      title: "Ad Filtering",
+      enable: "Enable ad filtering",
+      enableHint: "Automatically download selected lists when enabled",
+      blockPopups: "Popup blocking",
+      blockPopupsHint: "Block annoying popups like '/pop?url=…'",
+      strength: "Filter strength",
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      globalLists: "Global Ad Filter Lists",
+      regionalLists: "Regional Ad Filter Lists",
+      cookieLists: "Cookie Notice Hiding",
+      tip: "Tip: selections will download in background and be stored locally, used only by this extension's ad filtering.",
+      syncAll: "Update All",
+      noTasks: "Nothing to update",
+      resultOkLabel: "OK",
+      resultFailLabel: "Fail",
+      syncing: "Syncing…",
+      syncOk: "Synced",
+      syncFail: "Sync failed",
+      cannotSelect: "Cannot fetch rules; disabled. Re-enable after a successful sync."
     },
     // Float panel
     floatPanel: {

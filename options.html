@@ -24,11 +24,16 @@
         </div>
       </div>
       <p class="hero-sub" id="settings-subtitle">配置 API / 模型 / 输出语言与 System Prompt 预设；底部有统一的"保存全部设置"。</p>
+      <!-- 顶部 Tab 导航：AI 摘要 / 广告过滤（置于标题栏底部） -->
+      <nav class="top-tabs" role="tablist" aria-label="Settings Tabs">
+        <button id="tab-ai-btn" class="top-tab active" role="tab" aria-selected="true" data-tab="ai">AI 摘要</button>
+        <button id="tab-adblock-btn" class="top-tab" role="tab" aria-selected="false" data-tab="adblock">广告过滤</button>
+      </nav>
     </div>
   </header>
 
   <main class="wrap main-with-dock">
-    
+    <div id="tab-ai" class="tab-pane">
     <!-- 基础配置 -->
     <section class="section card">
       <h2 class="section-title"><span class="dot"></span> <span id="basic-config">基础配置</span></h2>
@@ -129,6 +134,7 @@
       </div>
     </section>
 
+    
     <!-- System Prompt -->
     <section class="section card note">
       <h2 class="section-title"><span class="dot"></span> <span id="system-prompt-title">System Prompt（系统提示词）</span></h2>
@@ -157,7 +163,7 @@
       </div>
     </section>
 
-    <!-- 快捷键设置（内容最后一栏） -->
+    <!-- 快捷键设置（AI 摘要页内） -->
     <section class="section card shortcut">
       <h2 class="section-title"><span class="dot"></span> <span id="shortcuts-title">快捷键设置</span></h2>
       <p class="shortcut-desc" id="shortcut-desc">你可以在 Chrome 的扩展快捷键页面里绑定快捷键，用于快速打开侧边栏。</p>
@@ -166,6 +172,83 @@
         <span class="hint" id="shortcut-hint">前往 <code>chrome://extensions/shortcuts</code>，搜索"麦乐可AI摘要阅读器"，给命令 <code>打开/切换侧边栏</code> 绑定组合键。</span>
       </div>
     </section>
+    </div>
+
+    <div id="tab-adblock" class="tab-pane is-hidden">
+    <!-- 广告过滤 -->
+    <section class="section card">
+      <h2 class="section-title"><span class="dot"></span> <span id="adblock-title">广告过滤</span></h2>
+      <div class="adblock-row">
+        <div class="field">
+          <label class="label" id="adblock-enable-label">启用广告过滤</label>
+          <div class="row" style="display:flex; align-items:center; gap:12px;">
+            <label class="switch">
+              <input id="adblock_enabled" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="hint" id="adblock-enable-hint">打开后自动下载所选规则</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" id="adblock-block-popups-label">弹窗拦截</label>
+          <div class="row" style="display:flex; align-items:center; gap:12px;">
+            <label class="switch">
+              <input id="adblock_block_popups" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="hint" id="adblock-block-popups-hint">阻止“/pop?url=…”等骚扰弹窗</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" id="adblock-strength-label">过滤强度</label>
+          <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
+            <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
+            <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
+            <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" id="adblock-global-lists-label"><span id="adblock-global-lists-text">全球性广告过滤列表</span>
+          <button id="sync_all_global" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_global_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
+        <div id="adblock_global_lists" class="checklist"></div>
+      </div>
+
+      <div class="field" style="margin-top:12px;">
+        <label class="label" id="adblock-regional-lists-label"><span id="adblock-regional-lists-text">区域性广告过滤列表</span>
+          <button id="sync_all_regional" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_regional_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
+        <div id="adblock_regional_lists" class="checklist"></div>
+      </div>
+
+      <div class="field" style="margin-top:12px;">
+        <label class="label" id="adblock-cookie-lists-label"><span id="adblock-cookie-lists-text">Cookie 提示隐藏</span>
+          <button id="sync_all_cookie" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_cookie_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
+        <div id="adblock_cookie_lists" class="checklist"></div>
+      </div>
+
+      <p class="hint" id="adblock-tip">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>
+    </section>
+    </div>
   </main>
 
   <!-- 新增：底部占位，避免被固定保存栏遮挡 -->

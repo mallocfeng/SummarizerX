@@ -1,13 +1,49 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX AI Reader",
-  "version": "1.9.1",
+  "version": "2.0.6",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
-  "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "contextMenus",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://easylist.to/*",
+    "https://easylist-downloads.adblockplus.org/*",
+    "https://filters.adtidy.org/*",
+    "https://raw.githubusercontent.com/*",
+    "https://pgl.yoyo.org/*",
+    "https://ublockorigin.github.io/*",
+    "https://adguardteam.github.io/*",
+    "https://*.nytimes.com/*",
+    "https://static01.nyt.com/*",
+    "https://securepubads.g.doubleclick.net/*",
+    "https://c.amazon-adsystem.com/*",
+    "https://warp.media.net/*",
+    "https://imasdk.googleapis.com/*",
+    "https://*.fwmrm.net/*",
+    "https://*.cnn.com/*",
+    "https://*.reuters.com/*",
+    "https://*.bloomberg.com/*",
+    "https://*.theguardian.com/*",
+    "https://*.yahoo.com/*",
+    "https://*.cnet.com/*"
+  ],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [
     {
-      "resources": ["i18n.js", "vendor/petite-vue.iife.js"],
+      "resources": [
+        "i18n.js",
+        "vendor/petite-vue.iife.js",
+        "adblock_engine.js",
+        "block_pop.js",
+        "stubs/nyt-betamax-ads-stub.js",
+        "stubs/ima3-empty.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
@@ -31,6 +67,12 @@
       "matches": ["<all_urls>"],
       "js": ["selection_translate.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["adblock_content.js"],
+      "run_at": "document_start",
+      "all_frames": true
     }
   ]
 }

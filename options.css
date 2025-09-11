@@ -108,16 +108,19 @@ html.lang-anim.lang-out .save-dock{
  * ========================= */
 .hero{
   position: relative;
+  /* Unify hero background with cards to remove color shift */
   background:
-    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
-    linear-gradient(180deg, var(--glass) 0%, var(--glass-soft) 100%);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
-  backdrop-filter: blur(12px) saturate(1.05);
+    /* soften the top-left highlight: larger radius, lower opacity, longer fade */
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
   border: 1px solid var(--border);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  padding: 20px 0 16px;
-  margin: 0 0 16px;
+  padding: 20px 0 0; /* remove space under tabs */
+  margin: 0;         /* eliminate gap above first card */
+  border-bottom: 0; /* separator will be drawn by the first card so it can float together */
   box-shadow: 0 2px 10px rgba(16,24,40,.06);
 }
 
@@ -142,6 +145,98 @@ html.lang-anim.lang-out .save-dock{
   font-size:12px; color:#3730a3; background:#eef2ff; border:1px solid #c7d2fe;
   padding:3px 8px; border-radius:999px;
 }
+
+/* Top tabs under header — tab look */
+.top-tabs{ display:flex; gap:8px; margin-top:10px; margin-bottom:0; /* small gap between tab boxes */ }
+.top-tabs .top-tab:first-child{ margin-left: 1px; } /* nudge first tab 1px to the right */
+.top-tab{
+  appearance:none; background: var(--surface-2); color:#5b667a;
+  padding:10px 14px 8px; margin:0;
+  border:1px solid var(--border); border-bottom:none; /* three-sided box */
+  border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-left-radius:0; border-bottom-right-radius:0;
+  font-size:14px; font-weight:800; cursor:pointer;
+  position: relative; /* for underline pseudo-element */
+  transition: transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
+}
+.top-tab:hover{ color:#0f172a; background:#eef1f7; }
+.top-tab.active,
+.top-tab[aria-selected="true"]{
+  color: var(--text); /* light mode: use regular text color (black-ish) */
+  background: rgba(37,99,235,.04);            /* lighter tint */
+  border-color: rgba(37,99,235,.22);          /* lower-contrast border */
+  box-shadow: 0 0 0 1px rgba(37,99,235,.04) inset,
+              0 0 6px rgba(37,99,235,.05);    /* softer glow */
+}
+/* Draw active underline with pseudo so it can move when card floats */
+.top-tab.active::after,
+.top-tab[aria-selected="true"]::after{
+  content: "";
+  position: absolute;
+  left: -2px; right: -2px; height: 2px;
+  bottom: 0; /* move down by 2px for better alignment */
+  z-index: 1;  /* ensure it renders above surrounding borders */
+  /* Center-strong gradient: opaque in middle, fade to transparent at edges */
+  background: linear-gradient(90deg,
+    rgba(37,99,235,0) 0%,      /* transparent left edge */
+    rgba(37,99,235,1) 50%,     /* peak at center */
+    rgba(37,99,235,0) 100%     /* transparent right edge */
+  );
+  border-radius: 2px;
+  transition: transform .15s ease;
+}
+html[data-theme="dark"] .top-tabs{ border-bottom-color: var(--border); }
+html[data-theme="dark"] .top-tab{ color:#a3adc2; background:#1a2333; border-color: var(--border); }
+html[data-theme="dark"] .top-tab:hover{ color:#e7ebf3; background:#24324a; }
+html[data-theme="dark"] .top-tab.active,
+html[data-theme="dark"] .top-tab[aria-selected="true"]{
+  color:#fff; /* white label on dark active tab */
+  background: rgba(123,140,255,.06);          /* lighter tint on dark */
+  border-color: rgba(123,140,255,.25);         /* lower-contrast border */
+  box-shadow: 0 0 0 1px rgba(123,140,255,.04) inset,
+              0 0 6px rgba(123,140,255,.06);   /* softer glow */
+}
+html[data-theme="dark"] .top-tab.active::after,
+html[data-theme="dark"] .top-tab[aria-selected="true"]::after{
+  background: linear-gradient(90deg,
+    rgba(123,140,255,0) 0%,     /* transparent left */
+    rgba(123,140,255,1) 50%,    /* center peak */
+    rgba(123,140,255,0) 100%    /* transparent right */
+  );
+}
+.top-tab:focus-visible{ outline:none; box-shadow: 0 2px 0 0 var(--primary) inset; }
+
+/* Connect first card with active tab: remove top border/radius for seamless feel */
+.tab-pane .section.card:first-of-type{
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+  position: relative; /* allow pseudo separator line */
+}
+
+/* Draw the separator line on the first card, so it "floats" with the card hover */
+.tab-pane .section.card:first-of-type::before{
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: -1px; height: 1px;
+  background: var(--border);
+}
+
+/* When first card floats up, move the active tab underline up the same amount */
+.hero.tabs-float .top-tab.active::after,
+.hero.tabs-float .top-tab[aria-selected="true"]::after{
+  transform: translateY(0); /* rely on tab's own -2px lift so underline matches card exactly */
+}
+
+/* Lift the active tab box along with the first card hover for a unified motion */
+.hero.tabs-float .top-tab.active,
+.hero.tabs-float .top-tab[aria-selected="true"]{
+  transform: translateY(-2px);
+}
+
+/* Tab panes */
+.tab-pane{ display:block; }
+.tab-pane.is-hidden{ display:none; }
 
 /* Language switcher — segmented */
 .language-switcher{ display:flex; gap:4px; background: var(--surface-2); border:1px solid var(--border); border-radius: 8px; padding: 2px; }
@@ -564,7 +659,15 @@ html[data-theme="light"]{
 
 /* Surfaces: hero & dock 使用与卡片一致的淡蓝配色（更和谐） */
 /* Light theme uses glass backgrounds defined above; keep borders if needed */
-html[data-theme="light"] .hero,
+/* Light theme: keep hero visually same as cards (add subtle candy tint like cards) */
+html[data-theme="light"] .hero{
+  background:
+    /* match softened highlight in light mode as well */
+    radial-gradient(220px 160px at 24px -24px, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 80%),
+    linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 60%, rgba(255,255,255,0) 100%),
+    linear-gradient(180deg, var(--card-glass) 0%, var(--card-glass-soft) 100%);
+  border-color: var(--card-br);
+}
 html[data-theme="light"] .save-dock{ border-color: var(--card-br); }
 html[data-theme="light"] .section.card{ border-color: var(--card-br); }
 
@@ -670,3 +773,99 @@ html[data-theme="light"] #trial-consent-wrap.consent-ok .help:focus-within{
   outline-offset: 2px;
 }
 html[data-theme="dark"] #trial-consent-wrap.consent-ok .help:focus-within{ box-shadow: 0 0 0 4px rgba(34,197,94,.22) !important; }
+/* ---- Toggle Switch (拨码开关) ---- */
+.switch{ position:relative; display:inline-block; width:46px; height:26px; }
+.switch input{ opacity:0; width:0; height:0; }
+.switch-slider{ position:absolute; cursor:pointer; inset:0; background:var(--surface-2); border-radius:999px; transition:.2s ease; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.switch-slider::before{ content:""; position:absolute; width:22px; height:22px; left:2px; top:2px; background:#fff; border-radius:50%; transition:.2s ease; box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.switch input:checked + .switch-slider{ background: var(--primary); }
+.switch input:checked + .switch-slider::before{ transform:translateX(20px); }
+.switch input:disabled + .switch-slider{ opacity:.5; cursor:not-allowed; }
+.switch input:focus-visible + .switch-slider{ box-shadow: var(--ring); }
+
+/* Improve OFF contrast in light theme */
+html[data-theme="light"] .switch .switch-slider{ background:#e5e7eb; box-shadow: inset 0 0 0 1px #cbd5e1; }
+html[data-theme="light"] .switch:hover .switch-slider{ background:#e2e8f0; box-shadow: inset 0 0 0 1px #cbd5e1; }
+html[data-theme="light"] .switch input:checked + .switch-slider{
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-600) 100%);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.24), 0 0 0 1px rgba(37,99,235,.35);
+}
+html[data-theme="light"] .switch input:checked + .switch-slider::before{
+  background:#fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+
+/* ---- Disabled field visual ---- */
+.field.disabled{ opacity:.6; pointer-events:none; }
+
+/* ---- Segmented buttons reuse (for 强度) ---- */
+#adblock-strength-seg{ display:inline-flex; gap:4px; border-radius:10px; padding:4px; background: var(--surface-2); border:1px solid var(--border); }
+#adblock-strength-seg .seg-btn{ appearance:none; border:0; background:transparent; padding:6px 12px; font:inherit; color: var(--muted); cursor:pointer; border-radius:8px; transition: background .15s, color .15s, box-shadow .15s; }
+#adblock-strength-seg .seg-btn:hover{ background: rgba(0,0,0,.04); color:#0f172a; }
+#adblock-strength-seg .seg-btn[aria-selected="true"],
+#adblock-strength-seg .seg-btn.active{ background: var(--primary); color:#fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+#adblock-strength-seg .seg-btn:focus-visible{ outline: none; box-shadow: var(--ring); }
+#adblock-strength-seg .seg-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+/* Dark theme adaptations for adblock strength */
+html[data-theme="dark"] #adblock-strength-seg{ background:#1a2333; border-color: var(--border); }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn{ color:#d7dde7; }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn:hover{ background: rgba(255,255,255,.06); color:#fff; }
+html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
+html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
+
+/* ---- Adblock first row layout (three controls in one line) ---- */
+.adblock-row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.adblock-row .field{ margin: 0; min-width: 220px; }
+.adblock-row .field .label{ margin-bottom: 6px; }
+.adblock-row .switch{ transform: none; }
+
+/* Per-rule sync button */
+.sync-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:6px; }
+.sync-btn:hover{ background: rgba(0,0,0,.05); color:#1f2937; }
+.sync-btn:focus-visible{ outline:none; box-shadow: var(--ring); }
+.sync-btn[disabled]{ opacity:.45; cursor:not-allowed; }
+.sync-btn svg{ width:16px; height:16px; stroke: currentColor; fill:none; }
+.sync-btn[data-loading="1"] svg{ animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.adbl-status{ font-size:12px; color:#64748b; margin-left:2px; }
+.adbl-status.ok{ color:#059669; }
+.adbl-status.err{ color:#b91c1c; }
+html[data-theme="dark"] .sync-btn:hover{ background: rgba(255,255,255,.06); color:#e6ebf5; }
+html[data-theme="dark"] .adbl-status{ color:#9fb0c6; }
+html[data-theme="dark"] .adbl-status.ok{ color:#7dd3a7; }
+html[data-theme="dark"] .adbl-status.err{ color:#fb7185; }
+
+/* Keep per-row layout stable when status appears */
+/* Adblock lists — aligned grid rows */
+.checklist{ display:block; }
+.checklist label.adbl-row{
+  display:grid; grid-template-columns: 20px 1fr 28px 120px; align-items:center; column-gap:10px;
+  margin: 6px 0; padding: 0;
+}
+.checklist label.adbl-row input[type="checkbox"]{ width:16px; height:16px; }
+.checklist .adbl-name{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.checklist .sync-btn{ width:24px; height:24px; justify-self:start; }
+.checklist .adbl-status{ width:120px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left; min-height:1.2em; }
+
+/* Batch summary below each section */
+.adbl-summary{ margin-top:6px; font-size:12px; color:#64748b; min-height:1.2em; }
+html[data-theme="dark"] .adbl-summary{ color:#9fb0c6; }
+/* Sync-all buttons next to section labels */
+.sync-all-btn{ appearance:none; border:0; background:transparent; color:#5b6b7f; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; margin-left:8px; vertical-align:middle; }
+.sync-all-btn{ position: relative; }
+.sync-all-btn:hover{ background: rgba(0,0,0,.05); color:#1f2937; }
+.sync-all-btn:focus-visible{ outline:none; box-shadow: var(--ring); }
+.sync-all-btn[disabled]{ opacity:.45; cursor:not-allowed; }
+.sync-all-btn svg{ width:16px; height:16px; stroke: currentColor; fill:none; }
+.sync-all-btn[data-loading="1"] svg{ animation: spin 1s linear infinite; }
+html[data-theme="dark"] .sync-all-btn:hover{ background: rgba(255,255,255,.06); color:#e6ebf5; }
+
+/* Custom tooltip for sync-all */
+.sync-all-btn:hover::after{ content: attr(data-tip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); background: rgba(17,24,39,.92); color: #f8fafc; padding: 4px 6px; border-radius: 6px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 10; }
+html[data-theme="light"] .sync-all-btn:hover::after{ background: rgba(0,0,0,.82); color:#fff; }
+
+/* Inline summary near the label button */
+.adbl-summary-inline{ margin-left:8px; font-size:12px; color:#64748b; }
+html[data-theme="dark"] .adbl-summary-inline{ color:#9fb0c6; }
