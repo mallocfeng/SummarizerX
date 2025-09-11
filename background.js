@@ -818,6 +818,28 @@ const MENU_ID_TRANSLATE_FULL = 'sx_translate_full';
 // 记录各 tab 是否已处于“全文对照翻译插入”状态
 const inlineStateByTab = new Map(); // tabId -> boolean
 
+// 根据当前 tab 的状态，更新“全文翻译/显示原文”菜单标题（用于跨 Tab 时保持独立状态）
+async function updateFullMenuTitleForTab(tabId){
+  try{
+    if (typeof tabId !== 'number') return;
+    const inline = inlineStateByTab.get(tabId) === true;
+    const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+    const targetLang = await getTargetLang();
+    let title = '';
+    if (inline) {
+      title = (ui_language === 'en')
+        ? 'SummarizerX: Restore original (remove inline translations)'
+        : 'SummarizerX：显示原文（移除对照翻译）';
+    } else {
+      title = (ui_language === 'en')
+        ? (targetLang === 'en' ? 'SummarizerX: Translate full page (inline → English)' : 'SummarizerX: Translate full page (inline → Chinese)')
+        : (targetLang === 'en' ? 'SummarizerX：全文翻译（段落对照 → 英文）' : 'SummarizerX：全文翻译（段落对照 → 中文）');
+    }
+    chrome.contextMenus.update(MENU_ID_TRANSLATE_FULL, { title });
+    chrome.contextMenus.refresh?.();
+  }catch{}
+}
+
 // 根据设置返回目标语言 'zh' | 'en'（默认 zh）
 async function getTargetLang() {
   const { output_lang = 'zh' } = await chrome.storage.sync.get({ output_lang: 'zh' });
@@ -902,6 +924,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
     ensureContextMenu();
   }
 });
+
+// 在激活标签、窗口焦点变化、或页面加载完成时，同步菜单标题为激活 tab 的状态
+try {
+  chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+    await updateFullMenuTitleForTab(tabId);
+  });
+} catch {}
+try {
+  chrome.windows?.onFocusChanged?.addListener(async () => {
+    try {
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (active?.id != null) await updateFullMenuTitleForTab(active.id);
+    } catch {}
+  });
+} catch {}
+try {
+  chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+    if (info.status === 'complete') { updateFullMenuTitleForTab(tabId); }
+  });
+} catch {}
 
 // 右键点击：让内容脚本执行翻译动作
 // chrome.contextMenus.onClicked.addListener(async (info, tab) => {
