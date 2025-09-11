@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.0.7-beta
+
+### English
+- Ad Filtering UI: The first four controls (Enable ad filtering / Popup blocking / NYTimes upsell / Strength) are now stacked vertically with a small right indent for cleaner layout.
+- NYTimes upsell control: Added a dedicated toggle to hide the “Family subscriptions / All Access Family” floating upsell popup; fully localized (中文/English).
+- Fresh install defaults: Ad filtering, popup blocking, and NYTimes upsell hiding are OFF by default.
+- Housekeeping: Removed obsolete `RELEASE_NOTES_v1.9.0.md`.
+
+### 中文
+- 广告过滤 UI：顶部四项（启用广告过滤 / 弹窗拦截 / 纽约时报浮窗 / 过滤强度）改为竖向排列，并整体右侧缩进，版面更整洁。
+- 纽约时报浮窗：新增独立开关，屏蔽 “Family subscriptions / All Access Family” 浮动弹窗；支持中英双语。
+- 初装默认：广告过滤开关、弹窗拦截、纽约时报浮窗屏蔽均为关闭状态。
+- 清理：移除 `RELEASE_NOTES_v1.9.0.md` 旧文件。
+
 ## v2.0.6
 
 ### English
