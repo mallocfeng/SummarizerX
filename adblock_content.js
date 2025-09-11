@@ -10,7 +10,7 @@
 
   // Conditionally inject page-world script to patch window.open and block nuisance popups
   try {
-    const { adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_block_popups: true });
+    const { adblock_block_popups = false } = await chrome.storage.sync.get({ adblock_block_popups: false });
     if (adblock_block_popups) {
       const s = document.createElement('script');
       s.src = chrome.runtime.getURL('block_pop.js');
@@ -37,6 +37,10 @@
           try { clearSessionCacheForHost(); } catch {}
         }
         await reapply();
+      }
+      if (changes.nyt_block_family_popup) {
+        // re-scan overlays on toggle change
+        try { schedulePlaceholderSweep(); } catch {}
       }
       if (changes.adblock_block_popups) {
         const on = !!changes.adblock_block_popups.newValue;
@@ -66,7 +70,9 @@
 
   async function reapply(){
     try {
-      const { adblock_enabled = false, adblock_strength = 'medium', adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled:false, adblock_strength:'medium', adblock_selected: [] });
+      const { adblock_enabled = false, adblock_strength = 'medium', adblock_selected = [], nyt_block_family_popup = false } = await chrome.storage.sync.get({ adblock_enabled:false, adblock_strength:'medium', adblock_selected: [], nyt_block_family_popup: false });
+      // snapshot NYT toggle for subsequent sweeps
+      try { window.__sx_nyt_block_family_popup = !!nyt_block_family_popup; } catch {}
       const style = document.getElementById('sx-adblock-style');
       // Safeguard: avoid cosmetic filtering on YouTube by default (prevents UI regressions)
       const host = location.hostname || '';
@@ -163,6 +169,7 @@ function schedulePlaceholderSweep(){
       // Tightened heuristic: skip placeholder collapsing on low strength
       if (__adblStrength !== 'low') collapseAdPlaceholders();
       collapseNYTPlaceholders();
+      collapseNYTFamilyUpsell();
       collapseFloatingOverlays();
       // Site specific inline ad containers
       try { if (/\bmissav\./i.test(host)) collapseMissavInlineAds(); } catch {}
@@ -285,6 +292,54 @@ function collapseNYTPlaceholders(){
 
   // Ensure the NYT ad shim is in place (idempotent)
   try { neutralizeNYTBetamaxAds(); } catch {}
+}
+
+// Hide NYTimes "Family subscriptions / All Access Family" upsell floating dialog/banner
+function collapseNYTFamilyUpsell(){
+  try {
+    const host = location.hostname || '';
+    if (!/nytimes\.com$/.test(host)) return;
+    // Respect user toggle (default true)
+    const on = (function(){ try { return window.__sx_nyt_block_family_popup !== false; } catch { return true; } })();
+    if (!on) return;
+
+    // Text patterns observed on NYT upsell
+    const txtRe = /(family\s+subscriptions?\s+are\s+here|all\s*access\s*family|家庭(订阅|方案)|家庭版)/i;
+
+    // Collect likely overlays: fixed/sticky or role=dialog banners
+    const nodes = [];
+    try { nodes.push(...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')); } catch {}
+    try { nodes.push(...document.querySelectorAll('[style*="position:fixed" i], [style*="position: sticky" i]')); } catch {}
+    try { nodes.push(...document.querySelectorAll('div,section,aside')); } catch {}
+
+    const seen = new WeakSet();
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    const EDGE = 140; // banner near edges
+
+    for (const el of nodes) {
+      try {
+        if (!el || !el.isConnected || seen.has(el)) continue;
+        seen.add(el);
+        const text = (el.textContent || '').trim();
+        if (!text || !txtRe.test(text)) continue; // must match upsell text
+
+        // Only target overlays/banners to avoid accidental content hiding
+        const cs = getComputedStyle(el);
+        const pos = (cs.position || '').toLowerCase();
+        const rect = el.getBoundingClientRect();
+        const z = parseInt(cs.zIndex || '0', 10);
+        const overlayish = (pos === 'fixed' || pos === 'sticky' || (isNaN(z) ? false : z >= 5));
+        const nearEdge = rect && (vh - rect.bottom <= EDGE || rect.top <= EDGE || vw - rect.right <= EDGE || rect.left <= EDGE);
+
+        if (overlayish || nearEdge) {
+          hardHide(el);
+          const p = el.parentElement;
+          if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+        }
+      } catch {}
+    }
+  } catch {}
 }
 
 // NYTimes ad neutralization (non-destructive):

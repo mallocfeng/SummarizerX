@@ -815,8 +815,15 @@ html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
 html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
 
 /* ---- Adblock first row layout (three controls in one line) ---- */
-.adblock-row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
-.adblock-row .field{ margin: 0; min-width: 220px; }
+.adblock-row{
+  display:flex;
+  flex-direction: column;      /* stack vertically */
+  align-items: flex-start;      /* left align */
+  gap:12px;                     /* vertical spacing between items */
+  margin-bottom:14px;
+  padding-left: 12px;           /* slight right indent */
+}
+.adblock-row .field{ margin: 0; width: 100%; min-width: 0; }
 .adblock-row .field .label{ margin-bottom: 6px; }
 .adblock-row .switch{ transform: none; }
 

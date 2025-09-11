@@ -333,7 +333,7 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
   const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
-  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: true });
+  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = false, nyt_block_family_popup = false } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: false, nyt_block_family_popup: false });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -391,6 +391,8 @@ async function loadSettings() {
     updateAdblockSectionEnabledState();
     const popCb = document.getElementById('adblock_block_popups');
     if (popCb) popCb.checked = !!adblock_block_popups;
+    const nytCb = document.getElementById('nyt_block_family_popup');
+    if (nytCb) nytCb.checked = !!nyt_block_family_popup;
   } catch {}
 }
 
@@ -428,7 +430,8 @@ async function saveSettings() {
     adblock_selected: (function(){
       return Array.from(getAdblockSelectedSet());
     })(),
-    adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked)
+    adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked),
+    nyt_block_family_popup: !!(document.getElementById('nyt_block_family_popup')?.checked)
   };
 
   // 同步保存平台专用 key（便于切换回填）
@@ -793,6 +796,9 @@ async function updateUIText() {
   updateElementText('adblock-enable-hint', await t('adblock.enableHint'));
   updateElementText('adblock-block-popups-label', await t('adblock.blockPopups'));
   updateElementText('adblock-block-popups-hint', await t('adblock.blockPopupsHint'));
+  // NYTimes popup switch
+  updateElementText('nyt-popup-label', await t('adblock.nytPopupLabel'));
+  updateElementText('nyt-popup-hint', await t('adblock.nytPopupHint'));
   updateElementText('adblock-strength-label', await t('adblock.strength'));
   // 强度按钮文字
   try {
@@ -1090,7 +1096,8 @@ function updateAdblockSectionEnabledState(){
     document.getElementById('adblock_global_lists'),
     document.getElementById('adblock_regional_lists'),
     document.getElementById('adblock_cookie_lists'),
-    document.getElementById('adblock_block_popups')
+    document.getElementById('adblock_block_popups'),
+    document.getElementById('nyt_block_family_popup')
   ];
   controls.forEach(el => { if (el) el.closest('.field')?.classList.toggle('disabled', !enabled); });
   document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input, #adblock_cookie_lists input').forEach(el => { el.disabled = !enabled; });
@@ -1098,6 +1105,8 @@ function updateAdblockSectionEnabledState(){
   document.querySelectorAll('.sync-btn').forEach(el => { el.disabled = !enabled; });
   const popCb = document.getElementById('adblock_block_popups');
   if (popCb) popCb.disabled = !enabled;
+  const nytCb = document.getElementById('nyt_block_family_popup');
+  if (nytCb) nytCb.disabled = !enabled;
 }
 
 function initAdblockUI(){
