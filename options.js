@@ -333,7 +333,7 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
   const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
-  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = false, nyt_block_family_popup = false } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: false, nyt_block_family_popup: false });
+  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = false, nyt_block_family_popup = false, adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: false, nyt_block_family_popup: false, adblock_user_rules_text: '' });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -393,6 +393,8 @@ async function loadSettings() {
     if (popCb) popCb.checked = !!adblock_block_popups;
     const nytCb = document.getElementById('nyt_block_family_popup');
     if (nytCb) nytCb.checked = !!nyt_block_family_popup;
+    const userTxt = document.getElementById('adblock_user_rules_text');
+    if (userTxt) userTxt.value = adblock_user_rules_text || '';
   } catch {}
 }
 
@@ -411,6 +413,17 @@ async function saveSettings() {
     $("model_extract").value = p.model_extract;
     $("model_summarize").value = p.model_summarize;
     $("extract_mode").value = "fast";
+  }
+
+  const $userTxt = document.getElementById('adblock_user_rules_text');
+  // 校验自定义隐藏规则（若存在）
+  if ($userTxt && $userTxt.value.trim()) {
+    const v = validateCustomRules($userTxt.value);
+    if (!v.ok) {
+      const msg = await t('adblock.userRulesInvalid').catch(()=> '自定义隐藏规则校验失败：');
+      await setStatus(`${msg}${v.msg}`);
+      throw new Error('user rules invalid');
+    }
   }
 
   const payload = {
@@ -433,6 +446,7 @@ async function saveSettings() {
     adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked),
     nyt_block_family_popup: !!(document.getElementById('nyt_block_family_popup')?.checked)
   };
+  if ($userTxt) payload.adblock_user_rules_text = $userTxt.value.trim();
 
   // 同步保存平台专用 key（便于切换回填）
   const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
@@ -813,11 +827,18 @@ async function updateUIText() {
       seg.setAttribute('aria-label', await t('adblock.strength'));
     }
   } catch {}
+  // 强度提示（自定义规则时建议选择“中”）
+  updateElementText('adblock-strength-custom-hint', await t('adblock.strengthCustomHint'));
   updateElementText('adblock-global-lists-text', await t('adblock.globalLists'));
   updateElementText('adblock-regional-lists-text', await t('adblock.regionalLists'));
   updateElementText('adblock-cookie-lists-text', await t('adblock.cookieLists'));
   // 自定义规则标题
   updateElementText('adblock-custom-lists-text', await t('adblock.customTitle'));
+  // 用户自定义隐藏（文本）
+  updateElementText('adblock-user-rules-label', await t('adblock.userRulesTitle'));
+  const uTxt = document.getElementById('adblock_user_rules_text');
+  if (uTxt) uTxt.placeholder = await t('adblock.userRulesPlaceholder');
+  updateElementText('adblock-user-rules-hint', await t('adblock.userRulesHint'));
   updateElementText('adblock-tip', await t('adblock.tip'));
   // 同步按钮提示
   const syncAllText = await t('adblock.syncAll');

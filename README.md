@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.0.7-beta (dev/next branch)
+Current beta: v2.0.9-beta (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -33,6 +33,7 @@ Current beta: v2.0.7-beta (dev/next branch)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
  - ✅ Consistent Consent Pulse: Trial consent attention “breathing” animation now behaves the same in light and dark themes
 - 🛡️ Ad Filtering (ABP 2.0 cosmetic): Enable in Settings → 广告过滤 (now below System Prompt). Choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s, etc.) and the new Cookie Notice Hiding category (EasyList Cookie General Hide). Per‑list sync, Low/Medium/High strength, and auto-sync on selection (checked lists download immediately). Rules are stored locally and applied per‑host.
+  - 🧰 Element Hiding Picker (beta): In the floating panel footer, click “Hide element”, then click any element to create a per-domain cosmetic rule; Confirm exits the picker; Cancel continues; press Esc to exit. The picker hides all matches on the current page immediately, and saves the rule under Settings → Ad Filtering → Custom hides. Tip: Medium strength is recommended when using custom/user rules.
   - ▶️ Video ads (beta, site packs): NYTimes + CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET — use session-scoped DNR to redirect specific ad modules (e.g., Betamax ads, IMA3) to safe stubs and block FreeWheel/GPT/Amazon/Media.net with initiator scoping to avoid side effects. Rules load only while a tab of the site is open.
   - 🗂 Settings tabs: Top tabs (AI Summary / Ad Filtering) for clearer navigation; polished tab visuals, gradient underline, and unified header/card background.
   - 🧩 NYTimes: optional toggle to hide the “Family subscriptions / All Access Family” upsell popup (off by default for fresh installs). Adblock main switch and popup blocker are also off by default on first install.
@@ -130,6 +131,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性
  - ✅ 试用同意提示一致：需要同意时的“呼吸”动画在明亮/暗黑主题下表现一致
 - 🛡️ 广告过滤（ABP 2.0 元素隐藏）：在设置 → 广告过滤（现位于“系统提示词”下方）开启；可选全球/区域列表（EasyList、EasyPrivacy、Fanboy’s等）和“Cookie 提示隐藏”分类（内置 EasyList Cookie General Hide）。支持单条规则“同步更新”、勾选后自动同步、高/中/低强度；规则本地保存，并按站点应用以隐藏/去除广告元素。
+  - 🧰 隐藏元素选择器（测试版）：在浮窗底部点击“隐藏元素”，再点击页面中的元素即可生成“按域名”的外观隐藏规则；“确认添加”会立即退出选择模式并隐藏当前页所有匹配元素；“取消”继续选择；按 Esc 退出。规则保存在 设置 → 广告过滤 → 自定义隐藏。提示：使用自定义/用户规则时，建议将过滤强度设为“中”。
   - ▶️ 视频广告（测试版，站点包）：NYTimes + CNN/路透/彭博/卫报/Yahoo/CNET — 使用“会话规则（DNR）”在仅打开目标站点时重定向特定广告模块（如 Betamax ads、IMA3）到安全空实现，并按站点限定阻断 FreeWheel/GPT/Amazon/Media.net，降低副作用。
   - 🗂 设置页标签：新增顶部标签（AI 摘要 / 广告过滤）与样式优化；保留渐变下划线并与首张卡片上浮联动；统一标题栏/卡片色调，视觉更自然。
 

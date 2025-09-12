@@ -77,6 +77,7 @@ const I18N = {
       low: "低",
       medium: "中",
       high: "高",
+      strengthCustomHint: "提示：如使用自定义规则，建议选择“中”。",
       globalLists: "全球性广告过滤列表",
       regionalLists: "区域性广告过滤列表",
       cookieLists: "Cookie 提示隐藏",
@@ -105,6 +106,10 @@ const I18N = {
       ,syntaxId: "• ID 快捷：###id 等同于 ## #id"
       ,syntaxException: "• 例外（取消隐藏）：example.com#@#selector"
       ,syntaxUnsupported: "• 不支持：网络规则（如 ||、@@、$ 选项）、脚本注入（##+js(...)）等"
+      ,userRulesTitle: "自定义隐藏（按域名，一行一条）"
+      ,userRulesPlaceholder: "例如：example.com##.ad-banner"
+      ,userRulesHint: "说明：每行一条 ABP 元素隐藏规则；建议使用域名限定的 ##/### 规则；不支持网络/脚本规则。"
+      ,userRulesInvalid: "自定义隐藏规则校验失败："
     },
     // 浮窗面板
     floatPanel: {
@@ -212,6 +217,7 @@ const I18N = {
       low: "Low",
       medium: "Medium",
       high: "High",
+      strengthCustomHint: "Hint: when using custom rules, Medium is recommended.",
       globalLists: "Global Ad Filter Lists",
       regionalLists: "Regional Ad Filter Lists",
       cookieLists: "Cookie Notice Hiding",
@@ -240,6 +246,10 @@ const I18N = {
       ,syntaxId: "• ID shortcut: ###id equals ## #id"
       ,syntaxException: "• Exception (unhide): example.com#@#selector"
       ,syntaxUnsupported: "• Unsupported: network rules (||, @@, $ options), scriptlets (##+js(...)), etc"
+      ,userRulesTitle: "Custom hides (by domain, one per line)"
+      ,userRulesPlaceholder: "Example: example.com##.ad-banner"
+      ,userRulesHint: "Tip: one ABP cosmetic rule per line; prefer domain-scoped ##/### rules; network/scriptlet rules are not supported."
+      ,userRulesInvalid: "Custom hide rules validation failed: "
     },
     // Float panel
     floatPanel: {

@@ -1358,6 +1358,18 @@
           <div class="footer-row">
             <small id="sx-footer-note">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
             <div class="footer-controls">
+              <div class="force-dark-toggle" id="sx-pick">
+                <span class="label" id="sx-pick-label">隐藏元素</span>
+                <button class="toggle-btn" id="sx-pick-btn" aria-label="隐藏元素" title="选择页面元素并生成隐藏规则">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <line x1="12" y1="1" x2="12" y2="5"></line>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="1" y1="12" x2="5" y2="12"></line>
+                    <line x1="19" y1="12" x2="23" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
               <div class="force-dark-toggle" id="sx-force-dark">
                 <span class="label" id="sx-force-dark-label">强制深色</span>
                 <button class="toggle-btn" id="sx-force-dark-btn" aria-label="强制深色模式" title="强制深色模式">
@@ -1709,6 +1721,10 @@
   // 关闭
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
+  // 元素选择器按钮
+  shadow.getElementById('sx-pick-btn')?.addEventListener('click', () => {
+    try { startElementPicker(); } catch (e) { console.warn('startElementPicker failed:', e); }
+  });
 
   // 保持折叠箭头在窗口尺寸变化时也对齐
   try{ window.addEventListener('resize', ()=>{ try{ updateEmptyArrowPosition(); }catch{} }, { passive:true }); }catch{}
@@ -1812,12 +1828,16 @@
       const t_appear = currentLangCache==='zh'?'外观':'Appearance';
       const t_force_dark = currentLangCache==='zh'?'强制深色':'Force Dark';
       const t_note = currentLangCache==='zh'?'注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。':'Note: Some pages (like chrome://, extension pages, PDF viewers) do not support injection.';
+      const t_pick = currentLangCache==='zh'?'隐藏元素':'Hide element';
+      const t_pick_tt = currentLangCache==='zh'?'选择页面元素并生成隐藏规则':'Pick a page element and create a hide rule';
       shadow.getElementById('sx-app-title').textContent = t_app;
       const runBtn=shadow.getElementById('sx-run'); if(runBtn && !runBtn.disabled) runBtn.textContent=t_run;
       const settingsBtn=shadow.getElementById('sx-settings'); if(settingsBtn){ settingsBtn.textContent=t_set; settingsBtn.title=t_set; }
       const closeBtn=shadow.getElementById('sx-close'); if(closeBtn){ closeBtn.title=t_close; closeBtn.setAttribute('aria-label', t_close); }
       shadow.getElementById('sx-theme-label').textContent=t_appear;
       shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
+      const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
+      const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
       shadow.getElementById('sx-footer-note').textContent=t_note;
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
@@ -2300,4 +2320,162 @@
       }
     });
   }catch{}
+
+  // ====== 元素选择器（生成按域名隐藏规则） ======
+  function startElementPicker(){
+    const originalDisplay = host.style.display;
+    host.style.display = 'none';
+    const overlay = document.createElement('div');
+    overlay.id = 'sx-pick-overlay';
+    overlay.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483646;pointer-events:none;';
+    const rect = document.createElement('div');
+    rect.id = 'sx-pick-rect';
+    rect.style.cssText = 'position:fixed;border:2px dashed #2563eb;box-shadow:0 0 0 99999px rgba(37,99,235,.08) inset;pointer-events:none;transition:all .03s;';
+    const tip = document.createElement('div');
+    tip.id = 'sx-pick-tip';
+    tip.style.cssText = 'position:fixed; padding:6px 8px; background:rgba(17,24,39,.9); color:#f8fafc; border-radius:8px; font-size:12px; pointer-events:none; max-width:50vw;';
+    tip.textContent = (currentLangCache==='zh') ? '点击选中元素，按 Esc 退出' : 'Click to select element, press Esc to exit';
+    overlay.appendChild(rect); overlay.appendChild(tip);
+    document.documentElement.appendChild(overlay);
+
+    let curEl = null;
+    let confirming = false;
+    const move = (e) => {
+      if (confirming) return;
+      const x = e.clientX, y = e.clientY;
+      const el = document.elementFromPoint(x,y);
+      if (!el || el === document.documentElement || el === document.body) return;
+      if (host && (el === host || (host.contains && host.contains(el)))) return;
+      curEl = el;
+      const r = el.getBoundingClientRect();
+      rect.style.left = r.left + 'px';
+      rect.style.top = r.top + 'px';
+      rect.style.width = r.width + 'px';
+      rect.style.height = r.height + 'px';
+      // tip position
+      tip.style.left = Math.min(window.innerWidth - 260, Math.max(8, r.left)) + 'px';
+      tip.style.top = Math.max(8, r.top - 32) + 'px';
+    };
+
+    const stopAll = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} };
+    const key = (e) => { if (confirming) return; if (e.key === 'Escape') { stopPick(true); stopAll(e);} };
+    const down = (e) => { if (confirming) return; stopAll(e); };
+    const up = (e) => { if (confirming) return; stopAll(e); };
+    const click = async (e) => {
+      if (confirming) return; // let confirm dialog receive click
+      if (!confirming) stopAll(e);
+      if (!curEl) return;
+      try {
+        const selector = buildNiceSelector(curEl);
+        const domain = location.hostname || '';
+        const rule = `${domain}##${selector}`;
+        confirming = true; // suspend event capture while confirming
+        const ok = await confirmPick(rule);
+        if (ok) {
+          try {
+            // Hide all elements matching the generated selector for immediate feedback
+            const nodes = document.querySelectorAll(selector);
+            nodes.forEach(n => { try { n.style.setProperty('display','none','important'); } catch{} });
+          } catch{}
+          try {
+            const { adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_user_rules_text: '' });
+            const lines = new Set((adblock_user_rules_text || '').split(/\r?\n/).map(s=>s.trim()).filter(Boolean));
+            lines.add(rule);
+            await chrome.storage.sync.set({ adblock_user_rules_text: Array.from(lines).join('\n') });
+          } catch {}
+          // Exit picking mode after confirm
+          stopPick(true);
+          return;
+        }
+      } finally {
+        // On cancel: continue picking, restore hint
+        if (document.getElementById('sx-pick-overlay')) {
+          confirming = false;
+          tip.textContent = (currentLangCache==='zh') ? '点击选中元素，按 Esc 退出' : 'Click to select element, press Esc to exit';
+        }
+      }
+    };
+
+    function stopPick(restore){
+      try {
+        window.removeEventListener('mousemove', move, true);
+        window.removeEventListener('keydown', key, true);
+        window.removeEventListener('pointerdown', down, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('click', click, true);
+      } catch {}
+      try { overlay.remove(); } catch {}
+      if (restore) host.style.display = originalDisplay || '';
+    }
+
+    window.addEventListener('mousemove', move, true);
+    window.addEventListener('keydown', key, true);
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('click', click, true);
+  }
+
+  function buildNiceSelector(el){
+    try{
+      const isStableId = (id)=> /^[A-Za-z][A-Za-z0-9_-]{1,63}$/.test(id) && !/(\d{4,}|[A-Fa-f0-9]{6,})/.test(id);
+      const isStableClass = (c)=> /^[a-z][a-z0-9-]{2,32}$/.test(c) && !/(\d{3,}|^css-|^jsx-|^sc-)/.test(c);
+      const classesOf = (node)=> Array.from((node.classList||[])).filter(isStableClass);
+
+      // 1) Prefer stable id on element
+      if (el.id && isStableId(el.id)) return `#${el.id}`;
+      // 2) Prefer stable classes on element (class chain only, for Low strength compatibility)
+      const cls = classesOf(el);
+      if (cls.length > 0) return `.${cls[0]}`;
+      // 3) Walk up to find a stable ancestor class and combine with a stable class on element if any
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        if (p.id && isStableId(p.id)) {
+          // Avoid descendant selectors for Low; fall back to parent id only
+          return `#${p.id}`;
+        }
+        const pc = classesOf(p);
+        if (pc.length > 0) {
+          // Use parent classes only to remain generic
+          return `.${pc[0]}`;
+        }
+        p = p.parentElement;
+      }
+      // 4) If element is a heading, use heading tag as a last resort (Medium strength recommended)
+      const tag = (el.tagName||'').toLowerCase();
+      if (/^h[1-3]$/.test(tag)) return tag;
+      // 5) Fallback to first class-like token from any ancestor (even if not fully stable)
+      p = el.parentElement;
+      while (p && p !== document.body) {
+        const any = Array.from((p.classList||[])).filter(s=>/^[A-Za-z0-9_-]{2,32}$/.test(s));
+        if (any.length) return `.${any[0]}`;
+        p = p.parentElement;
+      }
+      return 'div';
+    }catch{ return 'div'; }
+  }
+
+  async function confirmPick(rule){
+    return new Promise((resolve)=>{
+      try{
+        const wrap = document.createElement('div');
+        wrap.id='sx-pick-confirm';
+        wrap.style.cssText = 'position:fixed;left:50%;top:20px;transform:translateX(-50%);z-index:2147483647;background:#0f172a;color:#f8fafc;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.25)';
+        const msg = document.createElement('div');
+        msg.textContent = (currentLangCache==='zh'?'添加隐藏规则：':'Add hide rule:') + ' ' + rule;
+        const row = document.createElement('div');
+        row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:8px';
+        const ok = document.createElement('button'); ok.textContent = currentLangCache==='zh'?'确认添加':'Confirm';
+        ok.style.cssText='appearance:none;border:1px solid #334155;background:#1b2a4b;color:#e2ebf8;border-radius:8px;padding:6px 10px;cursor:pointer;';
+        const cancel = document.createElement('button'); cancel.textContent = currentLangCache==='zh'?'取消':'Cancel';
+        cancel.style.cssText='appearance:none;border:1px solid #334155;background:#0b1220;color:#e2ebf8;border-radius:8px;padding:6px 10px;cursor:pointer;';
+        ok.addEventListener('click', ()=>{ cleanup(); resolve(true); });
+        cancel.addEventListener('click', ()=>{ cleanup(); resolve(false); });
+        row.appendChild(cancel); row.appendChild(ok);
+        wrap.appendChild(msg); wrap.appendChild(row);
+        document.documentElement.appendChild(wrap);
+        function cleanup(){ try{ wrap.remove(); }catch{} }
+      }catch{ resolve(false); }
+    });
+  }
+
 })();

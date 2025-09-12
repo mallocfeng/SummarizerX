@@ -214,10 +214,13 @@
 
         <div class="field">
           <label class="label" id="adblock-strength-label">过滤强度</label>
-          <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
-            <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
-            <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
-            <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+          <div class="row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
+              <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
+              <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
+              <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+            </div>
+            <div class="hint" id="adblock-strength-custom-hint" style="margin:0;">提示：如使用自定义规则，建议选择“中”。</div>
           </div>
         </div>
       </div>
@@ -307,6 +310,13 @@
 
         <!-- 自定义规则列表展示 -->
         <div id="adblock_custom_lists" class="checklist" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- 用户元素隐藏（按域名） -->
+      <div class="field" style="margin-top:12px;">
+        <label class="label" id="adblock-user-rules-label">自定义隐藏（按域名，一行一条）</label>
+        <textarea id="adblock_user_rules_text" class="ctrl mono" rows="4" placeholder="例如：example.com##.ad-banner"></textarea>
+        <div class="hint" id="adblock-user-rules-hint">说明：每行一条 ABP 元素隐藏规则，仅建议使用域名限定的 ##/### 规则；不支持网络/脚本规则。</div>
       </div>
 
       <p class="hint" id="adblock-tip">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>

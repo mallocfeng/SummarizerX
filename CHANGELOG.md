@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.0.9-beta
+
+### English
+- Float panel: Added a coordinated “Hide element” control (icon + label) next to Force Dark.
+- Picker UX: Clicking Confirm now exits picking mode immediately; clicking Cancel returns to picking; Esc exits.
+- Reliability: Confirmation dialog no longer blocked by global capture; works consistently.
+- Generalized selectors: Prefer stable IDs and simple, stable class tokens; fall back to heading tags (h1–h3) if necessary. Improves reusability across the same site.
+- Batch hide on confirm: Immediately hides all elements matching the generated selector for instant feedback; the rule is saved under user hides (per-domain cosmetic) and applied by the engine.
+- Settings: Inline hint to recommend Medium strength when using custom/user rules; i18n for all new strings.
+
+### 中文
+- 浮窗面板：在“强制深色”旁新增“隐藏元素”控件（图标 + 文字），风格统一。
+- 选择器交互：点击“确认添加”后立即退出隐藏模式；点击“取消”则继续框选；按 Esc 退出。
+- 稳定性：确认对话框不再被全局捕获阻挡，按钮可正常点击。
+- 通用选择器：优先稳定 ID 和简单稳定类名；必要时回退到标题标签（h1–h3），提升同站点复用性。
+- 批量隐藏：确认后立即隐藏当前页所有匹配的元素，并保存到“用户隐藏（按域名）”规则，由引擎统一应用。
+- 设置：在“过滤强度”右侧加入提示——使用自定义/用户规则时，推荐选择“中”；相关文案均已双语化。
+
 ## v2.0.8-beta
 
 ### English

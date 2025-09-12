@@ -31,7 +31,7 @@
   // Observe changes regardless of initial state so toggling on/off works without reload
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === 'sync') {
-      if (changes.adblock_enabled || changes.adblock_strength || changes.adblock_selected) {
+      if (changes.adblock_enabled || changes.adblock_strength || changes.adblock_selected || changes.adblock_user_rules_text) {
         // If user turned off, clear cache for this host to avoid early hide next reload
         if (changes.adblock_enabled && changes.adblock_enabled.newValue === false) {
           try { clearSessionCacheForHost(); } catch {}
@@ -80,11 +80,13 @@
       if (isYouTube) { if (style) style.remove(); disconnectRemover(); return; }
       if (!adblock_enabled) { if (style) style.remove(); return; }
       const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
+      const { adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_user_rules_text: '' });
       const collected = [];
       for (const id of adblock_selected || []) {
         const rec = adblock_rules[id];
         if (rec?.content) collected.push(rec.content);
       }
+      if (adblock_user_rules_text && adblock_user_rules_text.trim()) collected.push(adblock_user_rules_text);
       if (!collected.length) { if (style) style.remove(); return; }
       const struct = mergeStructs(collected.map(parseCosmetic));
       const selectors = compileForHost(struct, location.hostname || '', adblock_strength);
