@@ -210,8 +210,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyDocumentTheme(v);
   }).catch(()=>{});
 
-  // 初始化国际化
-  await initI18n();
+  // 初始化国际化（兜底保护）
+  try { await initI18n(); } catch (e) { console.warn('initI18n failed:', e); }
 
   // 初始化 Tab 切换（AI 摘要 / 广告过滤）
   try { initTopTabs(); } catch(e) { console.warn('initTopTabs failed:', e); }
@@ -964,8 +964,11 @@ async function switchLanguage(lang) {
     // 等待淡出完成（或超时兜底）
     await new Promise(res=> setTimeout(res, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 180));
 
-    // 保存语言设置 + 更新文案
-    await chrome.storage.sync.set({ ui_language: lang });
+    // 保存语言设置（同时写 sync 与 local，容错）
+    await Promise.allSettled([
+      chrome.storage.sync.set({ ui_language: lang }),
+      chrome.storage.local.set({ ui_language_cache: lang })
+    ]);
     await updatePageLanguage();
     updateLanguageSwitcher(lang);
     await updateUIText();

@@ -1148,6 +1148,13 @@
         color:#334155; border-bottom-left-radius: var(--chrome-radius); border-bottom-right-radius: var(--chrome-radius); }
       .footer-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap; }
       .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
+      /* Note tip (compact icon-only) */
+      .note-tip{ position:relative; display:inline-flex; align-items:center; gap:6px; padding:0 8px; height:28px; border-radius:8px; background: rgba(250,204,21,.18); border:1px solid rgba(217,119,6,.35); color:#92400e; font-weight:700; cursor:default; user-select:none; }
+      .note-tip .dot{ width:10px; height:10px; border-radius:999px; background:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.18); }
+      .note-tip .chev{ width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid currentColor; opacity:.7; }
+      .note-tip .note-tooltip{ position:absolute; left:0; bottom: calc(100% + 8px); min-width:260px; max-width:520px; padding:10px 12px; border-radius:10px; border:1px solid #f3e9c5; background:#fff9e6; color:#92400e; font-weight:600; line-height:1.6; box-shadow: 0 8px 24px rgba(0,0,0,.12); opacity:0; transform: translateY(6px); pointer-events:none; transition: opacity .16s ease, transform .16s ease; z-index: 20; }
+      .note-tip:hover .note-tooltip, .note-tip:focus .note-tooltip, .note-tip:focus-within .note-tooltip{ opacity:1; transform: translateY(0); pointer-events:auto; }
+      .note-tip .note-tooltip::after{ content:""; position:absolute; top:100%; left:14px; width:10px; height:10px; background:#fff9e6; border-left:1px solid #f3e9c5; border-bottom:1px solid #f3e9c5; transform: rotate(45deg); }
       .force-dark-toggle{ display:flex; align-items:center; gap:8px; }
       .force-dark-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
       .toggle-btn{ 
@@ -1259,6 +1266,11 @@
         color:#d8e0ee; border-top-color: var(--border);
         box-shadow: 0 -1px 8px rgba(0,0,0,.28);
       }
+      /* Dark theme for note tip */
+      :host([data-theme="dark"]) .note-tip{ background: rgba(250,204,21,.10); border-color: rgba(250,204,21,.35); color:#f2e9c0; }
+      :host([data-theme="dark"]) .note-tip .dot{ background:#fbbf24; box-shadow:0 0 0 4px rgba(250,204,21,.15); }
+      :host([data-theme="dark"]) .note-tip .note-tooltip{ background: rgba(45,33,10,.95); border-color: rgba(250,204,21,.30); color:#f7f0ca; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+      :host([data-theme="dark"]) .note-tip .note-tooltip::after{ background: rgba(45,33,10,.95); border-left-color: rgba(250,204,21,.30); border-bottom-color: rgba(250,204,21,.30); }
       :host([data-theme="dark"]) .empty .illus{ 
         background: linear-gradient(135deg, rgba(142,162,255,.08) 0%, rgba(142,162,255,.04) 100%);
         border-color: rgba(142,162,255,.15);
@@ -1356,7 +1368,11 @@
         </div>
         <div class="footer">
           <div class="footer-row">
-            <small id="sx-footer-note">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
+            <div class="note-tip" id="sx-footer-note" tabindex="0" aria-label="注意事项" title="注意事项">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="chev" aria-hidden="true"></span>
+              <div class="note-tooltip" id="sx-footer-note-tooltip">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</div>
+            </div>
             <div class="footer-controls">
               <div class="force-dark-toggle" id="sx-pick">
                 <span class="label" id="sx-pick-label">隐藏元素</span>
@@ -1827,6 +1843,7 @@
       const t_close = currentLangCache==='zh'?'关闭':'Close';
       const t_appear = currentLangCache==='zh'?'外观':'Appearance';
       const t_force_dark = currentLangCache==='zh'?'强制深色':'Force Dark';
+      const t_note_label = currentLangCache==='zh'?'注意事项':'Notes';
       const t_note = currentLangCache==='zh'?'注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。':'Note: Some pages (like chrome://, extension pages, PDF viewers) do not support injection.';
       const t_pick = currentLangCache==='zh'?'隐藏元素':'Hide element';
       const t_pick_tt = currentLangCache==='zh'?'选择页面元素并生成隐藏规则':'Pick a page element and create a hide rule';
@@ -1838,7 +1855,9 @@
       shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
       const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
       const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
-      shadow.getElementById('sx-footer-note').textContent=t_note;
+      const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
+      const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
+      const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
     }catch(e){ console.warn('Failed to update UI text:', e); }

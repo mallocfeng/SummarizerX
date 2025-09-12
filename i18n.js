@@ -282,13 +282,29 @@ const I18N = {
   }
 };
 
-// 获取当前语言设置
+// 获取当前语言设置（优先 sync，失败则回退 local 缓存）
 async function getCurrentLanguage() {
+  const normalize = (v) => {
+    const s = String(v || '').trim().toLowerCase();
+    if (s === 'en' || s === 'english' || s === 'en-us') return 'en';
+    if (s === 'zh' || s === 'zh-cn' || s === 'chinese' || s === '中文') return 'zh';
+    return s || 'zh';
+  };
   try {
-    const result = await chrome.storage.sync.get(['ui_language']);
-    return result.ui_language || 'zh'; // 默认中文
-  } catch {
+    const [syncRes, localRes] = await Promise.allSettled([
+      chrome.storage.sync.get(['ui_language']),
+      chrome.storage.local.get(['ui_language_cache'])
+    ]);
+    const syncLang = (syncRes.status === 'fulfilled') ? syncRes.value.ui_language : undefined;
+    const localLang = (localRes.status === 'fulfilled') ? localRes.value.ui_language_cache : undefined;
+    if (syncLang) return normalize(syncLang);
+    if (localLang) return normalize(localLang);
     return 'zh';
+  } catch {
+    try {
+      const localOnly = await chrome.storage.local.get(['ui_language_cache']);
+      return localOnly.ui_language_cache ? normalize(localOnly.ui_language_cache) : 'zh';
+    } catch { return 'zh'; }
   }
 }
 
