@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.0.8-beta
+
+### English
+- Ad Filtering → Custom rules: Added a bottom section to import custom lists from URL (txt) with strict validation and to save fully manual rules via a large textarea. Both appear as selectable items with per-item sync (URL lists) and a section-level “Update All”.
+- Validation: Reject unsupported network/scriptlet rules (e.g., `||`, `@@`, `$`, `##+js(...)`); allow only cosmetic subset (##, ###, #@#) with domain scoping and negations.
+- i18n: All new labels, placeholders, buttons, and the syntax guide localized (中文/English). Integrated with the existing language switcher.
+
+### 中文
+- 广告过滤 → 自定义规则：在底部新增“自定义规则”区域，支持两种方式：
+  1) 通过 URL 导入 txt（下载后严格校验，合格才允许添加）；
+  2) 完全自定义（大文本框输入）。
+  导入/保存后会显示在“自定义规则”列表，可勾选启用；带 URL 的条目支持逐条/全部更新。
+- 校验：拒绝不支持的网络/脚本规则（如 `||`、`@@`、`$`、`##+js(...)`），仅允许外观隐藏子集（##、###、#@#），支持域名与否定域名。
+- 多语言：新增标题、按钮、占位符与语法说明的中英双语，并与现有语言切换联动。
+
 ## v2.0.7-beta
 
 ### English

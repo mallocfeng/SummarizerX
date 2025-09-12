@@ -692,12 +692,33 @@ async function downloadAdblockRules(selectedIds = []) {
     await chrome.storage.local.set({ adblock_rules: {}, adblock_last_update: Date.now(), adblock_error: null });
     return;
   }
+  // 基础内置规则
   const map = listMap();
+  // 合并自定义（仅含 URL 的自定义规则参与下载；纯文本自定义无需下载）
+  try {
+    const { adblock_custom_lists = [] } = await chrome.storage.sync.get({ adblock_custom_lists: [] });
+    for (const it of (Array.isArray(adblock_custom_lists) ? adblock_custom_lists : [])) {
+      if (it && it.id && it.url) {
+        map.set(it.id, { id: it.id, url: it.url, name: it.name || it.id });
+      }
+    }
+  } catch {}
+
   const results = {};
   const errors = [];
+  // 先保留纯文本自定义（无 URL）的现有内容
+  try {
+    const loc = await chrome.storage.local.get({ adblock_rules: {} });
+    const existing = loc.adblock_rules || {};
+    for (const id of idSet) {
+      if (!map.has(id) && existing[id]?.content) {
+        results[id] = existing[id];
+      }
+    }
+  } catch {}
   for (const id of idSet) {
     const item = map.get(id);
-    if (!item) continue;
+    if (!item) continue; // 纯文本自定义或未知 id：跳过
     try {
       const txt = await downloadText(item.url);
       results[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: Date.now(), content: txt };

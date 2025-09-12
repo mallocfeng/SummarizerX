@@ -89,6 +89,22 @@ const I18N = {
       syncOk: "同步成功",
       syncFail: "同步失败",
       cannotSelect: "无法获取规则，已禁用此项；成功同步后可再勾选。"
+      ,customTitle: "自定义广告过滤规则"
+      ,customUrlPlaceholder: "自定义 txt 规则 URL（以 .txt 结尾）"
+      ,customUrlFetch: "下载并校验"
+      ,customUrlNamePlaceholder: "规则名称（例如：我的自定义规则）"
+      ,customUrlConfirm: "确认添加"
+      ,customTextLabel: "完全自定义（大文本框）"
+      ,customTextPlaceholder: "在此粘贴/输入规则，每行一条；支持 ##/###/#@# 语法，见下方说明"
+      ,customTextNamePlaceholder: "规则名称（必填）"
+      ,customTextSave: "保存为自定义规则"
+      ,syntaxTitle: "输入规则语法（仅支持外观隐藏子集）："
+      ,syntaxComment: "• 注释行以 !、[Adblock、[uBlock 开头"
+      ,syntaxGlobal: "• 全局隐藏：##selector"
+      ,syntaxDomain: "• 仅作用于域名：example.com##selector（可用逗号分隔多个域；~example.com表示排除域）"
+      ,syntaxId: "• ID 快捷：###id 等同于 ## #id"
+      ,syntaxException: "• 例外（取消隐藏）：example.com#@#selector"
+      ,syntaxUnsupported: "• 不支持：网络规则（如 ||、@@、$ 选项）、脚本注入（##+js(...)）等"
     },
     // 浮窗面板
     floatPanel: {
@@ -208,6 +224,22 @@ const I18N = {
       syncOk: "Synced",
       syncFail: "Sync failed",
       cannotSelect: "Cannot fetch rules; disabled. Re-enable after a successful sync."
+      ,customTitle: "Custom Adblock Rules"
+      ,customUrlPlaceholder: "Custom rules txt URL (.txt)"
+      ,customUrlFetch: "Download & Validate"
+      ,customUrlNamePlaceholder: "Rule name (e.g., My rules)"
+      ,customUrlConfirm: "Confirm Add"
+      ,customTextLabel: "Fully Custom (textarea)"
+      ,customTextPlaceholder: "Paste/type rules here, one per line; supports ##/###/#@# syntax; see guide below"
+      ,customTextNamePlaceholder: "Rule name (required)"
+      ,customTextSave: "Save as Custom Rule"
+      ,syntaxTitle: "Rule Syntax (cosmetic subset only):"
+      ,syntaxComment: "• Comment lines start with !, [Adblock, or [uBlock"
+      ,syntaxGlobal: "• Global hide: ##selector"
+      ,syntaxDomain: "• Domain-scoped: example.com##selector (comma-separated; ~example.com to exclude)"
+      ,syntaxId: "• ID shortcut: ###id equals ## #id"
+      ,syntaxException: "• Exception (unhide): example.com#@#selector"
+      ,syntaxUnsupported: "• Unsupported: network rules (||, @@, $ options), scriptlets (##+js(...)), etc"
     },
     // Float panel
     floatPanel: {
