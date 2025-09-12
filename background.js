@@ -564,6 +564,16 @@ async function buildAdultRules(){
   addBlock('^https?://([a-z0-9.-]*\\.)?adtelligent\\.com/');
   addBlock('^https?://([a-z0-9.-]*\\.)?mgid\\.com/');
 
+  // MissAV-specific: block Stripchat Spot widget (bottom-right white bubble)
+  // This script mounts a floating chat-like widget with text like
+  // "just send a message and ask for ...". Blocking it prevents the popup entirely.
+  addBlock('^https?://creative\\.myavlive\\.com/widgets/Spot/');
+  // Also block their generic creative loader domain often used for inpage widgets
+  // (safe for initiators in this adult set; does not affect core playback)
+  addBlock('^https?://creative\\.myavlive\\.com/.+');
+  // Occasionally seen auxiliary ad loader
+  addBlock('^https?://([a-z0-9.-]*\\.)?sunnycloudstone\\.com/');
+
   return rules;
 }
 
