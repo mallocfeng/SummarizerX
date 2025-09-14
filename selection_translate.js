@@ -838,12 +838,19 @@
         .sx-it-text.on{ opacity:1; }
         /* Local zoom controls (per paragraph) */
         blockquote[data-sx-inline-translation="1"]{ position: relative; }
-        .sx-it-zoom{ position:absolute; right:8px; top:50%; transform: translateY(-50%); display:flex; gap:6px; align-items:center; opacity:.9; z-index:1; }
-        .sx-it-zoom button{ width:22px; height:22px; border-radius:6px; border:1px solid rgba(80,110,140,.35); background: rgba(255,255,255,.88); color:#1f2937; font-weight:700; font-size:13px; line-height:1; cursor:pointer; padding:0; display:grid; place-items:center; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-        .sx-it-zoom button:hover{ background: #fff; }
+        .sx-it-zoom{ position:absolute; right:8px; top:8px; transform: none; display:flex; gap:6px; align-items:center; opacity:.9; z-index:1; }
+        .sx-it-zoom button{
+          width:22px; height:22px; border-radius:6px; border:1px solid rgba(80,110,140,.35);
+          background: rgba(255,255,255,.88); color:#1f2937; font-weight:700; font-size:13px; line-height:1;
+          cursor:pointer; padding:0; display:grid; place-items:center;
+          box-shadow: 0 1px 2px rgba(0,0,0,.06);
+          transition: transform .12s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease;
+        }
+        .sx-it-zoom button:hover{ background: #fff; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+        .sx-it-zoom button:active{ transform: translateY(0); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
         @media (prefers-color-scheme: dark){
           .sx-it-zoom button{ background: rgba(30,41,59,.78); color:#e5e7eb; border-color: rgba(148,163,184,.35); }
-          .sx-it-zoom button:hover{ background: rgba(30,41,59,.86); }
+          .sx-it-zoom button:hover{ background: rgba(30,41,59,.86); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
         }
       `;
       document.head.appendChild(st);
