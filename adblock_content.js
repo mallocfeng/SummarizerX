@@ -387,6 +387,12 @@ function earlyInjectNYTNoAdsShim(){
 // ----- Generic floating overlay (bottom-right ads) remover -----
 function collapseFloatingOverlays(){
   try {
+    // Safety: avoid hiding legitimate sticky UI on ChatGPT/OpenAI properties
+    try {
+      const h = (location.hostname || '').toLowerCase();
+      if (/(^|\.)chatgpt\.com$/.test(h) || /(^|\.)openai\.com$/.test(h)) return;
+    } catch {}
+
     // Site-specific: MISSAV corner floating ads are persistent; apply stronger sweep.
     try { if (/\bmissav\./i.test(location.hostname || '')) collapseMissavCornerAds(); } catch {}
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.0 - 2025-09-14
+
+### English
+- Fix: Prevented the floating overlay cleaner from hiding ChatGPT’s bottom‑left avatar/settings panel on `chatgpt.com`.
+- Safety: Added a domain safeguard in `collapseFloatingOverlays()` to skip ChatGPT/OpenAI properties.
+- Version: Bumped extension version to 2.1.0 in `manifest.json`.
+
+### 中文
+- 修复：广告浮层清理会误伤 ChatGPT 左下角头像/设置区的问题（`chatgpt.com`）。
+- 安全：为 ChatGPT/OpenAI 域名加入白名单保护，跳过浮动层清理逻辑。
+- 版本：`manifest.json` 升级为 2.1.0。
+
 ## v2.0.9-beta
 
 ### English
