@@ -5,11 +5,13 @@
 ### English
 - Inline translate: Added per-paragraph zoom controls (+ / −) for long translated quotes; zoom only affects the current quote.
 - UX: Reserve right padding to avoid text overlapping controls; center glyphs in buttons for better alignment.
+- UI: Pin the +/- controls to the top-right of each quote so they don’t shift while zooming; add a subtle hover lift for feedback.
 - Version: Bumped to 2.1.1.
 
 ### 中文
 - 全文对照：为较长段落的内联译文块新增 +/- 放大缩小按钮；仅作用于当前段落。
 - 交互：自动为右侧按钮预留内边距，避免与文字遮挡；优化按钮图标的居中显示。
+- 体验：将 +/- 固定在段落右上角，缩放时按钮不再随文字漂移；悬停有轻微上浮反馈。
 - 版本：升级至 2.1.1。
 
 ## v2.1.0 - 2025-09-14
