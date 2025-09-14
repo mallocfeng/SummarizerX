@@ -836,6 +836,15 @@
         blockquote[data-sx-inline-translation="1"].sx-it.on{ opacity: 1; transform: translateY(0); }
         .sx-it-text{ opacity:0; transition: opacity .34s ease; }
         .sx-it-text.on{ opacity:1; }
+        /* Local zoom controls (per paragraph) */
+        blockquote[data-sx-inline-translation="1"]{ position: relative; }
+        .sx-it-zoom{ position:absolute; right:8px; top:50%; transform: translateY(-50%); display:flex; gap:6px; align-items:center; opacity:.9; z-index:1; }
+        .sx-it-zoom button{ width:22px; height:22px; border-radius:6px; border:1px solid rgba(80,110,140,.35); background: rgba(255,255,255,.88); color:#1f2937; font-weight:700; font-size:13px; line-height:1; cursor:pointer; padding:0; display:grid; place-items:center; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+        .sx-it-zoom button:hover{ background: #fff; }
+        @media (prefers-color-scheme: dark){
+          .sx-it-zoom button{ background: rgba(30,41,59,.78); color:#e5e7eb; border-color: rgba(148,163,184,.35); }
+          .sx-it-zoom button:hover{ background: rgba(30,41,59,.86); }
+        }
       `;
       document.head.appendChild(st);
     }catch{}
@@ -991,6 +1000,35 @@
         textEl.className = 'sx-it-text';
         textEl.textContent = translated;
         q.appendChild(textEl);
+        // If paragraph is long enough (>=20 CJK or >=20 latin alphanum), add per-paragraph zoom controls
+        try{
+          const cjkCount = (translated.match(/[\u4E00-\u9FFF]/g) || []).length;
+          const latinCount = (translated.match(/[A-Za-z0-9]/g) || []).length;
+          if (cjkCount >= 20 || latinCount >= 20){
+            const zoomBox = document.createElement('div');
+            zoomBox.className = 'sx-it-zoom';
+            const minus = document.createElement('button'); minus.type='button'; minus.title='缩小'; minus.textContent='-';
+            const plus  = document.createElement('button'); plus.type='button'; plus.title='放大'; plus.textContent='+';
+            zoomBox.appendChild(minus); zoomBox.appendChild(plus);
+            q.appendChild(zoomBox);
+            // Reserve space on the right to avoid text overlapping buttons
+            try {
+              // Fallback padding before measurement
+              q.style.paddingRight = '60px';
+              requestAnimationFrame(()=>{
+                try{
+                  const w = zoomBox.getBoundingClientRect().width || 0;
+                  const pad = Math.max(56, Math.ceil(w + 12));
+                  q.style.paddingRight = pad + 'px';
+                }catch{}
+              });
+            } catch {}
+            q.dataset.sxZoom = '1';
+            const applyZoom = (f)=>{ try{ q.style.fontSize = Math.round(f*100) + '%'; }catch{} };
+            minus.addEventListener('click', (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.max(0.7, Math.round((f-0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
+            plus.addEventListener('click',  (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.min(2.0, Math.round((f+0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
+          }
+        }catch{}
         // 阶梯延时，增强瀑布式显现（每块 24ms，最多 240ms）
         const delay = Math.min(240, __sxRevealIndex * 24);
         __sxRevealIndex++;

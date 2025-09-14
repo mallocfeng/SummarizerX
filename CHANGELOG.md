@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.1 - 2025-09-14
+
+### English
+- Inline translate: Added per-paragraph zoom controls (+ / −) for long translated quotes; zoom only affects the current quote.
+- UX: Reserve right padding to avoid text overlapping controls; center glyphs in buttons for better alignment.
+- Version: Bumped to 2.1.1.
+
+### 中文
+- 全文对照：为较长段落的内联译文块新增 +/- 放大缩小按钮；仅作用于当前段落。
+- 交互：自动为右侧按钮预留内边距，避免与文字遮挡；优化按钮图标的居中显示。
+- 版本：升级至 2.1.1。
+
 ## v2.1.0 - 2025-09-14
 
 ### English
