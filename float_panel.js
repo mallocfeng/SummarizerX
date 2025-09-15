@@ -2041,9 +2041,11 @@
           const wrapRect = wrapEl.getBoundingClientRect();
           const appbar = shadow.querySelector('.appbar');
           const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
           const appH = appbar ? appbar.getBoundingClientRect().height : 0;
           const footH = footer ? footer.getBoundingClientRect().height : 0;
-          const target = Math.max(120, Math.round(wrapRect.height - appH - footH));
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
           container.style.willChange = 'height';
           container.style.contain = 'layout style';
           container?.style.setProperty('--sx-target', target + 'px');
@@ -2214,9 +2216,11 @@
           const wrapRect = wrapEl.getBoundingClientRect();
           const appbar = shadow.querySelector('.appbar');
           const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
           const appH = appbar ? appbar.getBoundingClientRect().height : 0;
           const footH = footer ? footer.getBoundingClientRect().height : 0;
-          const target = Math.max(120, Math.round(wrapRect.height - appH - footH));
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
           // prepare container for smooth transition
           container.style.willChange = 'height';
           container.style.contain = 'layout style';
