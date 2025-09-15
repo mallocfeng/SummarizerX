@@ -1361,7 +1361,7 @@
       .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; }
       .qa-url{ font-size:12px; color: #546079; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:6px; }
       :host([data-theme="dark"]) .qa-url{ color:#9fb0d0; opacity:.95; }
-      .qa-row{ display:flex; gap:8px; align-items:flex-end; }
+      .qa-row{ display:flex; gap:8px; align-items:flex-start; }
       .qa-row textarea{ flex:1 1 auto; min-height:34px; max-height:120px; resize:vertical; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: #fff; color: var(--text); font-size:14px; line-height:1.4; }
       .qa-row textarea::placeholder{ color:#8aa3d0; opacity:.8; }
       :host([data-theme="dark"]) .qa-row textarea{ background:#0f172a; color: #e2ebf8; border-color:#27344b; }
@@ -1989,6 +1989,16 @@
     const chatCard = shadow.getElementById('sx-chat');
     const chatList = shadow.getElementById('sx-chat-list');
     if (!qaInput || !qaSend || !chatCard || !chatList) return;
+    // auto-resize textarea to show all input lines (up to max-height)
+    const autoResize = () => {
+      try{
+        qaInput.style.height = 'auto';
+        const max = 120;
+        const h = Math.min(max, qaInput.scrollHeight);
+        qaInput.style.height = h + 'px';
+      }catch{}
+    };
+    qaInput.addEventListener('input', autoResize);
     const appendBubble = (role, html, pending=false)=>{
       const b = document.createElement('div');
       b.className = `chat-bubble ${role}`;
@@ -2092,6 +2102,11 @@
     };
     qaSend.addEventListener('click', doSend);
     qaInput.addEventListener('keydown', (ev)=>{
+      if (ev.key==='Enter' && ev.shiftKey){
+        // allow newline; resize after the key inserts the line break
+        setTimeout(autoResize, 0);
+        return;
+      }
       if (ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); doSend(); }
     });
   }
