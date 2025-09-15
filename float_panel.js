@@ -1333,6 +1333,41 @@
       :host([data-theme="dark"]) .tbtn-share:hover{ background:#23365e; border-color:#3a5588; box-shadow: 0 2px 12px rgba(142,162,255,.22); }
       :host([data-theme="dark"]) .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(142,162,255,.35); }
 
+      /* ===== Chat Bubbles ===== */
+      .chat-list{ display:flex; flex-direction:column; gap:8px; padding:6px 2px; }
+      .chat-bubble{ max-width:92%; padding:12px 16px; border-radius:14px; box-shadow: var(--shadow-1); white-space:pre-wrap; word-break:break-word; line-height:1.55; }
+      .chat-bubble.user{ align-self:flex-end; background:#e6f0ff; color:#0b1733; border:1px solid #cfe0ff; }
+      .chat-bubble.ai{ align-self:flex-start; background:#f6f8fc; color:#0f172a; border:1px solid #d9e6ff; }
+      :host([data-theme="dark"]) .chat-bubble.user{ background:#1b2a4b; color:#e2ebf8; border:1px solid #2a3f66; }
+      :host([data-theme="dark"]) .chat-bubble.ai{ background:#0f172a; color:#e2ebf8; border:1px solid #27344b; }
+      .chat-bubble .skl{ height:12px; margin:8px 0; border-radius:8px; background: linear-gradient(90deg, rgba(148,163,184,.18), rgba(148,163,184,.28), rgba(148,163,184,.18)); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
+      @keyframes shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      /* typing indicator: three bouncing dots */
+      .typing{ display:inline-flex; gap:6px; align-items:center; padding:2px 0; }
+      .typing .dot{ width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.55; animation: bounce 1.1s ease-in-out infinite; }
+      .typing .dot:nth-child(1){ animation-delay: 0s; }
+      .typing .dot:nth-child(2){ animation-delay: .15s; }
+      .typing .dot:nth-child(3){ animation-delay: .3s; }
+      @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity:.45 } 40% { transform: translateY(-4px); opacity:.9 } }
+      /* Tighter paragraph spacing inside chat bubbles only */
+      .chat-bubble .md p{ margin:6px 0; }
+      .chat-bubble .md ul, .chat-bubble .md ol{ margin:6px 0 6px 18px; }
+      .chat-bubble .md blockquote{ margin:8px 0; }
+      .chat-bubble .md pre{ margin:8px 0; }
+      .chat-hide{ animation: fadeUp .28s ease forwards; }
+      @keyframes fadeUp { from{ opacity:1; transform: translateY(0);} to{ opacity:0; transform: translateY(-10px);} }
+
+      /* ===== QA Bar ===== */
+      .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; }
+      .qa-url{ font-size:12px; color: #546079; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:6px; }
+      :host([data-theme="dark"]) .qa-url{ color:#9fb0d0; opacity:.95; }
+      .qa-row{ display:flex; gap:8px; align-items:flex-end; }
+      .qa-row textarea{ flex:1 1 auto; min-height:34px; max-height:120px; resize:vertical; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: #fff; color: var(--text); font-size:14px; line-height:1.4; }
+      .qa-row textarea::placeholder{ color:#8aa3d0; opacity:.8; }
+      :host([data-theme="dark"]) .qa-row textarea{ background:#0f172a; color: #e2ebf8; border-color:#27344b; }
+      :host([data-theme="dark"]) .qa-row textarea::placeholder{ color:#7a90bf; }
+      .qa-row .btn{ flex:0 0 auto; height:34px; padding:8px 12px; }
+
       /* ===== Accessibility ===== */
       @media (prefers-reduced-motion: reduce){
         .btn, .card{ transition: none; }
@@ -1360,11 +1395,23 @@
         <div class="container" id="sx-container">
           <div class="empty-illus" id="sx-empty-arrow" aria-hidden="true"></div>
           <section class="section">
+            <div id="sx-chat" class="card card-head" data-title="你问我答" style="display:none">
+              <div class="chat-list" id="sx-chat-list"></div>
+            </div>
+          </section>
+          <section class="section">
             <div id="sx-summary" class="card card-head" data-title="摘要"></div>
           </section>
           <section class="section">
             <div id="sx-cleaned" class="card card-head" data-title="可读正文"></div>
           </section>
+        </div>
+        <div class="qa-bar" id="sx-qa-area" role="form" aria-label="页面问答">
+          <div class="qa-url" id="sx-qa-url" title=""></div>
+          <div class="qa-row">
+            <textarea id="sx-qa-input" rows="1" placeholder="基于当前网页提问…"></textarea>
+            <button id="sx-qa-send" class="btn" type="button">发送</button>
+          </div>
         </div>
         <div class="footer">
           <div class="footer-row">
@@ -1429,6 +1476,9 @@
           </div>
         </div>
       </div>`;
+
+    // Bind QA bar interactions
+    try { setupQABar(shadow); } catch {}
     return host;
   }
 
@@ -1840,6 +1890,9 @@
       const t_app = currentLangCache==='zh'?'麦乐可 AI 摘要阅读器':'SummarizerX AI Reader';
       const t_set = currentLangCache==='zh'?'设置':'Settings';
       const t_run = currentLangCache==='zh'?'提取并摘要':'Extract & Summarize';
+      const t_qa_title = currentLangCache==='zh'?'你问我答':'Q&A';
+      const t_qa_ph = currentLangCache==='zh'?'基于当前网页提问…':'Ask about this page…';
+      const t_qa_send = currentLangCache==='zh'?'发送':'Send';
       const t_close = currentLangCache==='zh'?'关闭':'Close';
       const t_appear = currentLangCache==='zh'?'外观':'Appearance';
       const t_force_dark = currentLangCache==='zh'?'强制深色':'Force Dark';
@@ -1860,6 +1913,10 @@
       const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
+      try { shadow.getElementById('sx-chat').setAttribute('data-title', t_qa_title); } catch {}
+      try { const i=shadow.getElementById('sx-qa-input'); if(i) i.placeholder=t_qa_ph; } catch {}
+      try { const b=shadow.getElementById('sx-qa-send'); if(b) b.textContent=t_qa_send; } catch {}
+      try { const u=shadow.getElementById('sx-qa-url'); if(u){ u.textContent=location.href; u.title=location.href; } } catch {}
     }catch(e){ console.warn('Failed to update UI text:', e); }
     try{ updateEmptyArrowPosition(); }catch{}
     try{ ensureShareButton(shadow); }catch{}
@@ -1923,6 +1980,122 @@
     if (vmCleaned) vmCleaned.html = cleanedHTML; else shadow.getElementById('sx-cleaned').innerHTML = cleanedHTML;
   }
 
+  // ===== QA logic =====
+  let chatMode = false;
+  const chatHistory = [];
+  function setupQABar(shadow){
+    const qaInput = shadow.getElementById('sx-qa-input');
+    const qaSend = shadow.getElementById('sx-qa-send');
+    const chatCard = shadow.getElementById('sx-chat');
+    const chatList = shadow.getElementById('sx-chat-list');
+    if (!qaInput || !qaSend || !chatCard || !chatList) return;
+    const appendBubble = (role, html, pending=false)=>{
+      const b = document.createElement('div');
+      b.className = `chat-bubble ${role}`;
+      b.innerHTML = pending ? `<span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>` : html;
+      chatList.appendChild(b); try{ b.classList.add('pull-in'); setTimeout(()=>b.classList.remove('pull-in'), 500); }catch{}
+      try{
+        const scroller = shadow.getElementById('sx-container');
+        scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+      }catch{}
+      return b;
+    };
+    const doSend = async ()=>{
+      const q = qaInput.value.trim();
+      if (!q) return;
+      const prev = qaSend.textContent;
+      qaSend.disabled = true; qaSend.textContent = (currentLangCache==='zh'?'发送中…':'Sending…');
+      // Switch to chat mode on first send
+      chatCard.style.display = '';
+      if (!chatMode){ chatMode = true; try{ shadow.getElementById('sx-summary').style.display='none'; shadow.getElementById('sx-cleaned').style.display='none'; }catch{} }
+      // Append user message bubble
+      const userHtml = escapeHtml(q);
+      appendBubble('user', userHtml, false);
+      // Append AI pending bubble
+      const aiBubble = appendBubble('ai', '', true);
+      // Clear the input so user text doesn't linger
+      try{ qaInput.value=''; qaInput.style.height=''; }catch{}
+      // During loading, hide other cards so only Q&A is visible
+      try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
+      try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+
+      // If panel is folded, expand like the summarize flow so the card is visible
+      let expanded = false;
+      try{
+        const wrapEl = shadow.getElementById('sx-wrap');
+        const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
+        if (wasEmpty){
+          wrapEl.classList.remove('fx-intro');
+          wrapEl.classList.add('expanding');
+          const container = shadow.getElementById('sx-container');
+          const wrapRect = wrapEl.getBoundingClientRect();
+          const appbar = shadow.querySelector('.appbar');
+          const footer = shadow.querySelector('.footer');
+          const appH = appbar ? appbar.getBoundingClientRect().height : 0;
+          const footH = footer ? footer.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH));
+          container.style.willChange = 'height';
+          container.style.contain = 'layout style';
+          container?.style.setProperty('--sx-target', target + 'px');
+          expanded = true;
+          let done=false; const finish=()=>{
+            if (done) return; done=true;
+            try{ wrapEl.classList.remove('is-empty'); wrapEl.classList.remove('expanding'); }catch{}
+          };
+          container?.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 900);
+        } else {
+          // Already expanded; do nothing special on the card to avoid flicker
+        }
+      }catch{}
+
+      // Global progress bar like summarize
+      try{ setLoading(shadow, true); }catch{}
+      try{
+        const resp = await chrome.runtime.sendMessage({ type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) });
+        if (!resp?.ok) throw new Error(resp?.error || 'QA failed');
+        chatCard.style.display = '';
+        const ans = String(resp.answer||'').replace(/^__NO_HIT__\s*/i,'').trim();
+        let html = stripInlineColor(renderMarkdown(ans));
+        // Collapse excessive breaks only within chat bubble rendering
+        html = html
+          .replace(/^(?:<br\s*\/?>(?:\s|&nbsp;)*?)+/i,'')
+          .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
+          .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
+        aiBubble.innerHTML = html;
+        // Ensure the answer is fully visible to the user:
+        try{
+          const scroller = shadow.getElementById('sx-container');
+          const vh = scroller?.clientHeight || 0;
+          const bh = aiBubble?.getBoundingClientRect().height || 0;
+          if (scroller && aiBubble){
+            if (bh >= vh - 12){
+              // Align the top of the answer to the top edge of the viewport
+              let offset = 0; let n = aiBubble;
+              while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
+              scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
+            } else {
+              // Not filling the viewport: scroll to bottom
+              scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+            }
+          }
+        }catch{}
+        // track history
+        chatHistory.push({ role:'user', content: q });
+        chatHistory.push({ role:'assistant', content: ans });
+      }catch(e){
+        try{ alert((currentLangCache==='zh'?'提问失败：':'Ask failed: ') + (e?.message || e)); }catch{}
+      } finally {
+        try{ setLoading(shadow, false); }catch{}
+        qaSend.disabled = false; qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
+      }
+    };
+    qaSend.addEventListener('click', doSend);
+    qaInput.addEventListener('keydown', (ev)=>{
+      if (ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); doSend(); }
+    });
+  }
+
   function ensureShareButton(shadow){
     try{
       const card = shadow.getElementById('sx-summary');
@@ -1970,6 +2143,16 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      // If in chat mode: gracefully hide chat, restore summary/cleaned
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (chatCard && chatCard.style.display !== 'none'){
+          chatCard.classList.add('chat-hide');
+          setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+          try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+          try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+        }
+      }catch{}
       // 若为试用模式但尚未同意条款：直接跳转设置页并中止，不进入运行态
       try {
         const { aiProvider = 'trial', trial_consent = false } = await chrome.storage.sync.get({ aiProvider: 'trial', trial_consent: false });

@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.2.0-beta - 2025-09-15
+
+### English
+- Q&A Chat Mode: Bottom bar now supports page-scoped Q&A with continuous bubbles (user right, AI left). Typing indicator (three bouncing dots), clean Markdown rendering, and smart scroll (align top for long answers, scroll to bottom for short ones).
+- Inline Translate Zoom: Per-paragraph +/- for long quotes; controls pinned top-right; hover lift; non-overlapping text.
+- UX Polish: Reduced paragraph spacing inside chat bubbles; increased bubble padding; removed first-replace flicker; cleaned extra breaks only within chat bubbles.
+- Panel Behavior: Q&A send auto-expands the panel (same as summarize) with progress bar; summary/cleaned cards hide during ask; clicking Summarize fades chat away and restores the two cards.
+- Adblock Safety: Do not hide ChatGPT/OpenAI sticky UI when collapsing floating overlays.
+
+### 中文
+- 你问我答（气泡模式）：底部输入支持基于当前网页的连续对话，用户气泡在右、AI 气泡在左；新增三点打字指示；Markdown 排版整洁；智能滚动（长答顶部对齐，短答自动滚底）。
+- 全文对照放大：对较长段落的引用块提供 +/- 放缩；按钮固定在右上角并带轻微悬停上浮；文本不与按钮重叠。
+- 交互优化：气泡内段落间距更紧凑；气泡内边距更舒适；首次替换不闪烁；仅在聊天域清理多余换行，不影响摘要/正文。
+- 面板行为：发送后自动展开浮窗并显示顶部进度条；对话期间隐藏“摘要/正文”；点击“提取并摘要”淡出对话并恢复两卡模式。
+- 广告过滤安全：避免在 ChatGPT/OpenAI 站点上误隐藏粘附式界面元素。
+
 ## v2.1.1 - 2025-09-14
 
 ### English

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX AI Reader",
-  "version": "2.1.1",
+  "version": "2.2.0-beta",
   "version_name": "2.0.9-beta",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": [

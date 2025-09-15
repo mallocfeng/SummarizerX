@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.0.9-beta (dev/next branch)
+Current beta: v2.2.0-beta (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -28,6 +28,8 @@ Current beta: v2.0.9-beta (dev/next branch)
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
  - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
+ - 💬 Page Q&A Chat (beta): Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
+ - 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
@@ -37,6 +39,7 @@ Current beta: v2.0.9-beta (dev/next branch)
   - ▶️ Video ads (beta, site packs): NYTimes + CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET — use session-scoped DNR to redirect specific ad modules (e.g., Betamax ads, IMA3) to safe stubs and block FreeWheel/GPT/Amazon/Media.net with initiator scoping to avoid side effects. Rules load only while a tab of the site is open.
   - 🗂 Settings tabs: Top tabs (AI Summary / Ad Filtering) for clearer navigation; polished tab visuals, gradient underline, and unified header/card background.
   - 🧩 NYTimes: optional toggle to hide the “Family subscriptions / All Access Family” upsell popup (off by default for fresh installs). Adblock main switch and popup blocker are also off by default on first install.
+  - ℹ️ Safety: Avoid collapsing ChatGPT/OpenAI sticky UI when cleaning floating overlays
 
 ### 🖼 Screenshots
 

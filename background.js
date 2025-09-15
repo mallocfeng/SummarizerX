@@ -1029,6 +1029,69 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true; // 异步
   }
+  if (msg?.type === 'SX_QA_ASK') {
+    (async () => {
+      try {
+        // Resolve tabId from sender; fallback to active tab
+        let tabId = sender?.tab?.id;
+        if (typeof tabId !== 'number') {
+          const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+          tabId = active?.id;
+        }
+        if (typeof tabId !== 'number') throw new Error('No tab context');
+
+        // Read settings and credentials
+        const cfg = await getSettings();
+        const isTrial = (cfg.aiProvider === 'trial');
+        if (!cfg.apiKey && !isTrial) throw new Error('请先到设置页填写并保存 API Key');
+        if (isTrial) {
+          try {
+            const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+            if (!trial_consent) throw new Error('试用模式需先同意通过代理传输页面内容');
+          } catch {}
+        }
+
+        // Get page raw
+        const raw = await getPageRawByTabId(tabId);
+        const finalLang = resolveFinalLang(cfg.output_lang || 'auto', raw.pageLang, raw.text || '');
+        const pageMd = (typeof raw.markdown === 'string' && raw.markdown.trim()) ? raw.markdown : textToMarkdown(String(raw.text || ''));
+        const clipped = pageMd.slice(0, 20000);
+
+        // Build prompts
+        const sys = [
+          'You are a helpful assistant that must answer STRICTLY using ONLY the provided page content.',
+          'Do NOT use external knowledge. If the content lacks enough information, say so briefly in natural language (no special tokens).',
+          'When the user question is ambiguous or uses deictic words like "this/that/it" (e.g., "如何评价这件事情" / "How to evaluate this"), interpret them as referring to the MAIN SUBJECT of this page (based on title and leading content).',
+          'Synthesize concise answers strictly from the page (facts, viewpoints, pros/cons, outcomes). Keep formatting tidy and readable.',
+          langLineEn(finalLang, false),
+          langLineNative(finalLang)
+        ].join('\n');
+        const q = String(msg.question || '').slice(0, 2000);
+        const h = Array.isArray(msg.history) ? msg.history.slice(-8) : [];
+        const hist = h.map(it => {
+          const role = (it && it.role==="assistant") ? "Assistant" : "User";
+          const content = String(it?.content||'').slice(0, 2000);
+          return `${role}: ${content}`;
+        }).join('\n');
+        const prompt = `Title: ${raw.title || '(untitled)'}\nURL: ${raw.url || ''}\n\nPAGE CONTENT (Markdown):\n${clipped}\n\nCHAT SO FAR (if any):\n${hist || '(none)'}\n\nQUESTION:\n${q}\n\nInstructions: Answer ONLY using the page content above.`;
+
+        const answer = await chatCompletion({
+          baseURL: cfg.baseURL,
+          apiKey: cfg.apiKey || 'trial',
+          model: cfg.model_summarize,
+          system: sys,
+          prompt,
+          temperature: 0.1
+        });
+
+        const txt = String(answer || '').trim();
+        sendResponse({ ok: true, answer: txt, url: raw.url || '', finalLang });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true; // async
+  }
   if (msg?.type === 'SX_INLINE_TRANSLATED_CHANGED') {
     try {
       const tabId = sender?.tab?.id;
