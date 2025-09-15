@@ -86,6 +86,11 @@ Current beta: v2.2.0-beta (dev/next branch)
 - Use the new **right-click menu** to translate selected text instantly
  - Use **Translate full page** from the right-click menu to insert translations below each paragraph as quote blocks; switch back via **Show original**
 
+#### Q&A Chat (beta)
+- In the floating panel, type your question in the bottom bar; press Enter (Shift+Enter for newline) or click Send.
+- The panel expands with a progress bar. Bubbles appear (you on the right, AI on the left). Answers render with tidy Markdown.
+- During chat, the Summary/Readable cards are hidden. Click **Extract & Summarize** to fade the chat away and restore the two cards.
+
 ### ⚙️ Settings Reference
 
 - **Prompt templates:** Customize AI instructions  
