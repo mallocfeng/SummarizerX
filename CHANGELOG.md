@@ -498,3 +498,20 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 🧼 设置页底部对齐与 meta 文本显示宽度优化。
 - 🧭 翻译模式严格输出纯文本：不含 Markdown/额外说明，保持原段落换行。
 - 🐛 修复：右键菜单标题与内联翻译实际状态保持同步（导航重置、标签页关闭清理、状态变更即时更新）。
+# Changelog
+
+## v2.2.2-beta - 2025-09-16
+
+### English
+- Q&A window bounds: Never auto-resize or auto-reposition the Q&A bubble when the side panel width changes. Enforce a 10px safe margin on both left and right. If shrinking the side panel would push the Q&A window within 10px of either edge, shrinking is blocked instead of squeezing the bubble. When near the right edge, the bubble no longer auto-moves inward.
+- Resize reliability: Fixed an issue where the Q&A bubble could continue resizing after mouse release. Added robust pointer capture + global listeners and immediate stop on buttons==0.
+- Summarize lockout: While Extract & Summarize is running (running/partial), the Q&A input and Send button are disabled and visually dimmed; they restore on done/error.
+- Safety polish: Hide horizontal overflow in the container and unify boundary margins to 10px during drag/resize.
+- Version: Bumped to 2.2.2-beta in manifest and docs.
+
+### 中文
+- 你问我答边界：不再因 sidepanel 宽度变化而“弹性”改变浮窗尺寸或位置；左右各保留 10px 安全边距。当收窄 sidepanel 会导致浮窗距任一侧低于 10px 时，改为阻止继续收窄；右侧接近边缘时，浮窗不再向内自动移动。
+- 缩放稳定性：修复“松开鼠标后仍继续改变大小”的问题；加入更稳健的指针捕获与全局监听，并在鼠标按钮抬起时立刻结束缩放。
+- 运行期禁用：执行“提取并摘要”期间（running/partial），禁用问答输入与发送按钮并灰显；处理完成或出错后自动恢复。
+- 安全细化：容器横向溢出隐藏；卡片拖动/缩放边界统一为 10px。
+- 版本：升级至 2.2.2-beta（manifest 与文档）。

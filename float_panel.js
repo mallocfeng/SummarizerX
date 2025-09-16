@@ -925,7 +925,7 @@
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; transition: height .6s cubic-bezier(.2,.7,.3,1); }
+      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; }
       .container .section:last-child{ margin-bottom:8px; }
       .container .section:first-child{ margin-top:4px; }
       /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
@@ -1336,10 +1336,11 @@
       /* ===== Chat Bubbles ===== */
       .chat-list{ display:flex; flex-direction:column; gap:8px; padding:6px 2px; }
       .chat-bubble{ max-width:92%; padding:12px 16px; border-radius:14px; box-shadow: var(--shadow-1); white-space:pre-wrap; word-break:break-word; line-height:1.55; }
-      .chat-bubble.user{ align-self:flex-end; background:#e6f0ff; color:#0b1733; border:1px solid #cfe0ff; }
-      .chat-bubble.ai{ align-self:flex-start; background:#f6f8fc; color:#0f172a; border:1px solid #d9e6ff; }
-      :host([data-theme="dark"]) .chat-bubble.user{ background:#1b2a4b; color:#e2ebf8; border:1px solid #2a3f66; }
-      :host([data-theme="dark"]) .chat-bubble.ai{ background:#0f172a; color:#e2ebf8; border:1px solid #27344b; }
+      /* Warm sticky-note palette for chat bubbles */
+      .chat-bubble.user{ align-self:flex-end; background:#FFE9A6; color:#3b2a05; border:1px solid #FDE68A; }
+      .chat-bubble.ai{ align-self:flex-start; background:#FFF9E6; color:#3b2f0b; border:1px solid #FDE68A; }
+      :host([data-theme="dark"]) .chat-bubble.user{ background: rgba(250,204,21,.12); color:#f8f5e3; border:1px solid rgba(250,204,21,.34); }
+      :host([data-theme="dark"]) .chat-bubble.ai{ background: rgba(250,204,21,.08); color:#efe9d2; border:1px solid rgba(250,204,21,.26); }
       .chat-bubble .skl{ height:12px; margin:8px 0; border-radius:8px; background: linear-gradient(90deg, rgba(148,163,184,.18), rgba(148,163,184,.28), rgba(148,163,184,.18)); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
       @keyframes shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
       /* typing indicator: three bouncing dots */
@@ -1356,6 +1357,111 @@
       .chat-bubble .md pre{ margin:8px 0; }
       .chat-hide{ animation: fadeUp .28s ease forwards; }
       @keyframes fadeUp { from{ opacity:1; transform: translateY(0);} to{ opacity:0; transform: translateY(-10px);} }
+
+      /* ===== Floating QA Overlay ===== */
+      #sx-chat.qa-float{ position:absolute; right:16px; z-index:60;
+        /* leave room for QA bar at bottom; JS sets --qa-bottom */
+        bottom: calc(var(--qa-bottom, 72px));
+        /* default larger size */
+        --qa-w: min(640px, 70%);
+        --qa-h: min(123vh, 1140px);
+        width: var(--qa-w);
+        height: var(--qa-h);
+        /* Fix width by default; do not elastically depend on container width */
+        min-width: 200px;
+        min-height: 280px;
+        max-width: none;
+        box-sizing: border-box;
+        overflow:hidden;
+        box-shadow: 0 8px 26px rgba(16,24,40,.16), 0 2px 10px rgba(16,24,40,.10);
+        border:1px solid var(--border);
+      }
+      #sx-chat.qa-float .chat-list{ height: calc(var(--qa-h) - 64px); overflow:auto; }
+      /* when repositioned by user */
+      #sx-chat.qa-float.qa-custom-pos{ right:auto; bottom:auto; }
+      /* show move cursor on header */
+      #sx-chat.qa-float.card.card-head::before{ cursor: move; }
+      /* resize handle */
+      #sx-chat.qa-float .qa-resize-handle{ position:absolute; right:8px; bottom:8px; width:12px; height:12px; cursor: nwse-resize; opacity:.65; z-index:3; }
+      #sx-chat.qa-float .qa-resize-handle::before{
+        content:""; position:absolute; inset:0; background:
+          linear-gradient(135deg, transparent 50%, rgba(234,179,8,.55) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(234,179,8,.70) calc(50% - 3px));
+        background-size: 100% 100%, 8px 8px; background-repeat:no-repeat; background-position: center center;
+        border-radius:2px;
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .qa-resize-handle::before{
+        background:
+          linear-gradient(135deg, transparent 50%, rgba(234,179,8,.65) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(234,179,8,.80) calc(50% - 3px));
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .qa-resize-handle::before{
+        background:
+          linear-gradient(135deg, transparent 50%, rgba(250,204,21,.60) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(250,204,21,.75) calc(50% - 3px));
+      }
+      /* Make floating chat stand out more than background cards */
+      :host([data-theme="light"]) #sx-chat.qa-float{
+        /* Sticky-note like warm paper in light theme (slightly translucent) */
+        background:
+          radial-gradient(220px 160px at 28px -28px, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 78%),
+          linear-gradient(180deg, rgba(255,247,214,.94) 0%, rgba(255,240,184,.90) 100%);
+        border-color: rgba(234,179,8,.35); /* amber-500 */
+        box-shadow: 0 10px 28px rgba(125,90,8,.16), 0 8px 18px rgba(234,179,8,.18);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float.card.card-head::before{
+        background:
+          linear-gradient(90deg, rgba(234,179,8,.20) 0%, rgba(253,224,71,.18) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, rgba(255,250,230,.92) 0%, rgba(255,243,191,.90) 100%);
+        border-bottom-color: rgba(234,179,8,.28);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float{
+        /* Warm-tinted dark paper (slightly translucent) */
+        background:
+          radial-gradient(260px 180px at 28px -28px, rgba(255,220,120,.10) 0%, rgba(255,220,120,0) 82%),
+          linear-gradient(180deg, rgba(32,40,60,.84) 0%, rgba(26,34,52,.80) 100%);
+        border-color: rgba(250,204,21,.30); /* amber-400 */
+        /* warm glow so shadow is visible on dark surfaces */
+        box-shadow: 0 12px 34px rgba(250,204,21,.16), 0 6px 18px rgba(12,18,28,.30);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float.card.card-head::before{
+        background:
+          linear-gradient(90deg, rgba(250,204,21,.20) 0%, rgba(251,191,36,.18) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, rgba(42,50,72,.70) 0%, rgba(34,42,64,.60) 100%);
+        border-bottom-color: rgba(250,204,21,.26);
+      }
+      .chat-list{ position: relative; }
+      #sx-chat.qa-float .card-tools{ display:flex; }
+      #sx-chat .card-tools .tbtn-close{ font-weight:700; min-width:auto; padding:4px 8px; border-radius:8px; }
+      /* Close button color matches sticky-note palette */
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close{
+        background:#FDE68A; /* amber-300 */
+        border-color: rgba(234,179,8,.50);
+        color:#3b2a05;
+        box-shadow: 0 1px 2px rgba(125,90,8,.18);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close:hover{
+        background:#FCD34D; /* amber-300 -> amber-400 */
+        border-color: rgba(234,179,8,.65);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close:focus-visible{
+        outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.35);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close{
+        background: rgba(250,204,21,.18);
+        border-color: rgba(250,204,21,.35);
+        color:#f6f3e6;
+        box-shadow: 0 1px 2px rgba(250,204,21,.12);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close:hover{
+        background: rgba(250,204,21,.26);
+        border-color: rgba(250,204,21,.45);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close:focus-visible{
+        outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.28);
+      }
+      #sx-chat.qa-float.qa-rise{ animation: qaRise .22s cubic-bezier(.2,.7,.3,1) both; }
+      @keyframes qaRise{ from{ opacity:0; transform: translateY(18px) scale(.98);} to{ opacity:1; transform: translateY(0) scale(1);} }
 
       /* ===== QA Bar ===== */
       .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; }
@@ -1692,18 +1798,18 @@
     const step = async ()=>{
       try{
         const st = await getState(tabId);
-        if (st.status==='done'){ setLoading(shadow,false); await render(st.summary, st.cleaned); stopPolling(); return; }
+        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); await render(st.summary, st.cleaned); stopPolling(); return; }
         if (st.status==='error'){
-          setLoading(shadow,false);
+          setSummarizing(shadow,false); setLoading(shadow,false);
           const i18n = await loadI18n(); const lang = i18n? await i18n.getCurrentLanguage():'zh';
           shadow.getElementById('sx-summary').innerHTML =
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${lang==='zh'?'发生错误，请重试。':'An error occurred, please try again.'}</p></div></div>`;
           stopPolling(); return;
         }
-        if (st.status==='partial'){ setLoading(shadow,true); await render(st.summary, null); }
-        else if (st.status==='running'){ setLoading(shadow,true); skeleton(shadow); }
+        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); await render(st.summary, null); }
+        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); }
       }catch{}
-      if (Date.now()-start>hardTimeout){ setLoading(shadow,false); stopPolling(); return; }
+      if (Date.now()-start>hardTimeout){ setSummarizing(shadow,false); setLoading(shadow,false); stopPolling(); return; }
       interval = Math.min(maxInterval, Math.round(interval*1.25));
       pollTimer = setTimeout(step, interval);
     };
@@ -1842,6 +1948,38 @@
   // 拖宽 + 记忆
   (function bindDrag(){
     const drag=shadow.getElementById('sx-drag'); const wrapEl=shadow.getElementById('sx-wrap');
+    // 当你问我答浮窗距离面板右缘小于安全距离时（含预测），阻止进一步缩小面板
+    const SAFE_MARGIN = 10; // px
+    function isQATouchingRightEdge(deltaShrinkPx = 0){
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard || chatCard.style.display==='none' || !chatCard.classList.contains('qa-float')) return false;
+        const container = shadow.getElementById('sx-container');
+        if (!container) return false;
+        const cr = chatCard.getBoundingClientRect();
+        const pr = container.getBoundingClientRect();
+        // 当前实际距离（不含容器 padding）
+        let dist = pr.right - cr.right;
+        // 若用户自定义了位置（left 定位），面板缩小时容器右缘向左移动，距离会随之减少
+        if (chatCard.classList.contains('qa-custom-pos') && deltaShrinkPx > 0) dist -= deltaShrinkPx;
+        return dist < SAFE_MARGIN;
+      }catch{ return false; }
+    }
+    function isQATouchingLeftEdge(deltaShrinkPx = 0){
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard || chatCard.style.display==='none' || !chatCard.classList.contains('qa-float')) return false;
+        const container = shadow.getElementById('sx-container');
+        if (!container) return false;
+        const cr = chatCard.getBoundingClientRect();
+        const pr = container.getBoundingClientRect();
+        // 当前左侧距离（不含容器 padding）
+        let dist = cr.left - pr.left;
+        // 若卡片靠右锚定（默认非自定义位置），缩小面板（从右侧收缩）会让 left 同步向右移动，左距将减少 deltaShrinkPx
+        if (!chatCard.classList.contains('qa-custom-pos') && deltaShrinkPx > 0) dist -= deltaShrinkPx;
+        return dist < SAFE_MARGIN;
+      }catch{ return false; }
+    }
     function clamp(px){
       const vw=Math.max(document.documentElement.clientWidth, window.innerWidth||0);
       const minW=Math.min(320, vw-80), maxW=Math.max(320, Math.min(720, vw-80));
@@ -1849,7 +1987,14 @@
     }
     function setW(clientX){
       const vw=Math.max(document.documentElement.clientWidth, window.innerWidth||0);
-      const fromRight=vw-clientX; const w=clamp(fromRight);
+      const fromRight=vw-clientX; let w=clamp(fromRight);
+      const curW = parseInt(getComputedStyle(host).width,10) || host.clientWidth || 0;
+      // 预测收缩量（>0 表示正在缩小）
+      const delta = Math.max(0, curW - w);
+      // 若与右/左缘的预测距离将小于安全值，则不再缩小
+      if (delta > 0 && (isQATouchingRightEdge(delta) || isQATouchingLeftEdge(delta))) {
+        w = curW; // 锁住当前宽度，直到不再贴边
+      }
       host.style.width = `${w}px`; try{ chrome.storage.sync.set({ float_panel_width: w }); }catch{}
     }
     let dragging=false;
@@ -1864,7 +2009,10 @@
     drag?.addEventListener('dblclick', async ()=>{
       const cur=parseInt(getComputedStyle(host).width,10)||420;
       const target=cur<520? 560: 380;
-      const w=clamp(target); host.style.width=`${w}px`; try{ chrome.storage.sync.set({ float_panel_width:w }); }catch{}
+      let w=clamp(target);
+      // 若双击目标会导致“缩小”，且预测距离将小于安全值（左右任一），则保持当前宽度不变
+      if (w < cur && (isQATouchingRightEdge(cur - w) || isQATouchingLeftEdge(cur - w))) w = cur;
+      host.style.width=`${w}px`; try{ chrome.storage.sync.set({ float_panel_width:w }); }catch{}
     });
     try{ chrome.storage.sync.get(['float_panel_width']).then(({float_panel_width})=>{ if(Number.isFinite(+float_panel_width)) host.style.width = `${clamp(+float_panel_width)}px`; updateEmptyArrowPosition(); }); }catch{}
   })();
@@ -1982,13 +2130,301 @@
 
   // ===== QA logic =====
   let chatMode = false;
+  let chatVisible = false; // whether chat card is currently shown
+  let hasSummarizeTriggered = false; // becomes true once user clicks Extract & Summarize (or state indicates run)
+  let summarizing = false; // when true, block Q&A input and send
+  let qaSending = false; // track if a QA request is in-flight
   const chatHistory = [];
+
+  function updateQAControls(shadow){
+    try{
+      const qaInput = shadow.getElementById('sx-qa-input');
+      const qaSend = shadow.getElementById('sx-qa-send');
+      const blocked = !!(summarizing || qaSending);
+      if (qaInput) qaInput.disabled = blocked;
+      if (qaSend) qaSend.disabled = blocked;
+    }catch{}
+  }
+  function setSummarizing(shadow, on){ summarizing = !!on; updateQAControls(shadow); }
   function setupQABar(shadow){
     const qaInput = shadow.getElementById('sx-qa-input');
     const qaSend = shadow.getElementById('sx-qa-send');
     const chatCard = shadow.getElementById('sx-chat');
     const chatList = shadow.getElementById('sx-chat-list');
     if (!qaInput || !qaSend || !chatCard || !chatList) return;
+
+    // Ensure a close button exists (for floating mode)
+    const ensureChatTools = ()=>{
+      try{
+        let tools = chatCard.querySelector('.card-tools');
+        if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+        let closeBtn = tools.querySelector('.tbtn-close');
+        const label = currentLangCache==='en' ? 'Close' : '关闭';
+        if (!closeBtn){
+          closeBtn = document.createElement('button');
+          closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+          closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+          tools.insertBefore(closeBtn, tools.firstChild || null);
+          closeBtn.addEventListener('click', ()=>{
+            // Shrink back to QA bar animation, then hide
+            try{
+              const qaBar = shadow.getElementById('sx-qa-area');
+              const ccRect = chatCard.getBoundingClientRect();
+              const qaRect = qaBar.getBoundingClientRect();
+              const ccCenterY = ccRect.top + ccRect.height/2;
+              const qaCenterY = qaRect.top + qaRect.height/2;
+              const dy = Math.round(qaCenterY - ccCenterY);
+              chatCard.style.transition = 'transform .24s cubic-bezier(.2,.7,.3,1), opacity .24s ease';
+              chatCard.style.willChange = 'transform, opacity';
+              chatCard.style.transform = `translateY(${dy}px) scale(.92)`;
+              chatCard.style.opacity = '0';
+              setTimeout(()=>{
+                chatCard.style.display='none';
+                chatCard.classList.remove('qa-float');
+                chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange='';
+                chatVisible = false;
+              }, 250);
+            }catch{
+              chatCard.style.display='none'; chatCard.classList.remove('qa-float'); chatVisible=false;
+            }
+          });
+        }
+        // ensure resize handle exists for visual hint and easy grabbing
+        let rh = chatCard.querySelector('.qa-resize-handle');
+        if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+      }catch{}
+    };
+
+    const updateQABottomVar = ()=>{
+      try{
+        const qaBar  = shadow.getElementById('sx-qa-area');
+        const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60;
+        // keep a smaller gap so initial card位置更靠下
+        chatCard.style.setProperty('--qa-bottom', (qaH + 8) + 'px');
+      }catch{}
+    };
+    try{ window.addEventListener('resize', ()=>{ requestAnimationFrame(()=>{ updateQABottomVar(); clampFloatWithinContainer(); }); }, { passive:true }); }catch{}
+
+    // Drag & resize for floating chat
+    const containerEl = shadow.getElementById('sx-container');
+    let dragState = null; // {startX,startY, startLeft, startTop}
+    let resizeState = null; // {startX,startY, startW, startH}
+
+    const startDrag = (ev)=>{
+      if (!chatCard.classList.contains('qa-float')) return;
+      // ignore drags starting on buttons or resize handle
+      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
+      if (path.some(n=> n?.classList?.contains?.('tbtn') || n?.classList?.contains?.('qa-resize-handle'))) return;
+      // limit drag start within header area
+      const rect = chatCard.getBoundingClientRect();
+      if ((ev.clientY - rect.top) > 52) return; // only header
+      // switch to absolute left/top positioning
+      const contRect = containerEl.getBoundingClientRect();
+      const left = rect.left - contRect.left + containerEl.scrollLeft;
+      const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+      chatCard.classList.add('qa-custom-pos');
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+      chatCard.style.right = '';
+      chatCard.style.bottom = '';
+      dragState = { startX: ev.clientX, startY: ev.clientY, startLeft: left, startTop: top };
+      try{ chatCard.setPointerCapture(ev.pointerId); }catch{}
+      ev.preventDefault();
+    };
+    const onDrag = (ev)=>{
+      if (!dragState) return;
+      const dx = ev.clientX - dragState.startX; const dy = ev.clientY - dragState.startY;
+      const contRect = containerEl.getBoundingClientRect();
+      const cardRect = chatCard.getBoundingClientRect();
+      const cs = getComputedStyle(containerEl);
+      const padL = parseInt(cs.paddingLeft)||0;
+      const padR = parseInt(cs.paddingRight)||0;
+      const viewLeft = containerEl.scrollLeft;
+      const viewTop  = containerEl.scrollTop;
+      const viewRight = viewLeft + contRect.width;
+      const viewBottom = viewTop + contRect.height;
+        const marginL = 10, marginR = 10, marginT = 0, marginB = 0;
+      const minLeft = viewLeft + padL + marginL;
+      const minTop  = viewTop + marginT; // no vertical padding considered for now
+      const maxLeft = viewRight - padR - marginR - cardRect.width;
+      const maxTop  = viewBottom - marginB - cardRect.height;
+      const left = Math.max(minLeft, Math.min(maxLeft, dragState.startLeft + dx));
+      const top  = Math.max(minTop,  Math.min(maxTop,  dragState.startTop + dy));
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+    };
+    const endDrag = (ev)=>{
+      if (!dragState) return;
+      dragState = null;
+      try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
+    };
+
+    const rh = ()=> chatCard.querySelector('.qa-resize-handle');
+    const inResizeZone = (ev)=>{
+      try{
+        const rect = chatCard.getBoundingClientRect();
+        const zone = 24; // px from bottom-right corner
+        return (ev.clientX >= rect.right - zone) && (ev.clientY >= rect.bottom - zone);
+      }catch{ return false; }
+    };
+    const startResize = (ev)=>{
+      if (!chatCard.classList.contains('qa-float')) return;
+      const handle = rh();
+      const hitHandle = !!(handle && ev.target === handle);
+      const hitZone = inResizeZone(ev);
+      if (!hitHandle && !hitZone) return;
+      // ensure custom pos so we don't fight bottom/right
+      const rect = chatCard.getBoundingClientRect();
+      const contRect = containerEl.getBoundingClientRect();
+      const left = rect.left - contRect.left + containerEl.scrollLeft;
+      const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+      chatCard.classList.add('qa-custom-pos');
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+      chatCard.style.right = '';
+      chatCard.style.bottom = '';
+      resizeState = { startX: ev.clientX, startY: ev.clientY, startW: rect.width, startH: rect.height, pointerId: ev.pointerId };
+      try{ chatCard.setPointerCapture(ev.pointerId); }catch{}
+      // Ensure we always end resizing on release, even if pointer capture is lost
+      try{
+        window.addEventListener('pointermove', onResize, true);
+        window.addEventListener('pointerup', endResize, true);
+        window.addEventListener('pointercancel', endResize, true);
+        window.addEventListener('blur', endResize, true);
+        // Fallbacks for environments/events that might miss pointerup
+        window.addEventListener('mouseup', endResize, true);
+        window.addEventListener('mouseleave', endResize, true);
+      }catch{}
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    const onResize = (ev)=>{
+      if (!resizeState) return;
+      // If this move is from a different pointer, ignore. If mouse buttons released, stop resizing.
+      if (resizeState.pointerId !== undefined && ev.pointerId !== undefined && ev.pointerId !== resizeState.pointerId) return;
+      if (ev.buttons === 0) { endResize(ev); return; }
+      const dx = ev.clientX - resizeState.startX; const dy = ev.clientY - resizeState.startY;
+      const contRect = containerEl.getBoundingClientRect();
+      // available viewport (visible) bounds in content coordinates
+      const viewLeft = containerEl.scrollLeft;
+      const viewTop  = containerEl.scrollTop;
+      const viewRight = viewLeft + contRect.width;
+      const viewBottom = viewTop + contRect.height;
+      const minW = 200; const minH = 260; const margin = 10;
+      // current left/top in content coordinates
+      const rect = chatCard.getBoundingClientRect();
+      const left = (parseFloat(chatCard.style.left) || 0);
+      const top  = (parseFloat(chatCard.style.top) || 0);
+      const maxWByEdge = Math.max(minW, Math.round(viewRight - left - margin));
+      const maxHByEdge = Math.max(minH, Math.round(viewBottom - top - margin));
+      const hardMaxW = 1400; const hardMaxH = 1100;
+      const maxW = Math.min(maxWByEdge, hardMaxW);
+      const maxH = Math.min(maxHByEdge, hardMaxH);
+      let w = Math.max(minW, Math.min(maxW, Math.round(resizeState.startW + dx)));
+      let h = Math.max(minH, Math.min(maxH, Math.round(resizeState.startH + dy)));
+      chatCard.style.setProperty('--qa-w', w + 'px');
+      chatCard.style.setProperty('--qa-h', h + 'px');
+      chatCard.style.width = w + 'px';
+      chatCard.style.height = h + 'px';
+      // If we reached boundaries, rebase the starting point so user can continue resizing smoothly
+      try{
+        if ((w<=minW && dx<0) || (w>=maxW && dx>0)){
+          resizeState.startX = ev.clientX; resizeState.startW = w;
+        }
+        if ((h<=minH && dy<0) || (h>=maxH && dy>0)){
+          resizeState.startY = ev.clientY; resizeState.startH = h;
+        }
+      }catch{}
+    };
+    const endResize = (ev)=>{
+      if (!resizeState) return;
+      resizeState = null;
+      try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
+      try{ clampFloatWithinContainer(); }catch{}
+      try{
+        window.removeEventListener('pointermove', onResize, true);
+        window.removeEventListener('pointerup', endResize, true);
+        window.removeEventListener('pointercancel', endResize, true);
+        window.removeEventListener('blur', endResize, true);
+        window.removeEventListener('mouseup', endResize, true);
+        window.removeEventListener('mouseleave', endResize, true);
+      }catch{}
+    };
+    try{ chatCard.addEventListener('lostpointercapture', endResize, true); }catch{}
+
+    // Update cursor when hovering near the bottom-right corner
+    const updateCursor = (ev)=>{
+      try{
+        if (!chatCard.classList.contains('qa-float')) return;
+        if (resizeState) { chatCard.style.cursor = 'nwse-resize'; return; }
+        chatCard.style.cursor = inResizeZone(ev) ? 'nwse-resize' : '';
+      }catch{}
+    };
+
+    // bind drag on card header; resize on handle
+    try{
+      chatCard.addEventListener('pointerdown', startDrag);
+      chatCard.addEventListener('pointermove', onDrag);
+      chatCard.addEventListener('pointerup', endDrag);
+      chatCard.addEventListener('pointercancel', endDrag);
+      chatCard.addEventListener('pointerdown', startResize, true);
+      chatCard.addEventListener('pointermove', onResize);
+      chatCard.addEventListener('pointerup', endResize);
+      chatCard.addEventListener('pointercancel', endResize);
+      chatCard.addEventListener('pointermove', updateCursor, { passive:true });
+      if (!chatCard._qaContRO && window.ResizeObserver){
+        chatCard._qaContRO = new ResizeObserver(()=>{ requestAnimationFrame(()=>clampFloatWithinContainer()); });
+        try{ chatCard._qaContRO.observe(containerEl); }catch{}
+        try{ chatCard._qaContRO.observe(shadow.host); }catch{}
+        try{ chatCard._qaContRO.observe(shadow.getElementById('sx-wrap')); }catch{}
+      }
+    }catch{}
+
+    const showChat = (withRise)=>{
+      chatCard.style.display='';
+      if (hasSummarizeTriggered){
+        ensureChatTools();
+        updateQABottomVar();
+        // First-open sizing: fit to visible container height (avoid being clipped)
+        try{
+          if (!chatCard._qaInitSized){
+            const container = shadow.getElementById('sx-container');
+            const contH = container?.clientHeight || 0;
+            const qaBottomStr = chatCard.style.getPropertyValue('--qa-bottom') || getComputedStyle(chatCard).getPropertyValue('--qa-bottom');
+            const qaBottom = parseInt(String(qaBottomStr||'').replace(/[^\d.-]/g,'')) || 72;
+            const margin = 12; // bottom safe gap
+            const avail = Math.max(0, contH - qaBottom - margin);
+            let initH = Math.max(280, Math.round(avail * 0.5)); // use half of available height
+            const hardMax = 1100;
+            initH = Math.min(initH, hardMax);
+            chatCard.style.height = initH + 'px';
+            chatCard.style.setProperty('--qa-h', initH + 'px');
+            chatCard._qaInitSized = true;
+          }
+        }catch{}
+        // keep size vars in sync when user resizes (native or custom)
+        try{
+          if (!chatCard._qaResizeObs){
+            const syncSizeVars = ()=>{
+              const r = chatCard.getBoundingClientRect();
+              chatCard.style.setProperty('--qa-w', Math.round(r.width) + 'px');
+              chatCard.style.setProperty('--qa-h', Math.round(r.height) + 'px');
+            };
+            chatCard._qaResizeObs = new ResizeObserver(()=>syncSizeVars());
+            chatCard._qaResizeObs.observe(chatCard);
+            syncSizeVars();
+          }
+        }catch{}
+        // After entering float mode, ensure bounds are respected
+        try{ clampFloatWithinContainer(); }catch{}
+        chatCard.classList.add('qa-float');
+        if (withRise){ try{ chatCard.classList.add('qa-rise'); setTimeout(()=>chatCard.classList.remove('qa-rise'), 260); }catch{} }
+      } else {
+        // Non-summary phase: behave like original (full-width card)
+        chatCard.classList.remove('qa-float');
+      }
+      chatVisible = true;
+    };
     // auto-resize textarea to show all input lines (up to max-height)
     const autoResize = () => {
       try{
@@ -1999,35 +2435,78 @@
       }catch{}
     };
     qaInput.addEventListener('input', autoResize);
+    // Calculate offset of an element relative to a root container
+    const offsetWithin = (el, root)=>{
+      try{
+        let y = 0; let n = el;
+        while (n && n !== root){ y += n.offsetTop || 0; n = n.offsetParent; }
+        return y;
+      }catch{ return 0; }
+    };
+    // In floating mode: keep the user bubble in view near top, while showing as much of AI answer as possible
+    const adjustChatViewport = (userBubble, aiBubble)=>{
+      try{
+        if (!chatCard.classList.contains('qa-float')) return;
+        if (!userBubble || !aiBubble) return;
+        const H = chatList.clientHeight || 0; if (H<=0) return;
+        const margin = 8;
+        const uTop = offsetWithin(userBubble, chatList);
+        const aBottom = offsetWithin(aiBubble, chatList) + (aiBubble.getBoundingClientRect().height || 0);
+        let desired = Math.min(uTop - margin, aBottom - H + margin);
+        if (!Number.isFinite(desired)) desired = uTop - margin;
+        chatList.scrollTo({ top: Math.max(0, desired), behavior: 'auto' });
+      }catch{}
+    };
     const appendBubble = (role, html, pending=false)=>{
       const b = document.createElement('div');
       b.className = `chat-bubble ${role}`;
       b.innerHTML = pending ? `<span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>` : html;
-      chatList.appendChild(b); try{ b.classList.add('pull-in'); setTimeout(()=>b.classList.remove('pull-in'), 500); }catch{}
+      chatList.appendChild(b);
+      try{ b.classList.add('pull-in'); setTimeout(()=>b.classList.remove('pull-in'), 500); }catch{}
       try{
         const scroller = shadow.getElementById('sx-container');
-        scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+        // In floating mode, avoid jumping container scroll; the window is already visible
+        if (!chatCard.classList.contains('qa-float')){
+          scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+        }
       }catch{}
       return b;
     };
     const doSend = async ()=>{
+      if (summarizing || qaSending) return; // blocked during summarize or when already sending
       const q = qaInput.value.trim();
       if (!q) return;
       const prev = qaSend.textContent;
-      qaSend.disabled = true; qaSend.textContent = (currentLangCache==='zh'?'发送中…':'Sending…');
+      qaSending = true; updateQAControls(shadow);
+      qaSend.textContent = (currentLangCache==='zh'?'发送中…':'Sending…');
       // Switch to chat mode on first send
-      chatCard.style.display = '';
-      if (!chatMode){ chatMode = true; try{ shadow.getElementById('sx-summary').style.display='none'; shadow.getElementById('sx-cleaned').style.display='none'; }catch{} }
-      // Append user message bubble
+      if (!chatMode){
+        chatMode = true;
+      }
+      // Show chat; if summary ever triggered, float above summary/cleaned
+      showChat(!chatVisible);
+      // During first/early phase (no summarize yet), hide other cards so only Q&A is visible
+      if (!hasSummarizeTriggered){
+        try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+      } else {
+        // Keep summary/cleaned visible; overlay floats above them
+        try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+      }
       const userHtml = escapeHtml(q);
-      appendBubble('user', userHtml, false);
+      const userBubble = appendBubble('user', userHtml, false);
       // Append AI pending bubble
       const aiBubble = appendBubble('ai', '', true);
+      // After both bubbles are in, adjust viewport to show user bubble and as much of AI as possible
+      try{ adjustChatViewport(userBubble, aiBubble); requestAnimationFrame(()=>adjustChatViewport(userBubble, aiBubble)); }catch{}
       // Clear the input so user text doesn't linger
       try{ qaInput.value=''; qaInput.style.height=''; }catch{}
-      // During loading, hide other cards so only Q&A is visible
-      try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
-      try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+      // During loading, hide other cards only if summarize hasn't been triggered
+      if (!hasSummarizeTriggered){
+        try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+      }
 
       // If panel is folded, expand like the summarize flow so the card is visible
       let expanded = false;
@@ -2066,7 +2545,7 @@
       try{
         const resp = await chrome.runtime.sendMessage({ type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) });
         if (!resp?.ok) throw new Error(resp?.error || 'QA failed');
-        chatCard.style.display = '';
+        showChat(false);
         const ans = String(resp.answer||'').replace(/^__NO_HIT__\s*/i,'').trim();
         let html = stripInlineColor(renderMarkdown(ans));
         // Collapse excessive breaks only within chat bubble rendering
@@ -2075,20 +2554,22 @@
           .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
           .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
         aiBubble.innerHTML = html;
-        // Ensure the answer is fully visible to the user:
+        // After answer renders, adjust again to show as much as possible while keeping question visible
+        try{ adjustChatViewport(userBubble, aiBubble); setTimeout(()=>adjustChatViewport(userBubble, aiBubble), 50); }catch{}
+        // Keep viewport anchored near the user question; do not auto-jump in floating mode
         try{
-          const scroller = shadow.getElementById('sx-container');
-          const vh = scroller?.clientHeight || 0;
-          const bh = aiBubble?.getBoundingClientRect().height || 0;
-          if (scroller && aiBubble){
-            if (bh >= vh - 12){
-              // Align the top of the answer to the top edge of the viewport
-              let offset = 0; let n = aiBubble;
-              while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
-              scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
-            } else {
-              // Not filling the viewport: scroll to bottom
-              scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+          if (!chatCard.classList.contains('qa-float')){
+            const scroller = shadow.getElementById('sx-container');
+            const vh = scroller?.clientHeight || 0;
+            const bh = aiBubble?.getBoundingClientRect().height || 0;
+            if (scroller && aiBubble){
+              if (bh >= vh - 12){
+                let offset = 0; let n = aiBubble;
+                while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
+                scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
+              } else {
+                scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+              }
             }
           }
         }catch{}
@@ -2099,11 +2580,14 @@
         try{ alert((currentLangCache==='zh'?'提问失败：':'Ask failed: ') + (e?.message || e)); }catch{}
       } finally {
         try{ setLoading(shadow, false); }catch{}
-        qaSend.disabled = false; qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
+        qaSending = false; updateQAControls(shadow);
+        // Restore label unless still blocked by summarizing
+        if (qaSend && !qaSend.disabled) qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
       }
     };
     qaSend.addEventListener('click', doSend);
     qaInput.addEventListener('keydown', (ev)=>{
+      if (summarizing || qaSending) return; // ignore input when blocked
       if (ev.key==='Enter' && ev.shiftKey){
         // allow newline; resize after the key inserts the line break
         setTimeout(autoResize, 0);
@@ -2160,12 +2644,35 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      // Mark that summarize has been triggered to switch future Q&A into floating mode
+      hasSummarizeTriggered = true;
+      setSummarizing(shadow, true);
       // If in chat mode: gracefully hide chat, restore summary/cleaned
       try{
         const chatCard = shadow.getElementById('sx-chat');
         if (chatCard && chatCard.style.display !== 'none'){
-          chatCard.classList.add('chat-hide');
-          setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+          // If floating, shrink towards QA bar; else use existing fade
+          if (chatCard.classList.contains('qa-float')){
+            try{
+              const qaBar = shadow.getElementById('sx-qa-area');
+              const ccRect = chatCard.getBoundingClientRect();
+              const qaRect = qaBar.getBoundingClientRect();
+              const ccCenterY = ccRect.top + ccRect.height/2;
+              const qaCenterY = qaRect.top + qaRect.height/2;
+              const dy = Math.round(qaCenterY - ccCenterY);
+              chatCard.style.transition = 'transform .24s cubic-bezier(.2,.7,.3,1), opacity .24s ease';
+              chatCard.style.willChange = 'transform, opacity';
+              chatCard.style.transform = `translateY(${dy}px) scale(.92)`;
+              chatCard.style.opacity = '0';
+              setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('qa-float'); chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange=''; }catch{} }, 250);
+            }catch{
+              chatCard.classList.add('chat-hide');
+              setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+            }
+          } else {
+            chatCard.classList.add('chat-hide');
+            setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+          }
           try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
           try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
         }
@@ -2262,7 +2769,7 @@
       }catch{}
       await pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
     }catch(e){
-      setLoading(shadow,false);
+      setSummarizing(shadow,false); setLoading(shadow,false);
       const box=shadow.getElementById('sx-summary');
       box.innerHTML = `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>运行失败：${escapeHtml(e?.message||String(e))}</p></div></div>`;
     }
@@ -2287,17 +2794,22 @@
       const tabId=await getActiveTabId();
       if (!tabId){ await setEmpty(shadow); return; }
       const st=await getState(tabId);
+      // Pre-mark summarize as triggered if panel state indicates it
+      try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
       if (st.status==='running'){
+        setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
       }
       else if (st.status==='partial'){
+        setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
       }
       else if (st.status==='done'){
+        setSummarizing(shadow,false);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
@@ -2313,23 +2825,27 @@
       const curId=await getActiveTabId(); if (msg.tabId!==curId) return;
       try{
         const st=await getState(curId);
+        try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
         if (st.status==='running'){
+          setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); skeleton(shadow);
         }
         else if (st.status==='partial'){
+          setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); await renderCards(st.summary, null);
         }
         else if (st.status==='done'){
+          setSummarizing(shadow,false);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
         }
         else if (st.status==='error'){
-          setLoading(shadow,false);
+          setSummarizing(shadow,false); setLoading(shadow,false);
           shadow.getElementById('sx-summary').innerHTML =
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>发生错误，请重试。</p></div></div>`;
           stopPolling();
@@ -2700,3 +3216,10 @@
   }
 
 })();
+    // Ensure the floating window never overflows to the right when container resizes
+    const clampFloatWithinContainer = ()=>{
+      try{
+        // No-op: do not auto-resize or auto-reposition the QA window on container/panel size changes.
+        // Bounds are enforced during user drag/resize interactions only.
+      }catch{}
+    };
