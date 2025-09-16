@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.2.1-beta - 2025-09-16
+
+### English
+- Extraction: prefer the DOM-provided Markdown when available, normalize newlines, and fall back to saved custom Markdown or auto-converted text.
+- Fast mode body reuses the sanitized Markdown so the summary and readable body stay consistent.
+- Cleaner heuristics skip navigation/aside sections via tag and ARIA role detection, treat block containers recursively, and honor `<br>` for better spacing.
+- Version: bumped to 2.2.1-beta.
+
+### 中文
+- 正文提取：优先使用内容脚本返回的 Markdown，并标准化换行；若无则回退到自定义 Markdown 或自动转换文本。
+- 快速模式正文复用同一份清洗后的 Markdown，让摘要与正文内容保持一致。
+- 清理规则：通过标签和 ARIA role 识别导航/侧边栏，递归处理块级容器、保留 `<br>`，减少多余空行。
+- 版本：升级至 2.2.1-beta。
+
 ## v2.2.0-beta - 2025-09-15
 
 ### English
