@@ -140,12 +140,20 @@ async function runForTab(tabId) {
 
   await setState(tabId, { status: "running" });
 
-  const { title, text, url, pageLang } = await getPageRawByTabId(tabId);
+  const { title, text, url, pageLang, markdown: pageMarkdown } = await getPageRawByTabId(tabId);
   const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text);
 
-  const quickMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim())
-    ? cfg.markdown
-    : textToMarkdown(typeof text === "string" ? text : "");
+  const rawTextMd = textToMarkdown(typeof text === "string" ? text : "");
+  const baseMarkdown = (() => {
+    if (typeof pageMarkdown === "string" && pageMarkdown.trim()) {
+      return pageMarkdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    if (typeof cfg?.markdown === "string" && cfg.markdown.trim()) {
+      return cfg.markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    return rawTextMd;
+  })();
+  const quickMd = baseMarkdown;
   const sysForSummary = buildSystemPrompt({
     custom: cfg.system_prompt_custom,
     preset: cfg.system_prompt_preset,
@@ -187,14 +195,11 @@ async function runForTab(tabId) {
   // 正文
   let cleanedMarkdown = "";
   if (cfg.extract_mode === "fast") {
-    const preferMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim().length > 0)
-      ? cfg.markdown
-      : textToMarkdown(typeof text === "string" ? text : "");
     const NOTICE_ZH = "当前“正文提取方式”为**本地快速模式**，以下正文为**原文**显示。若希望按目标语言显示正文，请在设置中将“正文提取方式”切换为 **AI 清洗模式**。";
     const NOTICE_EN = "Extract mode is **Local Fast**. The readable body below is shown **in the original language**. If you want the body to follow the target language, switch “Extract Mode” to **AI Clean** in Settings.";
     const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
     const BODY_LIMIT = 50000;
-    const body = (preferMd ? String(preferMd) : "").slice(0, BODY_LIMIT);
+    const body = (baseMarkdown ? String(baseMarkdown) : "").slice(0, BODY_LIMIT);
     cleanedMarkdown = (noticeBlock + "\n" + body).replace(/\n{3,}/g, "\n\n").trim();
   } else {
     const clipped = (text || "").slice(0, 20000);

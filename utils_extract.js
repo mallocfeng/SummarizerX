@@ -2,6 +2,14 @@
 (function () {
   const BAD_RE = /nav|aside|footer|header|form|menu|banner|complementary|advert|ads|promo|subscribe|breadcrumb|pagination|comment|related|toc|newsletter|cookie/i;
   const GOOD_RE = /article|main|content|post|entry|markdown|doc|read|story|article-body|post-body|prose|md/i;
+  const BLOCK_CONTAINER = new Set(["div", "section", "article", "main", "body", "figure"]);
+  const FORCE_SKIP_TAG = new Set(["nav", "aside", "footer", "header", "form"]);
+
+  function hasBadRole(node) {
+    const role = node.getAttribute?.("role") || "";
+    if (!role) return false;
+    return /(navigation|banner|contentinfo|search|complementary)/i.test(role);
+  }
 
   function isVisible(el) {
     if (!(el instanceof Element)) return false;
@@ -42,8 +50,10 @@
     if (!(node instanceof Element)) return "";
 
     if (!isVisible(node)) return "";
-    if (BAD_RE.test(node.className || "") || BAD_RE.test(node.id || "")) return "";
+    if (BAD_RE.test(node.className || "") || BAD_RE.test(node.id || "") || hasBadRole(node)) return "";
     const tag = node.tagName.toLowerCase();
+
+    if (FORCE_SKIP_TAG.has(tag)) return "";
 
     if (["script","style","noscript","iframe","svg","canvas","menu"].includes(tag)) return "";
 
@@ -92,6 +102,8 @@
       if (!text) return "";
       return `\n\n${"#".repeat(level)} ${text}\n\n`;
     }
+
+    if (tag === "br") return "\n";
 
     // lists
     if (tag === "ul" || tag === "ol") {
@@ -142,6 +154,16 @@
     if (tag === "p") {
       const text = inlineChildrenToText(node, opts).trim();
       return text ? `\n\n${text}\n\n` : "";
+    }
+
+    if (BLOCK_CONTAINER.has(tag)) {
+      const pieces = [];
+      node.childNodes && node.childNodes.forEach(ch => {
+        const chunk = nodeToMarkdown(ch, opts);
+        if (chunk && chunk.trim()) pieces.push(chunk.trim());
+      });
+      if (!pieces.length) return "";
+      return `\n\n${pieces.join("\n\n")}\n\n`;
     }
 
     return blockChildrenToMarkdown(node, opts);
