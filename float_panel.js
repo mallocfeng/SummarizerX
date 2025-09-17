@@ -1507,15 +1507,43 @@
       @keyframes qaRise{ from{ opacity:0; transform: translateY(18px) scale(.98);} to{ opacity:1; transform: translateY(0) scale(1);} }
 
       /* ===== QA Bar ===== */
-      .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; }
+      .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; transition: background-color .18s ease, border-color .18s ease; }
+      /* Make ask area visually associated with the chat card (light) */
+      :host([data-theme="light"]) .qa-bar{
+        background:
+          linear-gradient(180deg, rgba(255,247,214,.52) 0%, rgba(255,243,191,.36) 100%),
+          var(--surface);
+        border-top-color: rgba(234,179,8,.28);
+      }
       .qa-url{ font-size:12px; color: #546079; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:6px; }
       :host([data-theme="dark"]) .qa-url{ color:#9fb0d0; opacity:.95; }
       .qa-row{ display:flex; gap:8px; align-items:flex-start; }
-      .qa-row textarea{ flex:1 1 auto; min-height:34px; max-height:120px; resize:vertical; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: #fff; color: var(--text); font-size:14px; line-height:1.4; }
-      .qa-row textarea::placeholder{ color:#8aa3d0; opacity:.8; }
-      :host([data-theme="dark"]) .qa-row textarea{ background:#0f172a; color: #e2ebf8; border-color:#27344b; }
-      :host([data-theme="dark"]) .qa-row textarea::placeholder{ color:#7a90bf; }
-      .qa-row .btn{ flex:0 0 auto; height:34px; padding:8px 12px; }
+      .qa-row textarea{ flex:1 1 auto; min-height:34px; max-height:120px; resize:vertical; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: #fff; color: var(--text); font-size:14px; line-height:1.4; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+      .qa-row textarea::placeholder{ color:#7c6b2a; opacity:.6; }
+      /* Light theme: use white input background for clarity; keep warm focus ring */
+      :host([data-theme="light"]) .qa-row textarea{ background: #ffffff; border-color: rgba(234,179,8,.42); }
+      :host([data-theme="light"]) .qa-row textarea:focus{ outline:none; border-color: rgba(234,179,8,.66); box-shadow: 0 0 0 3px rgba(234,179,8,.22); background: #ffffff; }
+      :host([data-theme="light"]) .qa-row textarea::placeholder{ color:#9a7b0e; opacity:.65; }
+      /* Dark theme: subtle warm tint matching floating chat */
+      :host([data-theme="dark"]) .qa-bar{
+        background:
+          linear-gradient(180deg, rgba(255,220,120,.10) 0%, rgba(255,220,120,.06) 100%),
+          var(--surface);
+        border-top-color: rgba(250,204,21,.22);
+      }
+      :host([data-theme="dark"]) .qa-row textarea{ background: rgba(26,34,52,.75); color: #e2ebf8; border-color: rgba(250,204,21,.28); }
+      :host([data-theme="dark"]) .qa-row textarea:focus{ outline:none; border-color: rgba(250,204,21,.45); box-shadow: 0 0 0 3px rgba(250,204,21,.20); background: rgba(32,40,60,.82); }
+      :host([data-theme="dark"]) .qa-row textarea::placeholder{ color:#d8c48a; opacity:.7; }
+      .qa-row .btn{ flex:0 0 auto; height:34px; padding:8px 12px; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease; }
+      /* Send button styled to match the chat card (light) */
+      #sx-qa-send{ background: #fef3c7; border-color:#fcd34d; color:#7c4a02; font-weight:800; }
+      #sx-qa-send:hover{ background:#fde68a; border-color:#f59e0b; color:#6b3e02; }
+      #sx-qa-send:active{ background:#fcd34d; border-color:#f59e0b; color:#5b3302; }
+      #sx-qa-send:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.28); }
+      :host([data-theme="dark"]) #sx-qa-send{ background: rgba(250,204,21,.16); border-color: rgba(250,204,21,.38); color:#f8f5e3; font-weight:800; }
+      :host([data-theme="dark"]) #sx-qa-send:hover{ background: rgba(250,204,21,.22); border-color: rgba(250,204,21,.50); }
+      :host([data-theme="dark"]) #sx-qa-send:active{ background: rgba(250,204,21,.32); border-color: rgba(250,204,21,.55); }
+      :host([data-theme="dark"]) #sx-qa-send:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.20); }
       /* Minimized QA restore icon */
       .qa-restore{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; border:1px solid var(--border); background: var(--surface-2); display:none; place-items:center; cursor:pointer; color:#334155; margin-top:0; align-self:center; transition: box-shadow .18s ease, transform .18s ease, background-color .18s ease; }
       .qa-restore svg{ width:16px; height:16px; display:block; stroke:currentColor; }
