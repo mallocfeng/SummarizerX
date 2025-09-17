@@ -1473,6 +1473,16 @@
       :host([data-theme="dark"]) .qa-row textarea{ background:#0f172a; color: #e2ebf8; border-color:#27344b; }
       :host([data-theme="dark"]) .qa-row textarea::placeholder{ color:#7a90bf; }
       .qa-row .btn{ flex:0 0 auto; height:34px; padding:8px 12px; }
+      /* Minimized QA restore icon */
+      .qa-restore{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; border:1px solid var(--border); background: var(--surface-2); display:none; place-items:center; cursor:pointer; color:#334155; margin-top:0; align-self:center; transition: box-shadow .18s ease, transform .18s ease, background-color .18s ease; }
+      .qa-restore svg{ width:16px; height:16px; display:block; stroke:currentColor; }
+      .qa-restore:hover{ filter: brightness(1.05); box-shadow: 0 0 0 6px rgba(59,130,246,.10); }
+      .qa-restore[aria-hidden="false"]{ display:grid; }
+      :host([data-theme="dark"]) .qa-restore{ border-color:#27344b; background:#0f172a; color:#e2ebf8; }
+      .qa-restore.flash{ animation: qaRestorePulse 1.05s ease-in-out 3; }
+      @keyframes qaRestorePulse{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(59,130,246,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(59,130,246,.18); } }
+      .qa-restore.flash-done{ animation: qaRestorePulseDone 1.05s ease-in-out 3; }
+      @keyframes qaRestorePulseDone{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(34,197,94,.22); } }
 
       /* ===== Accessibility ===== */
       @media (prefers-reduced-motion: reduce){
@@ -2056,6 +2066,7 @@
       shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
       const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
       const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
+      const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
       const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
       const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
       const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
@@ -2149,6 +2160,21 @@
   function setupQABar(shadow){
     const qaInput = shadow.getElementById('sx-qa-input');
     const qaSend = shadow.getElementById('sx-qa-send');
+    // Ensure a restore icon exists in the QA bar (right side)
+    let qaRestore = shadow.getElementById('sx-qa-restore');
+    try{
+      if (!qaRestore){
+        qaRestore = document.createElement('button');
+        qaRestore.id = 'sx-qa-restore';
+        qaRestore.className = 'qa-restore';
+        qaRestore.type = 'button';
+        qaRestore.setAttribute('aria-hidden','true');
+        qaRestore.title = currentLangCache==='en' ? 'Show Q&A' : '显示你问我答';
+        qaRestore.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>';
+        const qaRow = shadow.querySelector('.qa-row');
+        if (qaRow){ qaRow.appendChild(qaRestore); }
+      }
+    }catch{}
     const chatCard = shadow.getElementById('sx-chat');
     const chatList = shadow.getElementById('sx-chat-list');
     if (!qaInput || !qaSend || !chatCard || !chatList) return;
@@ -2166,27 +2192,7 @@
           closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
           tools.insertBefore(closeBtn, tools.firstChild || null);
           closeBtn.addEventListener('click', ()=>{
-            // Shrink back to QA bar animation, then hide
-            try{
-              const qaBar = shadow.getElementById('sx-qa-area');
-              const ccRect = chatCard.getBoundingClientRect();
-              const qaRect = qaBar.getBoundingClientRect();
-              const ccCenterY = ccRect.top + ccRect.height/2;
-              const qaCenterY = qaRect.top + qaRect.height/2;
-              const dy = Math.round(qaCenterY - ccCenterY);
-              chatCard.style.transition = 'transform .24s cubic-bezier(.2,.7,.3,1), opacity .24s ease';
-              chatCard.style.willChange = 'transform, opacity';
-              chatCard.style.transform = `translateY(${dy}px) scale(.92)`;
-              chatCard.style.opacity = '0';
-              setTimeout(()=>{
-                chatCard.style.display='none';
-                chatCard.classList.remove('qa-float');
-                chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange='';
-                chatVisible = false;
-              }, 250);
-            }catch{
-              chatCard.style.display='none'; chatCard.classList.remove('qa-float'); chatVisible=false;
-            }
+            minimizeChat();
           });
         }
         // ensure resize handle exists for visual hint and easy grabbing
@@ -2194,6 +2200,143 @@
         if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
       }catch{}
     };
+
+    // Minimize/Restore state
+    let chatMinimized = false;
+    let savedGeom = null; // { custom, left, top, width, height, rightGap }
+
+    function getContainerBounds(){
+      const contRect = containerEl.getBoundingClientRect();
+      const cs = getComputedStyle(containerEl);
+      const padL = parseInt(cs.paddingLeft)||0;
+      const padR = parseInt(cs.paddingRight)||0;
+      const viewLeft = containerEl.scrollLeft;
+      const viewRight = viewLeft + contRect.width;
+      const SAFE = 10;
+      const innerLeftAbs = viewLeft + padL + SAFE;
+      const innerRightAbs = viewRight - padR - SAFE;
+      const availW = Math.max(0, innerRightAbs - innerLeftAbs);
+      return { contRect, innerLeftAbs, innerRightAbs, availW };
+    }
+
+    function minimizeChat(){
+      try{
+        if (!chatCard.classList.contains('qa-float')){ chatCard.style.display='none'; chatVisible=false; return; }
+        // Save current geometry relative to container
+        const rect = chatCard.getBoundingClientRect();
+        const { contRect } = getContainerBounds();
+        const left = rect.left - contRect.left + containerEl.scrollLeft;
+        const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+        const width = rect.width; const height = rect.height;
+        const custom = chatCard.classList.contains('qa-custom-pos');
+        const rightGap = contRect.right - rect.right; // for right-anchored restore
+        savedGeom = { custom, left, top, width, height, rightGap: Math.max(10, Math.round(rightGap)) };
+
+        // Animate towards QA restore icon and then hide
+        try{
+          const qaBar = shadow.getElementById('sx-qa-area');
+          const ccRect = rect;
+          let iconRect = qaRestore?.getBoundingClientRect?.();
+          if (!iconRect || iconRect.width===0 || iconRect.height===0){
+            // Fallback to QA row right side
+            const row = shadow.querySelector('.qa-row');
+            const r = row? row.getBoundingClientRect() : qaBar.getBoundingClientRect();
+            iconRect = { left: r.right-18, top: r.top, width: 18, height: r.height };
+          }
+          const ccX = ccRect.left + ccRect.width/2;
+          const ccY = ccRect.top  + ccRect.height/2;
+          const icX = iconRect.left + iconRect.width/2;
+          const icY = iconRect.top  + iconRect.height/2;
+          const dx = Math.round(icX - ccX);
+          const dy = Math.round(icY - ccY);
+          chatCard.style.transition = 'transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s ease';
+          chatCard.style.willChange = 'transform, opacity';
+          chatCard.style.transform = `translate(${dx}px, ${dy}px) scale(.6)`;
+          chatCard.style.opacity = '0';
+          setTimeout(()=>{
+            chatCard.style.display='none';
+            chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange='';
+          }, 240);
+        }catch{ chatCard.style.display='none'; }
+
+        // Show restore icon
+        if (qaRestore){ qaRestore.setAttribute('aria-hidden','false'); qaRestore.classList.add('flash'); setTimeout(()=>{ try{ qaRestore.classList.remove('flash'); }catch{} }, 3300); }
+        chatMinimized = true; chatVisible = false;
+      }catch{}
+    }
+
+    function restoreChat(){
+      try{
+        // Get icon position BEFORE hiding it, to animate from its center
+        let iconRect = qaRestore?.getBoundingClientRect?.();
+        if (!iconRect || iconRect.width===0 || iconRect.height===0){
+          const qaBar = shadow.getElementById('sx-qa-area');
+          const row = shadow.querySelector('.qa-row');
+          const r = row? row.getBoundingClientRect() : qaBar.getBoundingClientRect();
+          iconRect = { left: r.right-18, top: r.top, width: 18, height: r.height };
+        }
+
+        updateQABottomVar();
+        chatCard.style.display='';
+        chatCard.classList.add('qa-float');
+        // size + pos restore with current bounds
+        const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+        const hardMaxW = 1400;
+        const baseW = Math.min(hardMaxW, Math.round(savedGeom?.width || 420));
+        const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+        chatCard.style.minWidth = '0px';
+        chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+        chatCard.style.height = (savedGeom?.height? Math.max(260, Math.min(1100, Math.round(savedGeom.height))) : chatCard.style.height);
+        if (savedGeom && savedGeom.custom){
+          // Clamp left within current bounds
+          const maxLeft = innerRightAbs - width;
+          const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(savedGeom.left)));
+          chatCard.classList.add('qa-custom-pos');
+          chatCard.style.right=''; chatCard.style.bottom='';
+          chatCard.style.left = left + 'px';
+          // keep previous top if possible
+          try{
+            const topMax = (containerEl.scrollTop + contRect.height) - 10 - (savedGeom.height||chatCard.getBoundingClientRect().height);
+            const topMin = containerEl.scrollTop;
+            const top = Math.max(topMin, Math.min(topMax, Math.round(savedGeom.top)));
+            chatCard.style.top = top + 'px';
+          }catch{}
+        } else {
+          // Right-anchored restore; respect at least 10px and saved right gap if any
+          chatCard.classList.remove('qa-custom-pos');
+          const gap = Math.max(10, savedGeom?.rightGap || 16);
+          chatCard.style.right = gap + 'px';
+          chatCard.style.left = '';
+          chatCard.style.top = '';
+          chatCard.style.bottom = '';
+        }
+        // Animate from restore icon to final spot
+        try{
+          const finalRect = chatCard.getBoundingClientRect();
+          const fx = finalRect.left + finalRect.width/2;
+          const fy = finalRect.top  + finalRect.height/2;
+          const ix = iconRect.left + iconRect.width/2;
+          const iy = iconRect.top  + iconRect.height/2;
+          const dx = Math.round(ix - fx);
+          const dy = Math.round(iy - fy);
+          chatCard.style.willChange = 'transform, opacity';
+          chatCard.style.transform = `translate(${dx}px, ${dy}px) scale(.6)`;
+          chatCard.style.opacity = '0';
+          requestAnimationFrame(()=>{
+            chatCard.style.transition = 'transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s ease';
+            chatCard.style.transform = 'translate(0,0) scale(1)';
+            chatCard.style.opacity = '1';
+            const done=()=>{ try{ chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange=''; }catch{} };
+            chatCard.addEventListener('transitionend', done, { once:true });
+            // Hide the restore icon only after animation kicks in
+            try{ qaRestore?.setAttribute('aria-hidden','true'); }catch{}
+          });
+        }catch{}
+        chatMinimized = false; chatVisible = true;
+      }catch{}
+    }
+
+    try{ qaRestore?.addEventListener('click', ()=>{ if (chatMinimized) restoreChat(); }); }catch{}
 
     const updateQABottomVar = ()=>{
       try{
@@ -2545,7 +2688,10 @@
       try{
         const resp = await chrome.runtime.sendMessage({ type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) });
         if (!resp?.ok) throw new Error(resp?.error || 'QA failed');
-        showChat(false);
+        // If user minimized during processing, do not auto-pop the chat back
+        if (!chatMinimized) {
+          showChat(false);
+        }
         const ans = String(resp.answer||'').replace(/^__NO_HIT__\s*/i,'').trim();
         let html = stripInlineColor(renderMarkdown(ans));
         // Collapse excessive breaks only within chat bubble rendering
@@ -2583,6 +2729,15 @@
         qaSending = false; updateQAControls(shadow);
         // Restore label unless still blocked by summarizing
         if (qaSend && !qaSend.disabled) qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
+        // If minimized while processing, signal completion on the restore icon (green pulse)
+        try{
+          if (chatMinimized && qaRestore){
+            qaRestore.setAttribute('aria-hidden','false');
+            qaRestore.classList.remove('flash');
+            qaRestore.classList.add('flash-done');
+            setTimeout(()=>{ try{ qaRestore.classList.remove('flash-done'); }catch{} }, 3200);
+          }
+        }catch{}
       }
     };
     qaSend.addEventListener('click', doSend);
