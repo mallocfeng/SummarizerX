@@ -1055,6 +1055,9 @@
         transform-origin: top center;
       }
       .card:hover{ transform: translateY(-2px); box-shadow: 0 2px 3px rgba(16,24,40,.06), 0 12px 28px rgba(16,24,40,.12); }
+      /* When floating Q&A is in front, suppress hover pop on background summary/cleaned cards */
+      .wrap.qa-hover-off #sx-summary:hover,
+      .wrap.qa-hover-off #sx-cleaned:hover{ transform: translateY(0) !important; box-shadow: 0 1px 1px rgba(16,24,40,.05), 0 8px 22px rgba(16,24,40,.08) !important; }
 
       /* Light theme: add a gentle color tint so cards aren't pure white */
       :host([data-theme="light"]) .card{
@@ -2335,6 +2338,7 @@
     // Minimize/Restore state
     let chatMinimized = false;
     let savedGeom = null; // { custom, left, top, width, height, rightGap }
+    const setBgCardHoverDisabled = (disabled)=>{ try{ shadow.getElementById('sx-wrap')?.classList?.toggle('qa-hover-off', !!disabled); }catch{} };
 
     function getContainerBounds(){
       const contRect = containerEl.getBoundingClientRect();
@@ -2392,7 +2396,7 @@
 
         // Show restore icon
         if (qaRestore){ qaRestore.setAttribute('aria-hidden','false'); qaRestore.classList.add('flash'); setTimeout(()=>{ try{ qaRestore.classList.remove('flash'); }catch{} }, 3300); }
-        chatMinimized = true; chatVisible = false;
+        chatMinimized = true; chatVisible = false; setBgCardHoverDisabled(false);
       }catch{}
     }
 
@@ -2463,7 +2467,7 @@
             try{ qaRestore?.setAttribute('aria-hidden','true'); }catch{}
           });
         }catch{}
-        chatMinimized = false; chatVisible = true;
+        chatMinimized = false; chatVisible = true; setBgCardHoverDisabled(true);
       }catch{}
     }
 
@@ -2700,7 +2704,7 @@
         // Non-summary phase: behave like original (full-width card)
         chatCard.classList.remove('qa-float');
       }
-      chatVisible = true;
+      chatVisible = true; setBgCardHoverDisabled(chatCard.classList.contains('qa-float'));
     };
     // auto-resize textarea to show all input lines (up to max-height)
     const autoResize = () => {
