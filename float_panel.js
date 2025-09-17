@@ -1370,7 +1370,11 @@
       :host([data-theme="dark"]) .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(142,162,255,.35); }
 
       /* ===== Chat Bubbles ===== */
-      .chat-list{ display:flex; flex-direction:column; gap:8px; padding:6px 2px; }
+      .chat-list{ display:flex; flex-direction:column; gap:16px; padding:0 2px 0; }
+      /* Provide a small visual breathing space at the very top when at scrollTop=0,
+         but no persistent top padding while scrolling (the spacer scrolls away). */
+      /* No extra spacer; keep tight to header and control via card padding */
+      .chat-list::before{ content:""; display:block; height:0; flex:0 0 0; }
       .chat-bubble{ max-width:92%; padding:12px 16px; border-radius:14px; box-shadow: var(--shadow-1); white-space:pre-wrap; word-break:break-word; line-height:1.55; }
       /* Warm sticky-note palette for chat bubbles */
       .chat-bubble.user{ align-self:flex-end; background:#FFE9A6; color:#3b2a05; border:1px solid #FDE68A; }
@@ -1395,6 +1399,8 @@
       @keyframes fadeUp { from{ opacity:1; transform: translateY(0);} to{ opacity:0; transform: translateY(-10px);} }
 
       /* ===== Floating QA Overlay ===== */
+      /* Chat card: header 44px + persistent 2px breathing; bottom 10px */
+      #sx-chat.card.card-head{ padding-top:46px; padding-bottom:10px; }
       #sx-chat.qa-float{ position:absolute; right:16px; z-index:60;
         /* leave room for QA bar at bottom; JS sets --qa-bottom */
         bottom: calc(var(--qa-bottom, 72px));
@@ -1412,7 +1418,8 @@
         box-shadow: 0 8px 26px rgba(16,24,40,.16), 0 2px 10px rgba(16,24,40,.10);
         border:1px solid var(--border);
       }
-      #sx-chat.qa-float .chat-list{ height: calc(var(--qa-h) - 64px); overflow:auto; }
+      /* Match chat-list height to card height minus top/bottom paddings (46 + 10) */
+      #sx-chat.qa-float .chat-list{ height: calc(var(--qa-h) - 56px); overflow:auto; overscroll-behavior: contain; }
       /* when repositioned by user */
       #sx-chat.qa-float.qa-custom-pos{ right:auto; bottom:auto; }
       /* show move cursor on header */
