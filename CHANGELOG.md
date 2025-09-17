@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.2.3-beta - 2025-09-17
+
+### English
+- Ad Filtering toggle in panel: Redesigned the status icon (shield with check/slash), with a fast, prominent tooltip; fully accessible (role=switch) and keyboard‑toggleable; z-index fixes ensure the tooltip appears above the body.
+- Quick toggle sync: Toggling ad filtering from the panel now writes to storage and the Options page live-syncs its UI without requiring a full reload (enabled switch, strength, selected lists, popup blocker, custom rules text).
+- Network rules control: `adblock_enabled` now also enables/disables DNR (dynamic and session) site packs — rules are installed/removed immediately when toggled off/on, so closing the switch actually stops network-level blocking too.
+- CSP compliance: Removed inline script injections. Replaced with extension-hosted stubs (`stubs/allow_popups.js`, `stubs/nyt-noads-shim.js`) to satisfy strict page CSPs.
+- Options toasts: Removed Petite‑Vue usage in options app to avoid `unsafe-eval` under MV3 CSP; replaced with a lightweight vanilla implementation while keeping the same events and ARIA live region.
+- Panel reliability: Action click prefers reusing an existing panel instance (ping/show) before re-injecting; fixed a duplicate `clampFloatWithinContainer` redeclaration edge case when reloading the panel.
+
+### 中文
+- 面板广告过滤开关：状态图标改为“盾牌 + 勾/斜杠”，提示气泡更大更快；支持键盘切换；修复层级，提示不会被主体遮挡。
+- 快捷开关同步：从面板切换广告过滤后，设置页（若已打开）会即时联动（开关、强度、勾选列表、弹窗拦截、自定义规则文本），无需刷新。
+- 网络规则联动：`adblock_enabled` 现在同时启用/移除 DNR（动态 + 会话）规则，关闭后立即停止网络级拦截。
+- CSP 兼容：去除内联脚本注入，改为使用扩展资源脚本（`stubs/allow_popups.js`、`stubs/nyt-noads-shim.js`），避免严格 CSP 报错。
+- 设置页提示：移除 Petite‑Vue 以消除 MV3 `unsafe-eval` 报错，改为原生轻量实现，保留原有事件与 ARIA。
+- 面板稳定性：点击图标优先唤醒已存在的面板（ping/show），避免重复注入；修复二次注入下 `clampFloatWithinContainer` 重复声明的问题。
+
 ## v2.2.1-beta - 2025-09-16
 
 ### English

@@ -431,6 +431,22 @@ async function setupVideoAdDNRRules() {
   } catch (e) { console.warn('DNR optional IMA rule update failed:', e); }
 }
 
+// Enable/disable the video ad DNR rules as a group based on adblock_enabled
+async function setVideoAdDNRRulesEnabled(enabled){
+  const ids = [2001,2002,2003,2004,2101,2102,2201,2202];
+  try{
+    if (!enabled){
+      // remove our managed dynamic rules
+      const existing = await chrome.declarativeNetRequest.getDynamicRules();
+      const toRemove = existing.filter(r => ids.includes(r.id)).map(r => r.id);
+      if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+      return;
+    }
+    // enabled: (re)install base rules and optional IMA depending on per-site toggle
+    await setupVideoAdDNRRules();
+  }catch(e){ console.warn('setVideoAdDNRRulesEnabled failed:', e); }
+}
+
 /* ====================== SpankBang session rules (site pack) ====================== */
 const SPANKBANG_DOMAINS = ['spankbang.com','www.spankbang.com'];
 
@@ -483,6 +499,13 @@ async function buildSpankbangRules() {
 }
 
 async function refreshSpankbangSessionRules(){
+  try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); if (!adblock_enabled){
+    // remove managed rules and exit
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managedIds = existing.filter(r => r.id === 2301 || r.id === 2302 || r.id === 2303).map(r => r.id);
+    if (managedIds.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managedIds, addRules: [] });
+    return;
+  } }catch{}
   let tabs = [];
   try { tabs = await chrome.tabs.query({}); } catch {}
   let hasSB = false;
@@ -583,6 +606,12 @@ async function buildAdultRules(){
 }
 
 async function refreshAdultSiteSessionRules(){
+  try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); if (!adblock_enabled){
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managed = existing.filter(r => r.id >= 2401 && r.id <= 2499).map(r => r.id);
+    if (managed.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managed, addRules: [] });
+    return;
+  } }catch{}
   // Check if any tab is one of our adult initiators
   let tabs = [];
   try { tabs = await chrome.tabs.query({}); } catch {}
@@ -618,8 +647,12 @@ async function refreshAdultSiteSessionRules(){
     chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
   } catch {}
 
-  chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
-  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
+  chrome.runtime.onInstalled.addListener(async () => {
+    try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+  });
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(async () => {
+    try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+  });
 
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -747,10 +780,16 @@ function scheduleAdblockUpdate(reason) {
   }, 500); // 简单防抖
 }
 
-// 存储变化时触发下载
+// 存储变化时触发下载 / 启停网络规则
 try {
-  chrome.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== 'sync') return;
+    if (changes.adblock_enabled) {
+      const enabled = !!changes.adblock_enabled.newValue;
+      try { await setVideoAdDNRRulesEnabled(enabled); } catch {}
+      try { await refreshSpankbangSessionRules(); } catch {}
+      try { await refreshAdultSiteSessionRules(); } catch {}
+    }
     if (changes.adblock_enabled || changes.adblock_selected) {
       scheduleAdblockUpdate('storage_changed');
     }
@@ -804,8 +843,23 @@ async function injectFloatPanel(tabId) {
 
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
+  // Prefer reusing existing panel in the page (if script already present)
+  try {
+    const ping = await chrome.tabs.sendMessage(tab.id, { type: 'SX_PING_PANEL' });
+    if (ping?.ok) {
+      if (!ping.present) {
+        await injectFloatPanel(tab.id);
+        return;
+      }
+      if (!ping.visible) {
+        try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_SHOW_PANEL' }); } catch {}
+      }
+      return;
+    }
+  } catch {}
+  // Fallback: inject fresh panel
   try { await injectFloatPanel(tab.id); }
-  catch (e) { console.warn("injectFloatPanel failed:", e); }
+  catch (e) { console.warn('injectFloatPanel failed:', e); }
 });
 
 async function closeAllFloatPanels() {

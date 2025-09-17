@@ -1020,6 +1020,28 @@ document.addEventListener('DOMContentLoaded', () => {
   try{
     chrome.storage.onChanged.addListener(async (changes, area) => {
       if (area !== 'sync') return;
+      // Keep Ad Filtering UI in sync when toggled from the floating panel
+      try{
+        if (changes.adblock_enabled){
+          const enabledEl = document.getElementById('adblock_enabled');
+          if (enabledEl) enabledEl.checked = !!changes.adblock_enabled.newValue;
+          try { updateAdblockSectionEnabledState(); } catch {}
+        }
+        if (changes.adblock_strength){
+          try { setSelectedStrength(String(changes.adblock_strength.newValue)); } catch {}
+        }
+        if (changes.adblock_selected){
+          try { applyAdblockSelections(new Set((changes.adblock_selected.newValue || []).filter(Boolean))); } catch {}
+        }
+        if (changes.adblock_block_popups){
+          const popCb = document.getElementById('adblock_block_popups');
+          if (popCb) popCb.checked = !!changes.adblock_block_popups.newValue;
+        }
+        if (changes.adblock_user_rules_text){
+          const userTxt = document.getElementById('adblock_user_rules_text');
+          if (userTxt) userTxt.value = String(changes.adblock_user_rules_text.newValue || '');
+        }
+      }catch{}
       if (changes.need_trial_consent_focus && changes.need_trial_consent_focus.newValue) {
         try {
           const sel = document.getElementById('aiProvider');

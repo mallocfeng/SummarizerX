@@ -52,12 +52,12 @@
             (document.documentElement || document.head || document.body).appendChild(s);
           } catch {}
         } else {
-          // disable patched window.open by setting page flag
+          // disable patched window.open by setting page flag via extension resource (CSP-safe)
           try {
             const s = document.createElement('script');
-            s.textContent = 'try{window.__sx_allow_popups=true;}catch{}';
+            s.src = chrome.runtime.getURL('stubs/allow_popups.js');
+            s.defer = false; s.async = false; s.type = 'text/javascript';
             (document.documentElement || document.head || document.body).appendChild(s);
-            s.remove();
           } catch {}
         }
       }
@@ -360,26 +360,7 @@ function earlyInjectNYTNoAdsShim(){
     const s = document.createElement('script');
     s.id = 'sx-nyt-noads-shim';
     s.type = 'text/javascript';
-    s.textContent = `
-      (function(){
-        try{
-          // Patch adClientUtils so site believes ads are disabled
-          var u = window.adClientUtils = window.adClientUtils || {};
-          var origHas = u.hasActiveToggle;
-          u.hasActiveToggle = function(name){
-            try{
-              var n = String(name||'');
-              if (/(^|_)dfp|geoedge|medianet|amazon|als_toggle|als|adslot|ads?/i.test(n)) return false;
-            }catch{}
-            return origHas ? origHas.apply(this, arguments) : false;
-          };
-          var origGet = u.getAdsPurrDirective;
-          u.getAdsPurrDirective = function(){ return 'no-ads'; };
-          // Optional: mark as opted-out flag consumed by some layers
-          try{ document.documentElement.dataset.optedOutOfAds = 'true'; }catch{}
-        }catch(e){}
-      })();
-    `;
+    s.src = chrome.runtime.getURL('stubs/nyt-noads-shim.js');
     (document.documentElement || document.head || document.body).appendChild(s);
   } catch {}
 }

@@ -887,20 +887,45 @@
         border-bottom:1px solid var(--border);
         /* raised glass: subtle outer drop shadow */
         box-shadow: 0 1px 6px rgba(16,24,40,.06);
+        position: relative; z-index: 20; /* keep tooltips above the body container */
         border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
-      /* Ad filtering status indicator (funnel icon) */
-      .adf-ind{ width:16px; height:16px; flex:0 0 auto; opacity:.9;
-        background: #94a3b8; /* slate-400 */
-        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.2 5.6A1 1 0 0 1 4 5h16a1 1 0 0 1 .8 1.6l-6.8 9.07V20a1 1 0 0 1-1.45.9l-3-1.5A1 1 0 0 1 9 18v-3.33L3.2 5.6Z"/></svg>') center/contain no-repeat;
-        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.2 5.6A1 1 0 0 1 4 5h16a1 1 0 0 1 .8 1.6l-6.8 9.07V20a1 1 0 0 1-1.45.9l-3-1.5A1 1 0 0 1 9 18v-3.33L3.2 5.6Z"/></svg>') center/contain no-repeat;
-        transition: transform .12s ease, opacity .12s ease, background-color .12s ease; 
+      /* Ad filtering status indicator (shield + check/slash); clickable toggle */
+      .adf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#94a3b8; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .adf-ind::before{ content:""; position:absolute; inset:0; background: currentColor; 
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>') center/contain no-repeat;
       }
-      .adf-ind.on{ background:#22c55e; opacity:1; }
-      .adf-ind:hover{ transform: scale(1.06); }
-      :host([data-theme="dark"]) .adf-ind{ background:#7d8fb0; opacity:.95; }
-      :host([data-theme="dark"]) .adf-ind.on{ background:#22c55e; }
+      /* On: add a check mark overlay */
+      .adf-ind.on{ color:#22c55e; }
+      .adf-ind.on::after{ content:""; position:absolute; inset:0; background: currentColor; opacity:.95;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
+      }
+      /* Off: add a slash overlay */
+      .adf-ind:not(.on)::after{ content:""; position:absolute; inset:0; background: currentColor; opacity:.9;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
+      }
+      .adf-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .adf-ind:active{ transform: translateY(0); }
+      .adf-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+      :host([data-theme="dark"]) .adf-ind{ color:#7d8fb0; }
+      :host([data-theme="dark"]) .adf-ind.on{ color:#22c55e; }
+
+      /* Ad filtering tooltip (fast, prominent) */
+      .adf-ind .adf-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .adf-ind .adf-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      :host([data-theme="dark"]) .adf-ind .adf-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .adf-ind .adf-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+      .adf-ind .adf-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
       .title{ font-size:14px; font-weight:800; letter-spacing:.2px; color:var(--text); }
 
@@ -1511,7 +1536,7 @@
       <div class="wrap" id="sx-wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="img" aria-label="" title=""></div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
@@ -2096,12 +2121,59 @@
   async function updateAdblockIndicator(shadow){
     try{
       const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      // ensure tooltip exists before updating text
+      ensureAdblockIndicatorTooltip(shadow);
       const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
       const enabled = !!adblock_enabled;
       el.classList.toggle('on', enabled);
       const txt = currentLangCache==='en' ? (enabled ? 'Ad filtering: On' : 'Ad filtering: Off') : (enabled ? '广告过滤：已开启' : '广告过滤：未开启');
-      el.setAttribute('title', txt);
+      // Use custom tooltip instead of native title (faster, larger)
+      try{ const tip = el.querySelector('.adf-tip'); if (tip) tip.textContent = txt; }catch{}
+      try{ el.removeAttribute('title'); }catch{}
       el.setAttribute('aria-label', txt);
+      el.setAttribute('aria-checked', enabled ? 'true':'false');
+    }catch{}
+  }
+
+  function bindAdblockIndicatorToggle(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      const toggle = async ()=>{
+        try{
+          const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+          const next = !adblock_enabled;
+          await chrome.storage.sync.set({ adblock_enabled: next });
+          // Optimistic UI: update immediately
+          await updateAdblockIndicator(shadow);
+        }catch(e){ console.warn('toggle adblock failed', e); }
+      };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); toggle(); } });
+    }catch{}
+  }
+
+  function ensureAdblockIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      let tip = el.querySelector('.adf-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'adf-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        // Hover/focus show quickly; hide quickly on leave/blur
+        let showTid = null, hideTid = null;
+        const show = ()=>{
+          try{ clearTimeout(hideTid); }catch{}
+          showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120);
+        };
+        const hide = ()=>{
+          try{ clearTimeout(showTid); }catch{}
+          hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60);
+        };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
     }catch{}
   }
 
@@ -2361,6 +2433,9 @@
     }
 
     try{ qaRestore?.addEventListener('click', ()=>{ if (chatMinimized) restoreChat(); }); }catch{}
+
+    // No-op clamp to keep calls safe (we don't auto-move/auto-resize on container changes)
+    const clampFloatWithinContainer = ()=>{};
 
     const updateQABottomVar = ()=>{
       try{
@@ -2966,6 +3041,7 @@
     await updateUIText();
     applyTrialLabelToFloatButton(shadow);
     try{ await updateAdblockIndicator(shadow); }catch{}
+    try{ bindAdblockIndicatorToggle(shadow); }catch{}
 
     await tryLoadPetiteVue();
     if (PV) mountVue();
@@ -3036,6 +3112,27 @@
       if (btn) btn.click(); else { const host=document.getElementById(PANEL_ID); if (host){ host.remove(); window[MARK]=false; } stopPolling(); }
     }
   });
+
+  // Lightweight message responder for background ping/show
+  try{
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse)=>{
+      try{
+        if (msg?.type === 'SX_PING_PANEL'){
+          const host = document.getElementById(PANEL_ID);
+          const visible = !!(host && host.style.display !== 'none');
+          sendResponse({ ok:true, present: !!host, visible });
+          return true;
+        }
+        if (msg?.type === 'SX_SHOW_PANEL'){
+          const host = document.getElementById(PANEL_ID);
+          if (host){ host.style.display = ''; try{ host.style.visibility=''; }catch{} }
+          sendResponse({ ok:true, shown: !!host });
+          return true;
+        }
+      }catch(e){ try{ sendResponse({ ok:false, error: String(e) }); }catch{} }
+      return false;
+    });
+  }catch{}
 
   // ===== 强制深色模式 =====
   function applyForceDarkMode(enabled) {
@@ -3397,10 +3494,3 @@
   }
 
 })();
-    // Ensure the floating window never overflows to the right when container resizes
-    const clampFloatWithinContainer = ()=>{
-      try{
-        // No-op: do not auto-resize or auto-reposition the QA window on container/panel size changes.
-        // Bounds are enforced during user drag/resize interactions only.
-      }catch{}
-    };
