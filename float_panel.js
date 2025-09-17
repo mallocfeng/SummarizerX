@@ -785,6 +785,12 @@
     if(host) return host;
     host=document.createElement('div');
     host.id=PANEL_ID;
+    // Prevent Dark Reader from instrumenting our Shadow DOM.
+    // Dark Reader skips shadow hosts with class "surfingkeys_hints_host".
+    // See iterateShadowHosts() in darkreader.js.
+    try{ host.classList.add('surfingkeys_hints_host'); }catch{}
+    // Also set a hint attribute (harmless if unsupported by DR).
+    try{ host.setAttribute('data-darkreader-ignore',''); }catch{}
     host.style.position='fixed';
     host.style.top='0';
     host.style.right='0';
@@ -2026,7 +2032,7 @@
     }
     
     // 应用强制深色模式
-    applyForceDarkMode(forceDarkMode);
+    applyForceDarkModeSmart(forceDarkMode);
   });
 
   // 拖宽 + 记忆
@@ -3173,7 +3179,7 @@
     });
   }catch{}
 
-  // ===== 强制深色模式 =====
+  // ===== 强制深色模式（旧版注入保留为后备） =====
   function applyForceDarkMode(enabled) {
     if (enabled) {
       // 注入强制深色模式CSS
@@ -3337,6 +3343,81 @@
     }
   }
 
+  // ===== 强制深色模式（优先 Dark Reader，失败回退到旧版注入） =====
+  function applyForceDarkModeSmart(enabled){
+    const tryEnableDarkReader = async () => {
+      try{
+        const libId = 'sx-darkreader-lib';
+        const bridgeId = 'sx-darkreader-bridge';
+        const inject = (src, id) => new Promise((res)=>{
+          try{
+            if (document.getElementById(id)) return res(true);
+            const s = document.createElement('script');
+            s.id = id; s.src = extURL(src); s.async = false; s.onload = () => res(true); s.onerror = () => res(false);
+            (document.documentElement || document.head || document.body).appendChild(s);
+          }catch{ res(false); }
+        });
+        const ok1 = await inject('vendor/darkreader.min.js', libId);
+        if (!ok1) return false;
+        const ok2 = await inject('vendor/sx-dark-bridge.js', bridgeId);
+        if (!ok2) return false;
+        return true;
+      }catch{ return false; }
+    };
+
+    const postToggle = (on) => { try{ window.postMessage({ type: 'SX_FORCE_DARK_TOGGLE', enabled: !!on, options: { brightness: 100, contrast: 95, sepia: 0 } }, '*'); }catch{} };
+    const markHostIgnored = (on)=>{
+      try{
+        const h=document.getElementById('sx-float-panel');
+        if(!h) return;
+        if(on){
+          h.setAttribute('data-darkreader-ignore','');
+          h.classList.add('surfingkeys_hints_host');
+        } else {
+          h.removeAttribute('data-darkreader-ignore');
+          // Keep the class to be safe; removing could cause DR to re-instrument
+          // h.classList.remove('surfingkeys_hints_host');
+        }
+      }catch{}
+    };
+    const enableFallback = () => {
+      markHostIgnored(false);
+      const existingLib = document.getElementById('sx-darkreader-lib'); if (existingLib) existingLib.remove();
+      const existingBridge = document.getElementById('sx-darkreader-bridge'); if (existingBridge) existingBridge.remove();
+      // 调用旧版注入函数作为回退
+      try{ applyForceDarkMode(true); }catch{}
+    };
+    const disableFallback = () => { try{ const s=document.getElementById('sx-force-dark-mode'); s && s.remove(); }catch{} };
+
+    if (enabled) {
+      (async()=>{
+        const ok = await tryEnableDarkReader();
+        if (ok){
+          markHostIgnored(true);
+          disableFallback();
+          try{ applyForceDarkMode(false); }catch{}
+          postToggle(true);
+          // 等待桥接标志，失败则回退
+          let tries = 0;
+          const check = ()=>{
+            const flag = document.documentElement.getAttribute('data-sx-dark');
+            if (flag === 'on') return; // 成功
+            if (flag === 'err' || tries>10){ enableFallback(); return; }
+            tries++; setTimeout(check, 60);
+          };
+          setTimeout(check, 100);
+        } else {
+          enableFallback();
+        }
+      })();
+    } else {
+      postToggle(false);
+      markHostIgnored(false);
+      disableFallback();
+      try{ applyForceDarkMode(false); }catch{}
+    }
+  }
+
   // 初始化强制深色模式状态
   (async () => {
     try {
@@ -3346,7 +3427,7 @@
       if (forceDarkBtn) {
         forceDarkBtn.classList.toggle('active', forceDarkMode);
       }
-      applyForceDarkMode(forceDarkMode);
+      applyForceDarkModeSmart(forceDarkMode);
     } catch (e) {
       console.warn('Failed to load force dark mode setting:', e);
     }
@@ -3370,7 +3451,7 @@
         if (forceDarkBtn) {
           forceDarkBtn.classList.toggle('active', forceDarkMode);
         }
-        applyForceDarkMode(forceDarkMode);
+        applyForceDarkModeSmart(forceDarkMode);
       }
     });
   }catch{}

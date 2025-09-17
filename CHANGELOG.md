@@ -533,3 +533,18 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 运行期禁用：执行“提取并摘要”期间（running/partial），禁用问答输入与发送按钮并灰显；处理完成或出错后自动恢复。
 - 安全细化：容器横向溢出隐藏；卡片拖动/缩放边界统一为 10px。
 - 版本：升级至 2.2.2-beta（manifest 与文档）。
+# Changelog
+
+## v2.2.4-beta - 2025-09-17
+
+### English
+- Force Dark Mode: integrated Dark Reader (MIT) dynamic theme by default with a safe local fallback. The floating sidepanel is now excluded from darkening to preserve its own theme. Dark Reader files are bundled locally (no remote fetch) and the upstream LICENSE is included.
+- Q&A chat polish: increased bubble spacing for readability; input bar styling aligned with the chat card; in light theme the textarea uses white background for clarity.
+- Scroll behavior: prevented scroll chaining from the floating Q&A window into the sidepanel (overscroll-behavior: contain); fine‑tuned top/bottom paddings when scrolling.
+- UX: when the Q&A window floats above, background cards (Summary/Readable) no longer lift on hover; restored after closing the chat float.
+
+### 中文
+- 强制深色模式：默认集成 Dark Reader（MIT）动态主题，并提供本地轻量回退。浮窗面板本身不会被“变黑”，其明/暗外观保持不变。Dark Reader 以本地文件打包（不走远程），并附带上游 LICENSE。
+- 你问我答细节：增大气泡间距；提问输入区配色与卡片统一；亮色模式下输入框采用白色底，易于辨认。
+- 滚动体验：阻止你问我答浮窗的滚动链路传导到侧边面板（overscroll-behavior: contain）；滚动到顶/底时的上下留白更合适。
+- 交互：当你问我答浮窗在前台时，背后“摘要/可读正文”卡片不再触发悬浮上浮；关闭浮窗后恢复。

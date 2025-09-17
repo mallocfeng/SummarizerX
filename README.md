@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.2.3-beta (dev/next branch)
+Current beta: v2.2.4-beta (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -32,7 +32,7 @@ Current beta: v2.2.3-beta (dev/next branch)
  - 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
-- 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability
+- 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability (now powered by Dark Reader’s dynamic engine; see Credits)
  - ✅ Consistent Consent Pulse: Trial consent attention “breathing” animation now behaves the same in light and dark themes
 - 🛡️ Ad Filtering (ABP 2.0 cosmetic): Enable in Settings → 广告过滤 (now below System Prompt). Choose global/regional lists (EasyList, EasyPrivacy, Fanboy’s, etc.) and the new Cookie Notice Hiding category (EasyList Cookie General Hide). Per‑list sync, Low/Medium/High strength, and auto-sync on selection (checked lists download immediately). Rules are stored locally and applied per‑host.
   - 🧰 Element Hiding Picker (beta): In the floating panel footer, click “Hide element”, then click any element to create a per-domain cosmetic rule; Confirm exits the picker; Cancel continues; press Esc to exit. The picker hides all matches on the current page immediately, and saves the rule under Settings → Ad Filtering → Custom hides. Tip: Medium strength is recommended when using custom/user rules.
@@ -138,7 +138,7 @@ All processing happens locally or via your configured AI API key. No data is sen
  - 🔍 全文对照放大（测试版）：对较长段落的引用块提供每段 +/- 放缩；控制按钮固定在右上角并带轻微悬停上浮，文本不会与按钮重叠
  - ⚡ Vue.js 集成：现代化响应式界面，提升性能和用户体验
  - 🎯 智能布局对齐：全文翻译智能定位，适配复杂网站布局（CSS Grid、响应式设计）
-- 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性
+- 🌙 强制深色模式：开关控制强制任何网页开启深色模式，优化文字颜色确保可读性（现已采用 Dark Reader 的动态主题引擎；见致谢）
  - ✅ 试用同意提示一致：需要同意时的“呼吸”动画在明亮/暗黑主题下表现一致
 - 🛡️ 广告过滤（ABP 2.0 元素隐藏）：在设置 → 广告过滤（现位于“系统提示词”下方）开启；可选全球/区域列表（EasyList、EasyPrivacy、Fanboy’s等）和“Cookie 提示隐藏”分类（内置 EasyList Cookie General Hide）。支持单条规则“同步更新”、勾选后自动同步、高/中/低强度；规则本地保存，并按站点应用以隐藏/去除广告元素。
   - 🧰 隐藏元素选择器（测试版）：在浮窗底部点击“隐藏元素”，再点击页面中的元素即可生成“按域名”的外观隐藏规则；“确认添加”会立即退出选择模式并隐藏当前页所有匹配元素；“取消”继续选择；按 Esc 退出。规则保存在 设置 → 广告过滤 → 自定义隐藏。提示：使用自定义/用户规则时，建议将过滤强度设为“中”。
@@ -223,3 +223,8 @@ All processing happens locally or via your configured AI API key. No data is sen
 ## 📜 License
 
 MIT License © 2025 [Malloc Feng](https://github.com/mallocfeng)
+
+## 🙏 Credits / 致谢
+
+- Force Dark Mode is powered by the excellent open‑source project Dark Reader (MIT): https://github.com/darkreader/darkreader. Thank you to the Dark Reader team and contributors. The upstream LICENSE is included at `vendor/DARKREADER_LICENSE`.
+- 强制深色模式基于优秀的开源项目 Dark Reader（MIT）：https://github.com/darkreader/darkreader。感谢 Dark Reader 团队与所有贡献者。上游 LICENSE 已包含于 `vendor/DARKREADER_LICENSE`。
