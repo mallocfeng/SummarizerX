@@ -890,6 +890,17 @@
         border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
+      /* Ad filtering status indicator (funnel icon) */
+      .adf-ind{ width:16px; height:16px; flex:0 0 auto; opacity:.9;
+        background: #94a3b8; /* slate-400 */
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.2 5.6A1 1 0 0 1 4 5h16a1 1 0 0 1 .8 1.6l-6.8 9.07V20a1 1 0 0 1-1.45.9l-3-1.5A1 1 0 0 1 9 18v-3.33L3.2 5.6Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.2 5.6A1 1 0 0 1 4 5h16a1 1 0 0 1 .8 1.6l-6.8 9.07V20a1 1 0 0 1-1.45.9l-3-1.5A1 1 0 0 1 9 18v-3.33L3.2 5.6Z"/></svg>') center/contain no-repeat;
+        transition: transform .12s ease, opacity .12s ease, background-color .12s ease; 
+      }
+      .adf-ind.on{ background:#22c55e; opacity:1; }
+      .adf-ind:hover{ transform: scale(1.06); }
+      :host([data-theme="dark"]) .adf-ind{ background:#7d8fb0; opacity:.95; }
+      :host([data-theme="dark"]) .adf-ind.on{ background:#22c55e; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
       .title{ font-size:14px; font-weight:800; letter-spacing:.2px; color:var(--text); }
 
@@ -1500,7 +1511,7 @@
       <div class="wrap" id="sx-wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="img" aria-label="" title=""></div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
@@ -2066,6 +2077,7 @@
       shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
       const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
       const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
+      try{ await updateAdblockIndicator(shadow); }catch{}
       const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
       const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
       const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
@@ -2079,6 +2091,18 @@
     }catch(e){ console.warn('Failed to update UI text:', e); }
     try{ updateEmptyArrowPosition(); }catch{}
     try{ ensureShareButton(shadow); }catch{}
+  }
+
+  async function updateAdblockIndicator(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+      const enabled = !!adblock_enabled;
+      el.classList.toggle('on', enabled);
+      const txt = currentLangCache==='en' ? (enabled ? 'Ad filtering: On' : 'Ad filtering: Off') : (enabled ? '广告过滤：已开启' : '广告过滤：未开启');
+      el.setAttribute('title', txt);
+      el.setAttribute('aria-label', txt);
+    }catch{}
   }
 
   function setLoading(shadow,loading){
@@ -2941,6 +2965,7 @@
 
     await updateUIText();
     applyTrialLabelToFloatButton(shadow);
+    try{ await updateAdblockIndicator(shadow); }catch{}
 
     await tryLoadPetiteVue();
     if (PV) mountVue();
@@ -3196,6 +3221,7 @@
     chrome.storage.onChanged.addListener((changes, area)=>{
       if (area==='sync' && changes.aiProvider) applyTrialLabelToFloatButton(shadow);
       if (area!=='sync') return;
+      if (changes.adblock_enabled){ try{ updateAdblockIndicator(shadow); }catch{} }
       if (changes.options_theme_override || changes.float_theme_override){
         const next=(changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue);
         if (['auto','light','dark'].includes(next)){
