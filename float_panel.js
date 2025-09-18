@@ -2667,6 +2667,22 @@
         a.addEventListener('mousedown', (ev)=>{ if (ev.button!==0){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} } });
         inner.appendChild(a);
       });
+
+      // One-time: capture-phase guard on shadow root to prevent composed events from escaping and
+      // triggering site-level navigation/scroll handlers (avoids page refresh or jump-to-top)
+      if (!shadow.__sxQuickAskGuard){
+        const guard = (ev)=>{
+          try{
+            const path = ev.composedPath ? ev.composedPath() : [];
+            const hits = path && path.some(n=> n && n.classList && n.classList.contains('qitem'));
+            if (hits){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }
+          }catch{}
+        };
+        ['click','mousedown','mouseup','pointerdown','pointerup'].forEach(t=>{
+          try{ shadow.addEventListener(t, guard, { capture:true }); }catch{}
+        });
+        shadow.__sxQuickAskGuard = true;
+      }
     }catch{}
   }
 
