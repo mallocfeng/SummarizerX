@@ -1963,7 +1963,7 @@
           stopPolling(); return;
         }
         if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); await render(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
-        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
+        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{} }
       }catch{}
       if (Date.now()-start>hardTimeout){ setSummarizing(shadow,false); setLoading(shadow,false); stopPolling(); return; }
       interval = Math.min(maxInterval, Math.round(interval*1.25));
@@ -2473,6 +2473,11 @@
         rid?.setAttribute('aria-label', currentLangCache==='en' ? 'Reader mode' : '阅读模式');
       }catch{}
       const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
+      // Sync quick-ask heading language if present
+      try{
+        const qaTitle = shadow.querySelector('.quick-ask .title');
+        if (qaTitle) qaTitle.textContent = (currentLangCache==='en'?'You might ask:':'猜你想问：');
+      }catch{}
       const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
       const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
       const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
@@ -3878,7 +3883,7 @@
           setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
+          setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{}
         }
         else if (st.status==='partial'){
           setSummarizing(shadow,true);
