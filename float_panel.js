@@ -911,8 +911,23 @@
       /* Reader mode icon (book) */
       .reader-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#64748b; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
       .reader-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
-        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2V5Zm14-2h-5v16h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2Z"/></svg>') center/contain no-repeat;
-        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2V5Zm14-2h-5v16h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2Z"/></svg>') center/contain no-repeat;
+        /* Obvious article icon: page with text lines */
+        -webkit-mask: url('data:image/svg+xml;utf8,
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M5 2h10l4 4v16H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
+            <path d="M15 2v4h4"/>
+            <path d="M7 9h10"/>
+            <path d="M7 13h10"/>
+            <path d="M7 17h7"/>
+          </svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M5 2h10l4 4v16H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
+            <path d="M15 2v4h4"/>
+            <path d="M7 9h10"/>
+            <path d="M7 13h10"/>
+            <path d="M7 17h7"/>
+          </svg>') center/contain no-repeat;
       }
       .reader-ind:hover{ transform: translateY(-1px); opacity:1; }
       .reader-ind:active{ transform: translateY(0); }
@@ -2171,10 +2186,11 @@
     const style = document.createElement('style');
     style.textContent = `
       :host{ --bg: #f5f7fb; --scrim: rgba(15,23,42,.55); --surface:#ffffff; --border:#e6eaf2; --text:#0f172a; --primary:#3b82f6; color-scheme: light; }
+      :host, :host *{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif !important; }
       :host([data-theme="dark"]) { --bg:#0b1220; --scrim: rgba(0,0,0,.55); --surface:#111a2e; --border:#1f2a44; --text:#e8eef9; --primary:#8ea2ff; color-scheme: dark; }
       .scrim{ position:fixed; inset:0; background: var(--scrim); backdrop-filter: blur(2px); }
-      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:auto; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
-      .bar{ position:sticky; top:0; display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
+      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:auto; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing:border-box; scrollbar-gutter: stable; }
+      .bar{ position:sticky; top:0; display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 12px; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
       :host([data-theme="dark"]) .bar{ background: linear-gradient(180deg, rgba(17,26,46,.65), rgba(17,26,46,0)); }
       .close{ width:28px; height:28px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:grid; place-items:center; }
       .close:hover{ background: rgba(0,0,0,.06); }
@@ -2196,6 +2212,7 @@
     `;
     sh.appendChild(style);
     const root = document.createElement('div'); sh.appendChild(root);
+    const syncTheme = ()=>{ try{ const t=shadow.host.getAttribute('data-theme')||'light'; sh.host.setAttribute('data-theme', t); }catch{} };
     sh.host.setAttribute('data-theme', theme);
     root.innerHTML = `
       <div class="scrim"></div>
@@ -2203,11 +2220,18 @@
         <div class="bar"><button class="close" aria-label="关闭">✕</button></div>
         <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
       </div>`;
-    const close = () => { try{ ov.remove(); host.style.display=''; }catch{} };
+    const close = () => { try{ if (mo) mo.disconnect(); ov.remove(); host.style.display=''; }catch{} };
     root.querySelector('.close')?.addEventListener('click', close);
     sh.querySelector('.scrim')?.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
     document.documentElement.appendChild(ov);
+    // Mirror panel theme changes dynamically
+    let mo = null;
+    try{
+      mo = new MutationObserver(()=> syncTheme());
+      mo.observe(shadow.host, { attributes:true, attributeFilter:['data-theme'] });
+    }catch{}
+    syncTheme();
     // auto-focus close for accessibility
     try{ sh.querySelector('.close')?.focus(); }catch{}
   }
