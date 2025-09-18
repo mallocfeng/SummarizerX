@@ -1011,10 +1011,10 @@ async function closeFloatPanel(tabId){
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  // URL 变化：仅清摘要运行态；保留 Q&A UI（避免 SPA/后台变更误清历史）
+  // URL 变化：切到新页面，清除该 tab 的 Q&A UI 状态并关闭旧页面浮窗
   if (changeInfo.url) {
     chrome.storage.session.remove(STATE_KEY(tabId));
-    // 保留 QA_UI_KEY
+    chrome.storage.session.remove(QA_UI_KEY(tabId));
     try { inlineStateByTab.set(tabId, false); } catch {}
   } else if (changeInfo.status === "loading") {
     // 同 URL 刷新/恢复：仅清摘要运行态
