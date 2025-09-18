@@ -1953,7 +1953,7 @@
     const step = async ()=>{
       try{
         const st = await getState(tabId);
-        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); await render(st.summary, st.cleaned); stopPolling(); return; }
+        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); await render(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling(); return; }
         if (st.status==='error'){
           setSummarizing(shadow,false); setLoading(shadow,false);
           const i18n = await loadI18n(); const lang = i18n? await i18n.getCurrentLanguage():'zh';
@@ -1961,8 +1961,8 @@
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${lang==='zh'?'发生错误，请重试。':'An error occurred, please try again.'}</p></div></div>`;
           stopPolling(); return;
         }
-        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); await render(st.summary, null); }
-        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); }
+        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); await render(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
+        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
       }catch{}
       if (Date.now()-start>hardTimeout){ setSummarizing(shadow,false); setLoading(shadow,false); stopPolling(); return; }
       interval = Math.min(maxInterval, Math.round(interval*1.25));
