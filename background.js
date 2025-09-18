@@ -16,6 +16,7 @@ const SYSTEM_PRESETS = {
 // ---- 会话状态（按 tabId）
 const S = chrome.storage.session;
 const STATE_KEY = (tabId) => `panel_state_v3:${tabId}`;
+const QA_UI_KEY = (tabId) => `qa_ui_v1:${tabId}`;
 
 async function getState(tabId) {
   const d = await S.get([STATE_KEY(tabId)]);
@@ -25,6 +26,15 @@ async function setState(tabId, state) {
   const prev = await getState(tabId);
   await S.set({ [STATE_KEY(tabId)]: { ...prev, ...state, ts: Date.now() } });
   chrome.runtime.sendMessage({ type: "PANEL_STATE_UPDATED", tabId }).catch(()=>{});
+}
+
+async function getQAUI(tabId) {
+  const d = await S.get([QA_UI_KEY(tabId)]);
+  return d[QA_UI_KEY(tabId)] || {};
+}
+async function setQAUI(tabId, ui) {
+  const prev = await getQAUI(tabId);
+  await S.set({ [QA_UI_KEY(tabId)]: { ...prev, ...ui, ts: Date.now() } });
 }
 
 /* ------------------------------------------------------------------ */
@@ -742,6 +752,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg?.type === 'QA_UI_GET') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        const data = await getQAUI(tabId);
+        safeReply({ ok:true, data });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+  if (msg?.type === 'QA_UI_CLEAR') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        await chrome.storage.session.remove(QA_UI_KEY(tabId));
+        safeReply({ ok:true });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+  if (msg?.type === 'QA_UI_SET') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        const ui = msg.ui && typeof msg.ui === 'object' ? msg.ui : {};
+        await setQAUI(tabId, ui);
+        safeReply({ ok:true });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+
   if (msg?.type === "REQUEST_READABLE") {
     (async () => {
       try {
@@ -934,19 +979,27 @@ async function closeAllFloatPanels() {
   } catch {}
 }
 
+async function closeFloatPanel(tabId){
+  try { if (typeof tabId === 'number') await chrome.tabs.sendMessage(tabId, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  // 只要开始加载或 URL 变化，就清掉该 tab 的缓存状态
-  if (changeInfo.status === "loading" || changeInfo.url) {
+  // URL 变化：仅清摘要运行态；保留 Q&A UI（避免 SPA/后台变更误清历史）
+  if (changeInfo.url) {
     chrome.storage.session.remove(STATE_KEY(tabId));
-    // 重置“全文翻译内联”状态，避免新页面沿用旧状态
+    // 保留 QA_UI_KEY
     try { inlineStateByTab.set(tabId, false); } catch {}
+  } else if (changeInfo.status === "loading") {
+    // 同 URL 刷新/恢复：仅清摘要运行态
+    chrome.storage.session.remove(STATE_KEY(tabId));
   }
 
   if (!changeInfo.url && changeInfo.status !== "loading") return;
-  closeAllFloatPanels();
+  // 仅关闭当前发生加载/跳转的 tab 的浮窗；其他 tab 的浮窗保持原样
+  closeFloatPanel(tabId);
 });
 
-chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
+// 不再在 tab 切换时关闭所有页面浮窗；让各 tab 的面板保留形态
 
 // 标签页关闭时清理状态
 try {
@@ -1193,6 +1246,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }).join('\n');
         const prompt = `Title: ${raw.title || '(untitled)'}\nURL: ${raw.url || ''}\n\nPAGE CONTENT (Markdown):\n${clipped}\n\nCHAT SO FAR (if any):\n${hist || '(none)'}\n\nQUESTION:\n${q}\n\nInstructions: Answer ONLY using the page content above.`;
 
+        // Mark QA busy to reflect in-flight state across tab switches
+        try { await setQAUI(tabId, { qaBusy: true }); } catch {}
+
         const answer = await chatCompletion({
           baseURL: cfg.baseURL,
           apiKey: cfg.apiKey || 'trial',
@@ -1203,8 +1259,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
 
         const txt = String(answer || '').trim();
+        // Persist history robustly (session + local-by-URL)
+        try {
+          const ui = await getQAUI(tabId);
+          const prev = Array.isArray(ui?.hist) ? ui.hist.slice(0) : [];
+          prev.push({ role: 'user', content: q });
+          prev.push({ role: 'assistant', content: txt });
+          await setQAUI(tabId, { hist: prev, qaBusy: false });
+          const urlKey = 'sx_qa_hist_v1:' + String(raw.url || '').split('#')[0];
+          try { await chrome.storage.local.set({ [urlKey]: { hist: prev, updatedAt: Date.now() } }); } catch {}
+        } catch {}
+
         sendResponse({ ok: true, answer: txt, url: raw.url || '', finalLang });
       } catch (e) {
+        try {
+          const tabId = sender?.tab?.id;
+          if (typeof tabId === 'number') await setQAUI(tabId, { qaBusy: false });
+        } catch {}
         sendResponse({ ok: false, error: e?.message || String(e) });
       }
     })();

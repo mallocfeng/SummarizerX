@@ -1981,6 +1981,16 @@
   // ===== 启动 =====
   const host = ensurePanel();
   const shadow = host.shadowRoot;
+  // Detect reload; on reload we clear any previous Q&A UI and local history for this URL
+  let __suppressRestoreOnce = false;
+  try{
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation');
+    if (nav && nav[0] && nav[0].type === 'reload') {
+      __suppressRestoreOnce = true;
+      try{ chrome.runtime.sendMessage({ type: 'QA_UI_CLEAR' }); }catch{}
+      try{ const key = 'sx_qa_hist_v1:' + String(location.href||'').split('#')[0]; chrome.storage.local.remove([key]); }catch{}
+    }
+  }catch{}
 
   // 动态定位折叠箭头到“提取并摘要”按钮正下方
   function updateEmptyArrowPosition(){
@@ -2044,25 +2054,58 @@
     try{
       const container = shadow.getElementById('sx-container');
       if (!container) return;
+
+      const isScrollable = (el)=>{
+        if (!el || el === container || el.nodeType !== 1) return false;
+        const cs = getComputedStyle(el);
+        const oy = cs.overflowY || cs.overflow;
+        if (!/(auto|scroll)/i.test(oy)) return false;
+        return (el.scrollHeight - el.clientHeight) > 1;
+      };
+      const nearestScroller = (start)=>{
+        let el = start instanceof Node ? start : null;
+        while (el && el !== container) {
+          if (isScrollable(el)) return el;
+          el = el.parentElement;
+        }
+        return container; // fallback to container itself
+      };
+      const canScroll = (el, dy)=>{
+        if (!el) return false;
+        if ((el.scrollHeight - el.clientHeight) <= 1) return false;
+        if (dy < 0) return el.scrollTop > 0; // up
+        if (dy > 0) return (el.scrollTop + el.clientHeight) < (el.scrollHeight - 1); // down
+        return false;
+      };
+
       const onWheel = (e)=>{
         try{
           const dy = e.deltaY || 0;
-          const atTop = container.scrollTop <= 0;
-          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
-          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
-          else { e.stopPropagation(); }
+          const scroller = nearestScroller(e.target);
+          if (canScroll(scroller, dy)) {
+            // Let this scroller handle it; just stop propagation to avoid page scroll
+            e.stopPropagation();
+            return;
+          }
+          // At edge (or no inner scroller) — prevent default so the page doesn’t scroll
+          e.preventDefault();
+          e.stopPropagation();
         }catch{}
       };
       container.addEventListener('wheel', onWheel, { passive:false });
+
+      // Touch containment with nearest scroller semantics
       let lastY = 0;
-      container.addEventListener('touchstart', (e)=>{ try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{} }, { passive:true });
+      container.addEventListener('touchstart', (e)=>{
+        try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{}
+      }, { passive:true });
       container.addEventListener('touchmove', (e)=>{
         try{
           if (!e.touches || !e.touches[0]) return;
           const y = e.touches[0].clientY; const dy = lastY ? (lastY - y) : 0; // positive -> scroll down
-          const atTop = container.scrollTop <= 0;
-          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
-          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+          const scroller = nearestScroller(e.target);
+          const can = canScroll(scroller, dy);
+          if (!can) { e.preventDefault(); e.stopPropagation(); }
           else { e.stopPropagation(); }
           lastY = y;
         }catch{}
@@ -2264,7 +2307,44 @@
           <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
         </div>
       </div>`;
-    const close = () => { try{ ov.remove(); host.style.display=''; }catch{} };
+    const close = async () => {
+      try{ ov.remove(); host.style.display=''; }catch{}
+      // After coming back from reader, restore chat geometry exactly as before
+      try{
+        const ui = await loadQAUIState();
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard) return;
+        const shouldFloat = (typeof ui?.float === 'boolean') ? !!ui.float : chatCard.classList.contains('qa-float');
+        if (!shouldFloat) return;
+        const containerEl = shadow.getElementById('sx-container');
+        const contRect = containerEl?.getBoundingClientRect?.();
+        const g = ui?.lastGeom;
+        if (!g || !contRect) return;
+        chatCard.classList.add('qa-float');
+        chatCard.style.minWidth = '0px';
+        chatCard.style.width = Math.round(g.width||chatCard.getBoundingClientRect().width) + 'px';
+        chatCard.style.setProperty('--qa-w', Math.round(g.width||chatCard.getBoundingClientRect().width) + 'px');
+        chatCard.style.height = Math.round(g.height||chatCard.getBoundingClientRect().height) + 'px';
+        chatCard.style.setProperty('--qa-h', Math.round(g.height||chatCard.getBoundingClientRect().height) + 'px');
+        if (g.custom){
+          chatCard.classList.add('qa-custom-pos');
+          chatCard.style.right=''; chatCard.style.bottom='';
+          chatCard.style.left = Math.round(g.left||0) + 'px';
+          chatCard.style.top  = Math.round(g.top||0) + 'px';
+        } else {
+          chatCard.classList.remove('qa-custom-pos');
+          const gap = Math.max(10, Math.round(g.rightGap || 16));
+          chatCard.style.right = gap + 'px';
+          chatCard.style.left = '';
+          chatCard.style.top = '';
+          chatCard.style.bottom = '';
+        }
+        // Lock size after restore so autosize won't shrink it
+        chatCard.dataset.userSized = '1';
+        chatCard._qaHasRestored = true;
+        chatCard._qaSizeLocked = true;
+      }catch{}
+    };
     root.querySelector('.close')?.addEventListener('click', close);
     sh.querySelector('.scrim')?.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
@@ -2308,6 +2388,22 @@
   }
 
   async function openReaderOverlay(){
+    // Snapshot current chat geometry to avoid size changes when we return
+    try{
+      const chatCard = shadow.getElementById('sx-chat');
+      const containerEl = shadow.getElementById('sx-container');
+      if (chatCard && containerEl && chatCard.style.display !== 'none'){
+        const rect = chatCard.getBoundingClientRect();
+        const contRect = containerEl.getBoundingClientRect();
+        const left = rect.left - contRect.left + containerEl.scrollLeft;
+        const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+        const custom = chatCard.classList.contains('qa-custom-pos');
+        const rightGap = contRect.right - rect.right;
+        const lastGeom = { custom, left, top, width: rect.width, height: rect.height, rightGap: Math.max(10, Math.round(rightGap)) };
+        const float = chatCard.classList.contains('qa-float');
+        saveQAUIState({ lastGeom, float });
+      }
+    }catch{}
     const data = await fetchReadable();
     const md = data?.markdown || '';
     const title = data?.title || '';
@@ -2523,6 +2619,28 @@
   let summarizing = false; // when true, block Q&A input and send
   let qaSending = false; // track if a QA request is in-flight
   const chatHistory = [];
+  let chatBubblesUI = [];
+  let qaTxn = 0; // cancel token for in-flight QA
+
+  // Persist lightweight QA UI state per-tab via background session storage
+  async function saveQAUIState(part){
+    try{ await chrome.runtime.sendMessage({ type: 'QA_UI_SET', ui: part||{} }); }catch{}
+  }
+  async function loadQAUIState(){
+    try{
+      const r = await chrome.runtime.sendMessage({ type: 'QA_UI_GET' });
+      return r?.ok ? (r.data||{}) : {};
+    }catch{ return {}; }
+  }
+
+  // Robust local backup: persist completed dialogue history by page URL (excludes in-flight turns)
+  function pageHistKey(){ try{ const u=location.href.split('#')[0]; return 'sx_qa_hist_v1:' + u; }catch{ return 'sx_qa_hist_v1:unknown'; } }
+  async function saveHistoryLocal(hist){
+    try{ const key = pageHistKey(); await chrome.storage.local.set({ [key]: { hist: Array.isArray(hist)? hist: [], updatedAt: Date.now() } }); }catch{}
+  }
+  async function loadHistoryLocal(){
+    try{ const key = pageHistKey(); const obj = await chrome.storage.local.get([key]); return obj?.[key] || null; }catch{ return null; }
+  }
 
   function updateQAControls(shadow){
     try{
@@ -2640,6 +2758,7 @@
         // Show restore icon
         if (qaRestore){ qaRestore.setAttribute('aria-hidden','false'); qaRestore.classList.add('flash'); setTimeout(()=>{ try{ qaRestore.classList.remove('flash'); }catch{} }, 3300); }
         chatMinimized = true; chatVisible = false; setBgCardHoverDisabled(false);
+        try{ saveQAUIState({ visible:false, minimized:true, float:true, lastGeom: savedGeom }); }catch{}
       }catch{}
     }
 
@@ -2665,6 +2784,7 @@
         chatCard.style.minWidth = '0px';
         chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
         chatCard.style.height = (savedGeom?.height? Math.max(260, Math.min(1100, Math.round(savedGeom.height))) : chatCard.style.height);
+        try{ chatCard._qaHasRestored = true; chatCard._qaSizeLocked = true; }catch{}
         if (savedGeom && savedGeom.custom){
           // Clamp left within current bounds
           const maxLeft = innerRightAbs - width;
@@ -2711,10 +2831,88 @@
           });
         }catch{}
         chatMinimized = false; chatVisible = true; setBgCardHoverDisabled(true);
+        try{
+          const rectNow = chatCard.getBoundingClientRect();
+          const contRect2 = containerEl.getBoundingClientRect();
+          const geom = {
+            custom: chatCard.classList.contains('qa-custom-pos'),
+            left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+            top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+            width: rectNow.width,
+            height: rectNow.height,
+            rightGap: contRect2.right - rectNow.right
+          };
+          saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+        }catch{}
       }catch{}
     }
 
-    try{ qaRestore?.addEventListener('click', ()=>{ if (chatMinimized) restoreChat(); }); }catch{}
+    try{ qaRestore?.addEventListener('click', async ()=>{
+      try{
+        if (chatMinimized) { restoreChat(); return; }
+        // Not marked minimized but user wants to restore: show from saved geometry
+        const ui = await loadQAUIState();
+        // Show chat card; prefer saved float flag, fallback to hasSummarizeTriggered
+        const shouldFloat = (typeof ui?.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+        chatCard.style.display='';
+        if (shouldFloat){
+          chatCard.classList.add('qa-float'); setBgCardHoverDisabled(true);
+          // Ensure tools (close + resize handle)
+          try{
+            let tools = chatCard.querySelector('.card-tools');
+            if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+            let closeBtn = tools.querySelector('.tbtn-close');
+            if (!closeBtn){
+              const label = currentLangCache==='en' ? 'Close' : '关闭';
+              closeBtn = document.createElement('button');
+              closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+              closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+              tools.insertBefore(closeBtn, tools.firstChild || null);
+              closeBtn.addEventListener('click', ()=>{
+                try{ chatCard.dispatchEvent(new CustomEvent('sx-minimize-chat', { bubbles:false })); }catch{}
+              });
+            }
+            let rh = chatCard.querySelector('.qa-resize-handle');
+            if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+          }catch{}
+        }
+        else { chatCard.classList.remove('qa-float'); setBgCardHoverDisabled(false); }
+        chatVisible = true;
+        // Apply geometry if floating and snapshot present
+        if (shouldFloat && ui?.lastGeom){
+          const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+          const hardMaxW = 1400;
+          const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+          const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+          chatCard.style.minWidth = '0px';
+          chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+          const h = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+          chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
+          if (ui.lastGeom.custom){
+            const maxLeft = innerRightAbs - width;
+            const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(ui.lastGeom.left||0)));
+            chatCard.classList.add('qa-custom-pos');
+            chatCard.style.right=''; chatCard.style.bottom='';
+            chatCard.style.left = left + 'px';
+            const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
+            const topMin = containerEl.scrollTop;
+            const top = Math.max(topMin, Math.min(topMax, Math.round(ui.lastGeom.top||0)));
+            chatCard.style.top = top + 'px';
+          } else {
+            chatCard.classList.remove('qa-custom-pos');
+            const gap = Math.max(10, Math.round(ui.lastGeom.rightGap || 16));
+            chatCard.style.right = gap + 'px';
+            chatCard.style.left = '';
+            chatCard.style.top = '';
+            chatCard.style.bottom = '';
+          }
+        }
+        // hide restore icon after showing
+        try{ qaRestore?.setAttribute('aria-hidden','true'); }catch{}
+        // persist visibility
+        saveQAUIState({ visible:true, minimized:false, float: shouldFloat });
+      }catch{}
+    }); }catch{}
 
     // No-op clamp to keep calls safe (we don't auto-move/auto-resize on container changes)
     const clampFloatWithinContainer = ()=>{};
@@ -2728,6 +2926,8 @@
       }catch{}
     };
     try{ window.addEventListener('resize', ()=>{ requestAnimationFrame(()=>{ updateQABottomVar(); clampFloatWithinContainer(); }); }, { passive:true }); }catch{}
+
+    // Rehydration moved to startup sequence after state is known
 
     // Drag & resize for floating chat
     const containerEl = shadow.getElementById('sx-container');
@@ -2781,6 +2981,19 @@
       if (!dragState) return;
       dragState = null;
       try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+      }catch{}
     };
 
     const rh = ()=> chatCard.querySelector('.qa-resize-handle');
@@ -2808,6 +3021,8 @@
       chatCard.style.right = '';
       chatCard.style.bottom = '';
       resizeState = { startX: ev.clientX, startY: ev.clientY, startW: rect.width, startH: rect.height, pointerId: ev.pointerId };
+      // Mark as user-sized so future autosize won't override
+      try{ chatCard.dataset.userSized = '1'; chatCard._qaSizeLocked = true; }catch{}
       try{ chatCard.setPointerCapture(ev.pointerId); }catch{}
       // Ensure we always end resizing on release, even if pointer capture is lost
       try{
@@ -2865,6 +3080,7 @@
       resizeState = null;
       try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
       try{ clampFloatWithinContainer(); }catch{}
+      try{ chatCard.dataset.userSized = '1'; chatCard._qaSizeLocked = true; }catch{}
       try{
         window.removeEventListener('pointermove', onResize, true);
         window.removeEventListener('pointerup', endResize, true);
@@ -2873,8 +3089,23 @@
         window.removeEventListener('mouseup', endResize, true);
         window.removeEventListener('mouseleave', endResize, true);
       }catch{}
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+      }catch{}
     };
     try{ chatCard.addEventListener('lostpointercapture', endResize, true); }catch{}
+    // Allow external code to request minimize without direct access to closure
+    try{ chatCard.addEventListener('sx-minimize-chat', ()=>{ try{ minimizeChat(); }catch{} }, false); }catch{}
 
     // Update cursor when hovering near the bottom-right corner
     const updateCursor = (ev)=>{
@@ -2911,7 +3142,7 @@
         updateQABottomVar();
         // First-open sizing: fit to visible container height (avoid being clipped)
         try{
-          if (!chatCard._qaInitSized){
+          if (!chatCard._qaInitSized && !chatCard.dataset.userSized && !chatCard._qaHasRestored){
             const container = shadow.getElementById('sx-container');
             const contH = container?.clientHeight || 0;
             const qaBottomStr = chatCard.style.getPropertyValue('--qa-bottom') || getComputedStyle(chatCard).getPropertyValue('--qa-bottom');
@@ -2924,6 +3155,7 @@
             chatCard.style.height = initH + 'px';
             chatCard.style.setProperty('--qa-h', initH + 'px');
             chatCard._qaInitSized = true;
+            chatCard._qaSizeLocked = true;
           }
         }catch{}
         // keep size vars in sync when user resizes (native or custom)
@@ -2948,6 +3180,19 @@
         chatCard.classList.remove('qa-float');
       }
       chatVisible = true; setBgCardHoverDisabled(chatCard.classList.contains('qa-float'));
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float: chatCard.classList.contains('qa-float'), lastGeom: geom });
+      }catch{}
     };
     // auto-resize textarea to show all input lines (up to max-height)
     const autoResize = () => {
@@ -2994,15 +3239,22 @@
           scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
         }
       }catch{}
+      try{
+        // Update UI snapshot (store empty html for pending AI; will be filled on finish)
+        chatBubblesUI.push({ role, html: pending ? '' : String(html||'') });
+        saveQAUIState({ bubbles: chatBubblesUI });
+      }catch{}
       return b;
     };
     const doSend = async ()=>{
       if (summarizing || qaSending) return; // blocked during summarize or when already sending
       const q = qaInput.value.trim();
       if (!q) return;
+      const myTxn = (++qaTxn);
       const prev = qaSend.textContent;
       qaSending = true; updateQAControls(shadow);
       qaSend.textContent = (currentLangCache==='zh'?'发送中…':'Sending…');
+      try{ saveQAUIState({ qaBusy:true, qaTxn: myTxn }); }catch{}
       // Switch to chat mode on first send
       if (!chatMode){
         chatMode = true;
@@ -3080,7 +3332,14 @@
           .replace(/^(?:<br\s*\/?>(?:\s|&nbsp;)*?)+/i,'')
           .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
           .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
+        // If this response is outdated (e.g., user switched away and we invalidated), ignore
+        if (myTxn !== qaTxn) return;
         aiBubble.innerHTML = html;
+        try{
+          // Fill the last AI bubble in UI snapshot
+          for (let i=chatBubblesUI.length-1; i>=0; i--){ if (chatBubblesUI[i]?.role==='ai'){ chatBubblesUI[i].html = html; break; } }
+          saveQAUIState({ bubbles: chatBubblesUI });
+        }catch{}
         // After answer renders, adjust again to show as much as possible while keeping question visible
         try{ adjustChatViewport(userBubble, aiBubble); setTimeout(()=>adjustChatViewport(userBubble, aiBubble), 50); }catch{}
         // Keep viewport anchored near the user question; do not auto-jump in floating mode
@@ -3103,11 +3362,13 @@
         // track history
         chatHistory.push({ role:'user', content: q });
         chatHistory.push({ role:'assistant', content: ans });
+        try{ const h = chatHistory.slice(0); saveQAUIState({ hist: h, qaBusy:false, qaTxn }); saveHistoryLocal(h); }catch{}
       }catch(e){
         try{ alert((currentLangCache==='zh'?'提问失败：':'Ask failed: ') + (e?.message || e)); }catch{}
       } finally {
         try{ setLoading(shadow, false); }catch{}
         qaSending = false; updateQAControls(shadow);
+        try{ if (myTxn === qaTxn) saveQAUIState({ qaBusy:false, qaTxn }); }catch{}
         // Restore label unless still blocked by summarizing
         if (qaSend && !qaSend.disabled) qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
         // If minimized while processing, signal completion on the restore icon (green pulse)
@@ -3328,10 +3589,11 @@
     await tryLoadPetiteVue();
     if (PV) mountVue();
 
+    let tabId=null; let st=null;
     try{
-      const tabId=await getActiveTabId();
+      tabId=await getActiveTabId();
       if (!tabId){ await setEmpty(shadow); return; }
-      const st=await getState(tabId);
+      st=await getState(tabId);
       // Pre-mark summarize as triggered if panel state indicates it
       try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
       if (st.status==='running'){
@@ -3354,6 +3616,178 @@
       }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
+
+    // After state and cards prepared, restore Q&A UI (visibility, geometry, and bubbles)
+    try{
+      if (!tabId) return;
+      const ui = await loadQAUIState();
+      if (ui && typeof ui === 'object'){
+        const chatCard = shadow.getElementById('sx-chat');
+        const chatList = shadow.getElementById('sx-chat-list');
+        // restore visibility and floating geometry
+        if (ui.visible){
+          // Show chat card and set float mode according to summarize state
+          try{
+            const wrapEl = shadow.getElementById('sx-wrap');
+            chatCard.style.display='';
+            const shouldFloat = (typeof ui.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+            if (shouldFloat){
+              chatCard.classList.add('qa-float');
+              wrapEl?.classList?.add('qa-hover-off');
+              // Ensure close button + resize handle exist (so Close is always visible)
+              try{
+                let tools = chatCard.querySelector('.card-tools');
+                if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+                let closeBtn = tools.querySelector('.tbtn-close');
+                if (!closeBtn){
+                  const label = currentLangCache==='en' ? 'Close' : '关闭';
+                  closeBtn = document.createElement('button');
+                  closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+                  closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+                  tools.insertBefore(closeBtn, tools.firstChild || null);
+                  closeBtn.addEventListener('click', ()=>{
+                    try{ chatCard.dispatchEvent(new CustomEvent('sx-minimize-chat', { bubbles:false })); }catch{}
+                  });
+                }
+                let rh = chatCard.querySelector('.qa-resize-handle');
+                if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+              }catch{}
+            } else {
+              chatCard.classList.remove('qa-float');
+              wrapEl?.classList?.remove('qa-hover-off');
+            }
+            chatVisible = true;
+          }catch{}
+          // Apply geometry only in float mode and if snapshot exists
+          const shouldFloat = (typeof ui.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+          if (shouldFloat && ui.lastGeom){
+            const containerEl = shadow.getElementById('sx-container');
+            const getContainerBounds = ()=>{
+              const contRect = containerEl.getBoundingClientRect();
+              const cs = getComputedStyle(containerEl);
+              const padL = parseInt(cs.paddingLeft)||0;
+              const padR = parseInt(cs.paddingRight)||0;
+              const viewLeft = containerEl.scrollLeft;
+              const viewRight = viewLeft + contRect.width;
+              const SAFE = 10;
+              const innerLeftAbs = viewLeft + padL + SAFE;
+              const innerRightAbs = viewRight - padR - SAFE;
+              const availW = Math.max(0, innerRightAbs - innerLeftAbs);
+              return { contRect, innerLeftAbs, innerRightAbs, availW };
+            };
+            const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+            const hardMaxW = 1400;
+            const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+            const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+            chatCard.style.minWidth = '0px';
+            chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+            const h = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+            chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
+            if (ui.lastGeom.custom){
+              const maxLeft = innerRightAbs - width;
+              const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(ui.lastGeom.left||0)));
+              chatCard.classList.add('qa-custom-pos');
+              chatCard.style.right=''; chatCard.style.bottom='';
+              chatCard.style.left = left + 'px';
+              const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
+              const topMin = containerEl.scrollTop;
+              const top = Math.max(topMin, Math.min(topMax, Math.round(ui.lastGeom.top||0)));
+              chatCard.style.top = top + 'px';
+            } else {
+              chatCard.classList.remove('qa-custom-pos');
+              const gap = Math.max(10, Math.round(ui.lastGeom.rightGap || 16));
+              chatCard.style.right = gap + 'px';
+              chatCard.style.left = '';
+              chatCard.style.top = '';
+              chatCard.style.bottom = '';
+            }
+            try{ chatCard._qaHasRestored = true; chatCard._qaSizeLocked = true; }catch{}
+          }
+        } else if (ui.minimized){
+          // Show restore affordance unless suppressed for first open after reload
+          if (!__suppressRestoreOnce){
+            try{ const r=shadow.getElementById('sx-qa-restore'); r?.setAttribute('aria-hidden','false'); }catch{}
+          } else { __suppressRestoreOnce = false; }
+        } else if ((Array.isArray(ui.bubbles) && ui.bubbles.length) || (Array.isArray(ui.hist) && ui.hist.length)){
+          // There is chat content but not visible/minimized: surface restore affordance
+          if (!__suppressRestoreOnce){
+            try{ const r=shadow.getElementById('sx-qa-restore'); r?.setAttribute('aria-hidden','false'); }catch{}
+          } else { __suppressRestoreOnce = false; }
+        }
+        // If previous send was still running when user left: drop the latest incomplete Q&A
+        try{
+          if (ui.qaBusy === true){
+            // invalidate any in-flight response
+            try{ qaTxn = Number.isFinite(+ui.qaTxn) ? (+ui.qaTxn + 1) : (qaTxn+1); }catch{}
+            // prune UI bubbles: remove trailing empty AI, then its preceding user
+            if (Array.isArray(ui.bubbles) && ui.bubbles.length){
+              const arr = ui.bubbles.slice(0);
+              if (arr.length && arr[arr.length-1]?.role==='ai' && !arr[arr.length-1]?.html){ arr.pop(); }
+              if (arr.length && arr[arr.length-1]?.role==='user'){ arr.pop(); }
+              ui.bubbles = arr;
+              try{ saveQAUIState({ bubbles: arr, qaBusy:false, qaTxn }); }catch{}
+            } else {
+              try{ saveQAUIState({ qaBusy:false, qaTxn }); }catch{}
+            }
+            // also ensure local flags/input are not blocked
+            qaSending = false; updateQAControls(shadow);
+          }
+        }catch{}
+        // restore bubbles: prefer hist (session or local), fallback to bubbles snapshot
+        try{
+          const buildFrom = (hist)=>{
+            if (!Array.isArray(hist) || !chatList) return false;
+            const built=[]; chatList.innerHTML='';
+            for (const it of hist){
+              if (!it || (it.role!=='user' && it.role!=='assistant')) continue;
+              const role = it.role==='assistant' ? 'ai' : 'user';
+              let html='';
+              if (role==='user') html = escapeHtml(String(it.content||''));
+              else html = stripInlineColor(renderMarkdown(String(it.content||'')))
+                            .replace(/^(?:<br\s*\/?>(?:\s|&nbsp;)*?)+/i,'')
+                            .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
+                            .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
+              built.push({ role, html });
+              const div=document.createElement('div'); div.className=`chat-bubble ${role}`; div.innerHTML=html; chatList.appendChild(div);
+            }
+            chatBubblesUI=built; try{ saveQAUIState({ bubbles: built }); }catch{}
+            if (ui.visible) chatMode=true;
+            return built.length>0;
+          };
+
+          let restored=false;
+          // 1) Prefer session hist
+          if (Array.isArray(ui.hist) && ui.hist.length){ restored = buildFrom(ui.hist); }
+          // 2) Fallback to local backup by URL
+          if (!restored){ const b = await loadHistoryLocal(); if (b?.hist?.length) restored = buildFrom(b.hist); }
+          // 3) Last resort: bubbles snapshot if present and complete
+          if (!restored && Array.isArray(ui.bubbles) && ui.bubbles.length>0){
+            const miss = ui.bubbles.some(b => b && b.role==='ai' && !(b.html && String(b.html).trim()));
+            if (!miss){
+              chatBubblesUI = ui.bubbles.slice(0); chatList.innerHTML='';
+              for (const it of chatBubblesUI){ const div=document.createElement('div'); div.className=`chat-bubble ${it?.role==='user'?'user':'ai'}`; div.innerHTML=String(it?.html||''); chatList.appendChild(div); }
+              if (ui.visible) chatMode=true; restored=true;
+            }
+          }
+        }catch{}
+        // restore textual history for continuity (prefer session hist, fallback to local backup)
+        try{
+          let histSet = false;
+          if (Array.isArray(ui.hist) && ui.hist.length){
+            while (chatHistory.length) chatHistory.pop();
+            for (const it of ui.hist){ if (it && (it.role==='user' || it.role==='assistant') && typeof it.content==='string'){ chatHistory.push({ role: it.role, content: it.content }); } }
+            histSet = true;
+          }
+          if (!histSet){
+            const b = await loadHistoryLocal();
+            if (b?.hist?.length){
+              while (chatHistory.length) chatHistory.pop();
+              for (const it of b.hist){ if (it && (it.role==='user' || it.role==='assistant') && typeof it.content==='string'){ chatHistory.push({ role: it.role, content: it.content }); } }
+            }
+          }
+        }catch{}
+      }
+    }catch{}
   })();
 
   // ===== 广播同步 =====
@@ -3390,6 +3824,7 @@
         }
       }catch{}
     }else if (msg.type==='SX_CLOSE_FLOAT_PANEL'){
+      try{ await chrome.runtime.sendMessage({ type:'QA_UI_SET', ui:{ visible:false } }); }catch{}
       const btn=shadow.getElementById('sx-close');
       if (btn) btn.click(); else { const host=document.getElementById(PANEL_ID); if (host){ host.remove(); window[MARK]=false; } stopPolling(); }
     }
