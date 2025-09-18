@@ -1345,6 +1345,17 @@
         border-color: #2a3d5f;
         box-shadow: 0 2px 8px rgba(142,162,255,0.3);
       }
+      /* Stronger contrast for Force-Dark active state in dark theme */
+      :host([data-theme="dark"]) #sx-force-dark-btn.active{
+        background: var(--primary-600);
+        border-color: var(--primary-600);
+        color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(142,162,255,0.28), 0 4px 12px rgba(0,0,0,0.55);
+      }
+      :host([data-theme="dark"]) #sx-force-dark-btn.active:hover{
+        background: var(--primary);
+        border-color: var(--primary);
+      }
       :host([data-theme="dark"]) .theme-toggle .label{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-toggle .seg{ background:#18233a; border-color:#2a3d5f; }
       :host([data-theme="dark"]) .theme-btn{ color:#d9e2f2; }
