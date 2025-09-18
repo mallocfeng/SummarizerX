@@ -3,6 +3,7 @@
 ## v2.2.5-beta - 2025-09-18
 
 ### English
+- New: Reader Mode — open via the book icon in the side panel; centered overlay with a frosted header, isolated scrolling that never scrolls the page, expanded side padding, and live theme sync (Auto/Light/Dark).
 - Reader Mode overlay: Title bar stays frosted and always visible; the vertical scrollbar is now confined to the content area and never overlaps the Close button.
 - Scroll containment: Continued wheel/middle‑click/trackpad scroll inside the overlay no longer scrolls the underlying page; touch scrolling is also contained. Mask layer absorbs scroll events.
 - Padding: Increased inner horizontal padding for more comfortable reading, with responsive behavior preserved.
@@ -11,6 +12,7 @@
  - Ad Filtering indicator: OFF state is now a red shield with a white slash; ON remains a green shield with a check. Colors adapt to light/dark themes. Tooltip remains fast and prominent.
 
 ### 中文
+- 新增：阅读模式（从侧栏标题行的小书图标进入）；居中浮窗，带磨砂标题栏；滚动事件被容器吸收不影响背景；两侧留白更宽；与外观（自动/浅色/深色）实时联动。
 - 阅读模式浮窗：标题栏保持磨砂半透明并始终可见；垂直滚动条仅出现在正文区域，不再遮挡关闭按钮。
 - 滚动隔离：在浮窗内继续滚动（鼠标滚轮/中键/触控板）不会再带动页面滚动；触摸滚动同样被容器捕获；遮罩层也会吞掉滚动事件。
 - 边距：增大正文左右内边距，阅读更舒适（保留自适应）。
