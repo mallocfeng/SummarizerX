@@ -2621,6 +2621,50 @@
     if (vmCleaned) vmCleaned.html = cleanedHTML; else shadow.getElementById('sx-cleaned').innerHTML = cleanedHTML;
   }
 
+  // Append 3 quick ask suggestions at the bottom of summary card
+  function ensureQuickAsk(shadow, qs){
+    try{
+      const list = Array.isArray(qs)? qs.filter(Boolean).slice(0,3): [];
+      const card = shadow.getElementById('sx-summary'); if (!card) return;
+      let box = card.querySelector('.quick-ask');
+      if (list.length===0){ if (box) box.remove(); return; }
+      if (!box){
+        box = document.createElement('div'); box.className='quick-ask';
+        const style = document.createElement('style'); style.textContent = `
+          .quick-ask{ margin-top:14px; padding-top:10px; border-top:1px dashed var(--border); }
+          .quick-ask .title{ font-size:12px; color:#56627a; margin-bottom:6px; }
+          :host([data-theme="dark"]) .quick-ask .title{ color:#9fb0d0; }
+          .quick-ask .qitem{ display:block; font-size:14px; color:#1e40af; text-decoration:underline; text-underline-offset:3px; margin:6px 0; cursor:pointer; }
+          .quick-ask .qitem:hover{ color:#0f172a; }
+          :host([data-theme="dark"]) .quick-ask .qitem{ color:#93c5fd; }
+          :host([data-theme="dark"]) .quick-ask .qitem:hover{ color:#e2ebf8; }
+        `;
+        card.appendChild(style);
+        const inner = document.createElement('div'); inner.className='qa-inner';
+        const title = document.createElement('div'); title.className='title'; title.textContent = (currentLangCache==='en'?'You might ask:':'猜你想问：');
+        inner.appendChild(title);
+        box.appendChild(inner);
+        card.appendChild(box);
+      }
+      const inner = box.querySelector('.qa-inner');
+      // remove old qitems
+      inner.querySelectorAll('.qitem').forEach(n=>n.remove());
+      // append new
+      list.forEach(q=>{
+        const a=document.createElement('a'); a.href='javascript:void(0)'; a.className='qitem'; a.textContent=q; a.setAttribute('role','button'); a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
+        a.addEventListener('click', ()=>{
+          try{
+            const qaInput = shadow.getElementById('sx-qa-input');
+            const qaSend  = shadow.getElementById('sx-qa-send');
+            if (qaInput){ qaInput.value = q; qaInput.dispatchEvent(new Event('input', {bubbles:true})); }
+            qaSend?.click();
+          }catch{}
+        });
+        inner.appendChild(a);
+      });
+    }catch{}
+  }
+
   // ===== QA logic =====
   let chatMode = false;
   let chatVisible = false; // whether chat card is currently shown
@@ -3621,7 +3665,7 @@
         setSummarizing(shadow,false);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-        setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+        setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
       }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
@@ -3811,19 +3855,19 @@
           setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,true); skeleton(shadow);
+          setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
         }
         else if (st.status==='partial'){
           setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,true); await renderCards(st.summary, null);
+          setLoading(shadow,true); await renderCards(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
         }
         else if (st.status==='done'){
           setSummarizing(shadow,false);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+          setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
         }
         else if (st.status==='error'){
           setSummarizing(shadow,false); setLoading(shadow,false);

@@ -190,10 +190,36 @@ async function runForTab(tabId) {
     temperature: 0.1
   });
 
+  // Generate 3 likely user questions for quick ask (in finalLang), plain text one per line
+  let quickQuestions = [];
+  try {
+    const qsPrompt = enforceUserLang(
+      `From the content below, generate 3 likely questions a reader may ask.\n`+
+      `Rules: return EXACTLY 3 lines, one question per line, no numbering, no quotes.\n\n`+
+      `Content:\n${quickMd.slice(0, 12000)}`,
+      finalLang,
+      false
+    );
+    const qsOut = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey: cfg.apiKey || 'trial',
+      model: cfg.model_summarize,
+      system: sysForSummary,
+      prompt: qsPrompt,
+      temperature: 0.6
+    });
+    quickQuestions = String(qsOut || '')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^[-*\d\.\)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  } catch {}
+
   await setState(tabId, {
     status: "partial",
     summary: summaryFast,
     cleaned: "",
+    quickQuestions,
     meta: {
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
@@ -242,6 +268,7 @@ async function runForTab(tabId) {
     status: "done",
     summary: summaryFast,
     cleaned: cleanedMarkdown,
+    quickQuestions,
     meta: {
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
