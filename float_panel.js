@@ -82,7 +82,8 @@
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, src) => {
       try{
         const s = String(src||'').trim();
-        const safe = /^(https?:|data:image\/|blob:|\/|\.|#)/i.test(s) ? s : '';
+        // Allow protocol-relative (//), generic data:, and common schemes
+        const safe = /^(https?:|data:|blob:|\/\/|\/|\.|#)/i.test(s) ? s : '';
         const a = (alt||'').trim();
         if (!safe) return '';
         return `<img src="${safe}" alt="${a}" loading="lazy">`;

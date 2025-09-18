@@ -5,9 +5,33 @@
     try{
       // 1) Click common expand buttons/links
       const MATCH = /(read more|show more|continue reading|expand|see more|load more|阅读全文|展开|显示更多|继续阅读)/i;
+      const isSafeAnchor = (el)=>{
+        try{
+          if (el.tagName?.toLowerCase() !== 'a') return false;
+          const role = (el.getAttribute('role')||'').toLowerCase();
+          const href = (el.getAttribute('href')||'').trim().toLowerCase();
+          const target = (el.getAttribute('target')||'').toLowerCase();
+          // Only allow anchors that behave like buttons or don't navigate away
+          if (role === 'button') return true;
+          if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('void(')) return true;
+          // in-page anchors
+          if (href.startsWith('#')) return true;
+          // anything with target or absolute http(s) likely navigates: disallow
+          if (target) return false;
+          try{ const u = new URL(href, location.href); if (u.origin !== location.origin) return false; }catch{}
+          return false;
+        }catch{ return false; }
+      };
       const candidates = Array.from(document.querySelectorAll('button, a'))
         .filter(el=>{
-          try{ const t=(el.innerText||'').trim(); return t && MATCH.test(t); }catch{ return false; }
+          try{ 
+            const t=(el.innerText||'').trim(); 
+            if (!t || !MATCH.test(t)) return false;
+            const tag = el.tagName?.toLowerCase();
+            if (tag === 'button') return true;
+            if (tag === 'a') return isSafeAnchor(el);
+            return false;
+          }catch{ return false; }
         })
         .slice(0,3);
       for (const el of candidates){ try{ el.click(); }catch{} }
@@ -111,6 +135,44 @@
             if (good){ img.setAttribute('src', good); img.removeAttribute('loading'); img.removeAttribute('decoding'); }
           }catch{}
         });
+        // 4) If Readability dropped the lede/hero image (common on news sites),
+        //    prepend a best-guess header image from the page (e.g., NYT header figure or og:image)
+        try {
+          const alreadyHasImg = !!tmp.querySelector('img');
+          if (!alreadyHasImg) {
+            let src = '';
+            let alt = '';
+            // Prefer a prominent header image near the headline if available (NYT and similar)
+            const ledeImg = document.querySelector('div[data-testid="imageblock-wrapper"] img')
+              || document.querySelector('figure.sizeLarge img')
+              || document.querySelector('figure img');
+            if (ledeImg) {
+              src = ledeImg.currentSrc || ledeImg.getAttribute('src') || '';
+              // Try a high-res from srcset
+              if (!src) {
+                const ss = ledeImg.getAttribute('srcset') || '';
+                const hi = pickFromSet(ss);
+                if (hi) src = hi;
+              }
+              alt = ledeImg.getAttribute('alt') || (ledeImg.closest('figure')?.querySelector('figcaption')?.innerText || '');
+            }
+            // Fallback to social meta images
+            if (!src) {
+              src = document.querySelector('meta[property="og:image"]')?.content
+                 || document.querySelector('meta[name="twitter:image"]')?.content
+                 || '';
+            }
+            if (src) {
+              try { src = new URL(src, location.href).href; } catch {}
+              const holder = document.createElement('p');
+              const im = document.createElement('img');
+              im.setAttribute('src', src);
+              if (alt) im.setAttribute('alt', alt.trim());
+              holder.appendChild(im);
+              tmp.insertBefore(holder, tmp.firstChild);
+            }
+          }
+        } catch {}
       }catch{}
       document.documentElement.appendChild(tmp);
       try{
