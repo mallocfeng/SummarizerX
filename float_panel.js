@@ -4224,6 +4224,24 @@
                 }
               `);
             }
+            // Sina 新闻/看点：正文容器常保留纯白底，Dark Reader 不一定覆盖到，补充背景修正
+            if (/(^|\.)sina\.com\.cn$/i.test(host) || /(^|\.)k\.sina\.com\.cn$/i.test(host)){
+              css.push(`
+                /* Force dark background on common article containers */
+                html, body,
+                #article_content, #article, #artibody,
+                .article, .article-content, .article-content-left,
+                .content, #content, .page, .blk-related{
+                  background-color: #121212 !important;
+                }
+                /* Ensure readable foreground on those containers */
+                #article_content, #article, #artibody,
+                .article, .article-content, .article-content-left,
+                .content, #content, .page, .blk-related{
+                  color: #eaeef5 !important;
+                }
+              `);
+            }
             const tag = document.createElement('style');
             tag.id = 'sx-force-dark-fixes';
             tag.textContent = css.join('\n');
