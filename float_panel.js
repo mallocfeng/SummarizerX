@@ -2652,15 +2652,19 @@
       inner.querySelectorAll('.qitem').forEach(n=>n.remove());
       // append new
       list.forEach(q=>{
-        const a=document.createElement('a'); a.href='javascript:void(0)'; a.className='qitem'; a.textContent=q; a.setAttribute('role','button'); a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
-        a.addEventListener('click', ()=>{
+        const a=document.createElement('a'); a.href='#'; a.className='qitem'; a.textContent=q; a.setAttribute('role','button'); a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
+        // Prevent any default navigation (including about:blank) and bubbling to underlying links
+        const ask = ()=>{
           try{
             const qaInput = shadow.getElementById('sx-qa-input');
             const qaSend  = shadow.getElementById('sx-qa-send');
             if (qaInput){ qaInput.value = q; qaInput.dispatchEvent(new Event('input', {bubbles:true})); }
             qaSend?.click();
           }catch{}
-        });
+        };
+        a.addEventListener('click', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} ask(); });
+        a.addEventListener('auxclick', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} }); // block middle-click
+        a.addEventListener('mousedown', (ev)=>{ if (ev.button!==0){ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} } });
         inner.appendChild(a);
       });
     }catch{}
