@@ -71,6 +71,47 @@
       tmp.setAttribute('data-sx-readable-root','1');
       tmp.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1px;height:1px;overflow:hidden;';
       tmp.innerHTML = article.content || '';
+      // Prepare within the temp root synchronously: expand clamps, normalize lazy media
+      try{
+        // 1) Expand <details>
+        tmp.querySelectorAll('details').forEach(d=>{ try{ d.setAttribute('open',''); }catch{} });
+        // 2) Remove simple CSS clamps/truncation
+        const sel = [
+          '[style*="line-clamp" i]','[style*="-webkit-line-clamp" i]','[style*="max-height" i]','.line-clamp','.clamp','.truncate','.collapsed','.ellipsis','.is-collapsed'
+        ].join(',');
+        tmp.querySelectorAll(sel).forEach(el=>{
+          try{
+            el.style.setProperty('max-height','none','important');
+            el.style.setProperty('-webkit-line-clamp','unset','important');
+            el.style.setProperty('overflow','visible','important');
+          }catch{}
+        });
+        // 3) Normalize images: prefer currentSrc/srcset/data-src* over tiny placeholders
+        const pickFromSet = (set)=>{
+          try{
+            const parts = String(set||"").split(',').map(s=>s.trim()).filter(Boolean).map(s=>{
+              const m=s.match(/\s*(\S+)\s+(\d+)w/); return m? { url:m[1], w:parseInt(m[2]) }: { url:s.split(/\s+/)[0], w:0 };
+            });
+            parts.sort((a,b)=> b.w-a.w); return parts.length? parts[0].url: '';
+          }catch{ return ''; }
+        };
+        const isTiny=(u)=>/data:image\/(gif|png)/i.test(u||'') && /base64/i.test(u||'');
+        tmp.querySelectorAll('img').forEach(img=>{
+          try{
+            const cands=[];
+            if (img.currentSrc) cands.push(img.currentSrc);
+            const ss = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+            const fromSet = pickFromSet(ss); if (fromSet) cands.push(fromSet);
+            ['data-src','data-original','data-hi-res-src','data-lazy-src','src'].forEach(a=>{ const v=img.getAttribute(a); if (v) cands.push(v); });
+            if (!fromSet && img.parentElement && img.parentElement.tagName.toLowerCase()==='picture'){
+              const s = img.parentElement.querySelector('source[srcset]');
+              const u = pickFromSet(s?.getAttribute('srcset')||''); if (u) cands.unshift(u);
+            }
+            const good = cands.find(u=>u && !isTiny(u));
+            if (good){ img.setAttribute('src', good); img.removeAttribute('loading'); img.removeAttribute('decoding'); }
+          }catch{}
+        });
+      }catch{}
       document.documentElement.appendChild(tmp);
       try{
         const markdown = extractMarkdown(tmp);
