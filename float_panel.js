@@ -1006,9 +1006,9 @@
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; overscroll-behavior: contain; }
+      .container{ flex:1 1 auto; padding:0 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; overscroll-behavior: contain; }
       .container .section:last-child{ margin-bottom:8px; }
-      .container .section:first-child{ margin-top:4px; }
+      .container .section:first-child{ margin-top:0; }
       /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
       .wrap.is-empty #sx-summary,
       .wrap.is-empty #sx-cleaned{ display:none !important; }
@@ -2723,8 +2723,8 @@
       try{
         const qaBar  = shadow.getElementById('sx-qa-area');
         const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60;
-        // keep a smaller gap so initial card位置更靠下
-        chatCard.style.setProperty('--qa-bottom', (qaH + 8) + 'px');
+        // keep a gap above the QA bar; adjust with latest overall upward shift (+2px)
+        chatCard.style.setProperty('--qa-bottom', (qaH + 19) + 'px');
       }catch{}
     };
     try{ window.addEventListener('resize', ()=>{ requestAnimationFrame(()=>{ updateQABottomVar(); clampFloatWithinContainer(); }); }, { passive:true }); }catch{}
