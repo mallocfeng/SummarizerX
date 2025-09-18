@@ -114,13 +114,36 @@
       return `[${text}](${abs})`;
     }
 
-    // <img>
+    // <img> — handle lazy-loaded and srcset/currentSrc
     if (tag === "img") {
       const alt = node.getAttribute("alt") || "";
-      const src = node.getAttribute("src") || "";
+      const isTinyPlaceholder = (u)=>/data:image\/(gif|png)/i.test(u||"") && /base64/i.test(u||"");
+      const pickFromSrcset = (set)=>{
+        try{
+          const parts = String(set||"").split(',').map(s=>s.trim()).filter(Boolean).map(s=>{
+            const m=s.match(/\s*(\S+)\s+(\d+)w/); return m? { url:m[1], w:parseInt(m[2]) }: { url:s.split(/\s+/)[0], w:0 };
+          });
+          parts.sort((a,b)=> b.w-a.w); return parts.length? parts[0].url: '';
+        }catch{ return ''; }
+      };
+      const cands = [];
+      try{ if (node.currentSrc) cands.push(node.currentSrc); }catch{}
+      [
+        'src', 'data-src', 'data-original', 'data-hi-res-src', 'data-lazy-src'
+      ].forEach(attr=>{ const v=node.getAttribute(attr); if (v) cands.push(v); });
+      const ss = node.getAttribute('srcset') || node.getAttribute('data-srcset');
+      const fromSet = pickFromSrcset(ss);
+      if (fromSet) cands.unshift(fromSet);
+      // Fallback: look for <source srcset> in parent <picture>
+      try{
+        if (!fromSet && node.parentElement && node.parentElement.tagName.toLowerCase()==='picture'){
+          const s = node.parentElement.querySelector('source[srcset]');
+          const u = pickFromSrcset(s?.getAttribute('srcset')||''); if (u) cands.unshift(u);
+        }
+      }catch{}
+      const src = (cands.find(u=>u && !isTinyPlaceholder(u)) || '').trim();
       if (!src) return "";
-      let abs = src;
-      try { abs = new URL(src, location.href).href; } catch {}
+      let abs = src; try { abs = new URL(src, location.href).href; } catch {}
       return `![${alt}](${abs})`;
     }
 

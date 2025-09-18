@@ -248,7 +248,8 @@ async function runForTab(tabId) {
       "You are an article cleaner.",
       "Your job: remove navigation, ads, cookie banners, boilerplate, and duplicate fragments.",
       "PRESERVE the ORIGINAL sentences and wording. DO NOT paraphrase or summarize.",
-      "Keep headings, lists, blockquotes, code fences, links, and tables.",
+      "Keep headings, lists, blockquotes, code fences, links, images, and tables.",
+      "For images: include them as Markdown ![alt](url) using the original alt text when available.",
       "Output clean Markdown of the main body only.",
       langLineEn(finalLang, true),
       langLineNative(finalLang)
