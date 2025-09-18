@@ -1310,6 +1310,48 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true; // async
   }
+  if (msg?.type === 'SX_READER_TRANSLATE_BLOCK') {
+    (async () => {
+      try {
+        const rawText = String(msg.text || '');
+        const target = (msg.target === 'en') ? 'en' : 'zh';
+        const cfg = await getSettings();
+        const isTrial = (cfg.aiProvider === 'trial');
+        if (!cfg.apiKey && !isTrial) throw new Error('请先到设置页填写并保存 API Key');
+        if (isTrial) {
+          try {
+            const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+            if (!trial_consent) throw new Error('试用模式需先同意通过代理传输页面内容');
+          } catch {}
+        }
+
+        const targetName = (target === 'en') ? 'English' : 'Chinese (Simplified)';
+        const sys = [
+          'You are a professional translator. Translate faithfully.',
+          'Preserve Markdown structure (headings, lists, blockquotes, code fences, links, images).',
+          'Do not add commentary. Output ONLY translated Markdown for THIS BLOCK — no HTML and no extra notes.',
+          'Keep code fences unchanged.'
+        ].join('\n');
+        const prompt = `Translate the following Markdown block into ${targetName}. Return ONLY the translated Markdown for this block.\n\n<<<BLOCK>>>\n${rawText}\n<<<END>>>`;
+        const txt0 = await chatCompletion({
+          baseURL: cfg.baseURL,
+          apiKey: cfg.apiKey || 'trial',
+          model: cfg.model_summarize,
+          system: sys,
+          prompt,
+          temperature: 0
+        });
+        let txt = String(txt0 || '').trim();
+        txt = txt.replace(/^\s*<article>\s*/i,'').replace(/\s*<\/article>\s*$/i,'');
+        txt = txt.replace(/^\s*```(?:markdown)?\s*/i,'').replace(/\s*```\s*$/i,'');
+        txt = txt.replace(/^\s*<<<BLOCK>>>\s*/i,'').replace(/\s*<<<END>>>\s*$/i,'');
+        sendResponse({ ok: true, text: txt });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true; // async
+  }
   if (msg?.type === 'SX_INLINE_TRANSLATED_CHANGED') {
     try {
       const tabId = sender?.tab?.id;

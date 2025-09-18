@@ -1770,6 +1770,22 @@
 
   // ===== 状态渲染（组件化）=====
   let currentLangCache='zh';
+  // Reader translate cache (per page session; no persistence across reload)
+  let __readerTransCache = null; // { key, translated: string[] | nulls (markdown per block), done: bool, forceView: 'original'|'translated'|null }
+  function readerCacheKey(title, markdown){ return `${title||''}\n----\n${String(markdown||'')}`; }
+  function readerCacheMatches(title, markdown){ try{ return !!__readerTransCache && __readerTransCache.key === readerCacheKey(title, markdown); }catch{ return false; } }
+  function readerCacheEnsure(title, markdown, n){
+    const key = readerCacheKey(title, markdown);
+    if (!__readerTransCache || __readerTransCache.key !== key){
+      __readerTransCache = { key, translated: Array.from({length: n}, ()=>null), done: false, forceView: null };
+    } else if (!Array.isArray(__readerTransCache.translated) || __readerTransCache.translated.length !== n){
+      __readerTransCache.translated = Array.from({length: n}, ()=>null);
+      __readerTransCache.done = false;
+    }
+    return __readerTransCache;
+  }
+  function readerCacheSetBlock(i, md){ if (!__readerTransCache) return; try{ __readerTransCache.translated[i] = String(md||''); }catch{} }
+  function readerCacheCountDone(){ try{ return (__readerTransCache?.translated||[]).reduce((a,x)=> a + (x?1:0), 0); }catch{ return 0; } }
 
   // 组件：卡片（Vue 启用时使用）
   function CardComponent(props){
@@ -2290,6 +2306,19 @@
       .close{ width:28px; height:28px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:grid; place-items:center; }
       .close:hover{ background: rgba(0,0,0,.06); }
       :host([data-theme="dark"]) .close:hover{ background: rgba(255,255,255,.08); }
+      .act{ height:28px; padding:0 10px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+      .act:hover{ background: rgba(0,0,0,.06); }
+      :host([data-theme="dark"]) .act:hover{ background: rgba(255,255,255,.08); }
+      .act[disabled]{ opacity:.6; cursor:default; }
+      .sel{ height:28px; padding:0 8px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; font-size:13px; }
+      :host([data-theme="dark"]) .sel{ background: rgba(255,255,255,.02); }
+      /* Integrated button progress */
+      #sx-reader-translate{ position: relative; overflow: hidden; }
+      #sx-reader-translate .fill{ position:absolute; left:0; top:0; height:100%; width:0%; background: var(--primary); opacity:.35; transition: width .22s ease, opacity .22s ease; z-index:0; }
+      :host([data-theme="dark"]) #sx-reader-translate .fill{ opacity:.5; }
+      #sx-reader-translate .fill::after{ content:""; position:absolute; right:0; top:0; width:2px; height:100%; background: var(--primary); opacity:.9; box-shadow: 0 0 6px var(--primary); }
+      #sx-reader-translate .label{ position:relative; z-index:1; }
+      #sx-reader-translate.busy{ box-shadow: 0 0 0 1px var(--primary) inset; }
       /* Double current horizontal padding for wider side spacing */
       .inner{ padding:20px 60px 30px; }
       .md{ font-size:17px; line-height:1.8; }
@@ -2305,16 +2334,39 @@
       .md code{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.92em; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:6px; padding:0 .35em; }
       .md pre{ margin:10px 0; padding:12px; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:12px; overflow:auto; line-height:1.6; }
       .md img{ display:block; margin:10px 0; border-radius:12px; max-width:100%; height:auto; }
+      /* Progressive translate blocks */
+      .md .blk{ margin:10px 0; }
+      .md .blk .tran{ display:none; }
+      .md .blk.translated .orig{ display:none; }
+      .md .blk.translated .tran{ display:block; }
+      #sx-reader-md[data-force-view="original"] .blk .orig{ display:block !important; }
+      #sx-reader-md[data-force-view="original"] .blk .tran{ display:none !important; }
+      #sx-reader-md[data-force-view="translated"] .blk .orig{ display:none !important; }
+      #sx-reader-md[data-force-view="translated"] .blk .tran{ display:block !important; }
     `;
     sh.appendChild(style);
     const root = document.createElement('div'); sh.appendChild(root);
     sh.host.setAttribute('data-theme', theme);
+    const tLbl = (currentLangCache==='en' ? 'Translate Original' : '翻译原文');
+    const tLblWorking = (currentLangCache==='en' ? 'Translating…' : '正在翻译…');
+    const tShowOriginal = (currentLangCache==='en' ? 'Show Original' : '显示原文');
+    const tShowTranslation = (currentLangCache==='en' ? 'Show Translation' : '显示翻译');
+    const tClose = (currentLangCache==='en' ? 'Close' : '关闭');
+    const tProviderLblFree = (currentLangCache==='en' ? 'Free service (unstable)' : '免费服务（可能不稳定）');
+    const tProviderLblSettingsPlaceholder = (currentLangCache==='en' ? 'Use Settings' : '使用设置');
     root.innerHTML = `
       <div class="scrim"></div>
       <div class="wrap" role="dialog" aria-modal="true" aria-label="阅读模式">
-        <div class="bar"><button class="close" aria-label="关闭">✕</button></div>
+        <div class="bar">
+          <select class="sel" id="sx-reader-provider" aria-label="Provider">
+            <option value="free">${tProviderLblFree}</option>
+            <option value="settings" id="sx-reader-provider-s2">${tProviderLblSettingsPlaceholder}</option>
+          </select>
+          <button class="act" id="sx-reader-translate" aria-label="${tLbl}"><span class="fill" aria-hidden="true"></span><span class="label">${tLbl}</span></button>
+          <button class="close" aria-label="${tClose}">✕</button>
+        </div>
         <div class="body">
-          <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
+          <div class="inner"><div class="md" id="sx-reader-md"></div></div>
         </div>
       </div>`;
     const close = async () => {
@@ -2362,6 +2414,74 @@
     // auto-focus close for accessibility
     try{ sh.querySelector('.close')?.focus(); }catch{}
 
+    // Build initial content as block wrappers for progressive translation
+    try{
+      const mdEl = sh.getElementById('sx-reader-md');
+      const originalMdFull = `${title ? `# ${title}\n\n` : ''}${markdown || ''}`.replace(/\r\n?/g,'\n');
+      // Split into blocks while preserving code fences
+      function splitBlocks(md){
+        const lines = String(md||'').split('\n');
+        const segs = []; let buf=[]; let inCode=false; let code=[];
+        for(const line of lines){
+          if(!inCode && /^```/.test(line)){ if(buf.length){ segs.push({type:'text', text: buf.join('\n')}); buf=[]; } inCode=true; code=[line]; continue; }
+          if(inCode){ code.push(line); if(/^```\s*$/.test(line)){ inCode=false; segs.push({type:'code', text: code.join('\n')}); code=[]; } continue; }
+          buf.push(line);
+        }
+        if(inCode && code.length){ segs.push({type:'code', text: code.join('\n')}); }
+        if(buf.length){ segs.push({type:'text', text: buf.join('\n')}); }
+        const out=[];
+        for(const s of segs){
+          if(s.type==='code'){ out.push(s.text); continue; }
+          const parts = s.text.split(/\n\s*\n+/).map(t=>t.trim()).filter(Boolean);
+          out.push(...parts);
+        }
+        return out;
+      }
+      function renderInner(md){
+        const tmp=document.createElement('div');
+        tmp.innerHTML = renderMarkdown(md);
+        const inner = tmp.querySelector('.md');
+        return inner? inner.innerHTML : tmp.innerHTML;
+      }
+      const blocks = splitBlocks(originalMdFull);
+      mdEl.innerHTML='';
+      blocks.forEach((b,i)=>{
+        const wrap = document.createElement('div');
+        wrap.className='blk';
+        wrap.setAttribute('data-i', String(i));
+        const origHTML = renderInner(b);
+        wrap.innerHTML = `<div class="orig">${origHTML}</div><div class="tran"></div>`;
+        mdEl.appendChild(wrap);
+      });
+      // Expose for translator
+      sh.__sxReaderBlocks = blocks;
+      // Pre-fill from cache if available
+      try{
+        if (readerCacheMatches(title, markdown) && Array.isArray(__readerTransCache?.translated)){
+          const arr = __readerTransCache.translated;
+          for (let i=0;i<blocks.length;i++){
+            const val = arr[i]; if (!val) continue;
+            const holder = mdEl.querySelector(`.blk[data-i="${i}"]`);
+            const tran = holder?.querySelector('.tran');
+            if (holder && tran){
+              const tmp=document.createElement('div'); tmp.innerHTML = renderMarkdown(val); const inner = tmp.querySelector('.md');
+              tran.innerHTML = inner ? inner.innerHTML : tmp.innerHTML;
+              holder.classList.add('translated');
+            }
+          }
+          // Apply last view preference if fully done
+          if (__readerTransCache.done){
+            const view = __readerTransCache.forceView || 'translated';
+            mdEl.setAttribute('data-force-view', view);
+            try{
+              const b = sh.querySelector('#sx-reader-translate');
+              if (b){ const lab=b.querySelector('.label'); if(lab) lab.textContent = (view==='translated') ? tShowOriginal : tShowTranslation; }
+            }catch{}
+          }
+        }
+      }catch{}
+    }catch{}
+
     // Prevent scroll chaining: when user continues to scroll at edges, don't scroll page
     try{
       const scroller = sh.querySelector('.body');
@@ -2394,6 +2514,190 @@
       // Also absorb wheel on scrim area so background never scrolls while overlay is open
       scrim?.addEventListener('wheel', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
       scrim?.addEventListener('touchmove', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
+    }catch{}
+
+    // Translate action with provider dropdown (free worker or settings AI), progressive per-block replace and final toggle
+    try{
+      const btn = root.querySelector('#sx-reader-translate');
+      const sel = root.querySelector('#sx-reader-provider');
+      const selOpt2 = root.querySelector('#sx-reader-provider-s2');
+      function settingsProviderLabel(ai){
+        const zh = {
+          openai: '使用设置中的 ChatGPT 进行翻译',
+          deepseek: '使用设置中的 DeepSeek 进行翻译',
+          trial: '使用试用服务进行翻译',
+          custom: '使用自定义服务进行翻译'
+        };
+        const en = {
+          openai: 'Use Settings: ChatGPT',
+          deepseek: 'Use Settings: DeepSeek',
+          trial: 'Use Settings: Trial',
+          custom: 'Use Settings: Custom'
+        };
+        const map = (currentLangCache==='en') ? en : zh;
+        const k = (ai==='openai'||ai==='deepseek'||ai==='trial'||ai==='custom') ? ai : 'trial';
+        return map[k];
+      }
+      let providerMode = 'free';
+      (async () => {
+        try{
+          const got = await chrome.storage.sync.get({ reader_translate_provider: 'free' });
+          providerMode = (got?.reader_translate_provider === 'settings') ? 'settings' : 'free';
+          if (sel) sel.value = providerMode;
+          // Also set the label of the Settings option based on current settings.aiProvider
+          try{
+            const st = await chrome.storage.sync.get({ aiProvider: 'trial' });
+            const ai = st?.aiProvider || 'trial';
+            if (selOpt2) selOpt2.textContent = settingsProviderLabel(ai);
+            sel?.setAttribute('title', providerMode==='free' ? tProviderLblFree : settingsProviderLabel(ai));
+          }catch{}
+        }catch{}
+      })();
+      sel?.addEventListener('change', async ()=>{
+        try{
+          providerMode = (sel.value === 'settings') ? 'settings' : 'free';
+          await chrome.storage.sync.set({ reader_translate_provider: providerMode });
+          if (selOpt2){
+            const st = await chrome.storage.sync.get({ aiProvider: 'trial' });
+            const ai = st?.aiProvider || 'trial';
+            selOpt2.textContent = settingsProviderLabel(ai);
+          }
+        }catch{}
+      });
+      if (btn){
+        let inProgress = false;
+        let allDone = !!(__readerTransCache && readerCacheMatches(title, markdown) && __readerTransCache.done);
+        const mdEl = sh.getElementById('sx-reader-md');
+        const blocks = Array.isArray(sh.__sxReaderBlocks) ? sh.__sxReaderBlocks.slice(0) : [];
+        const btnFill = btn.querySelector('.fill');
+        const overallTotal = blocks.length;
+        const preDoneBase = (readerCacheMatches(title, markdown) ? readerCacheCountDone() : 0);
+        function setProgressPct(pct, doneText){
+          try{
+            if (!btnFill) return;
+            const v = Math.max(0, Math.min(100, Math.round(pct)));
+            btnFill.style.width = v + '%';
+            btn.setAttribute('aria-valuenow', String(v));
+            if (doneText) btn.setAttribute('title', doneText);
+          }catch{}
+        }
+
+        async function translateBlock(idx, text, targetName){
+          const holder = mdEl?.querySelector(`.blk[data-i="${idx}"]`);
+          if (!holder) return;
+          const tran = holder.querySelector('.tran');
+          const isCode = /^```/.test(String(text||'').trim());
+          if (isCode){
+            // keep code as original
+            const orig = holder.querySelector('.orig');
+            if (tran && orig){ tran.innerHTML = orig.innerHTML; }
+            holder.classList.add('translated');
+            return;
+          }
+          let txt = '';
+          if (providerMode === 'settings'){
+            const res = await chrome.runtime.sendMessage({ type: 'SX_READER_TRANSLATE_BLOCK', text, target: (targetName==='English'?'en':'zh') }).catch(()=> null);
+            if (!res?.ok) throw new Error(res?.error || 'translate failed');
+            txt = String(res.text || '').trim();
+          } else {
+            // Free worker (Gemini via CF)
+            const sys = 'You are a professional translator. Translate faithfully. Preserve Markdown structure (headings, lists, blockquotes, code fences, links, images). Do not add commentary. Output ONLY translated Markdown for THIS BLOCK — no HTML and no extra notes. Keep code fences unchanged.';
+            const user = `Translate the following Markdown block into ${targetName}. Return ONLY the translated Markdown for this block.\n\n<<<BLOCK>>>\n${text}\n<<<END>>>`;
+            const body = { model: 'models/gemini-2.5-flash', temperature: 0.2, messages: [{ role:'system', content: sys }, { role:'user', content: user }] };
+            const controller = new AbortController();
+            const to = setTimeout(()=>{ try{ controller.abort(); }catch{} }, 180000);
+            const resp = await fetch('https://gemini.mallocfeng1982.win/v1/chat/completions', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: controller.signal });
+            clearTimeout(to);
+            const raw = await resp.text().catch(()=> '');
+            let j={}; try{ j = raw ? JSON.parse(raw) : {}; }catch{}
+            txt = String(j?.choices?.[0]?.message?.content || '').trim();
+            if (!txt){
+              const reason = j?.error?.message || j?.error || j?.message || j?.promptFeedback?.blockReason || (`HTTP ${resp.status}`);
+              console.warn('[Reader Translate] Block failed', { idx, status: resp.status, body: raw });
+              throw new Error(reason || 'empty');
+            }
+            txt = txt.replace(/^\s*<article>\s*/i,'').replace(/\s*<\/article>\s*$/i,'');
+            txt = txt.replace(/^\s*```(?:markdown)?\s*/i,'').replace(/\s*```\s*$/i,'');
+            txt = txt.replace(/^\s*<<<BLOCK>>>\s*/i,'').replace(/\s*<<<END>>>\s*$/i,'');
+          }
+          if (tran){
+            // Render only inner content to avoid nested .md
+            const tmp=document.createElement('div'); tmp.innerHTML = renderMarkdown(txt); const inner = tmp.querySelector('.md');
+            tran.innerHTML = inner ? inner.innerHTML : tmp.innerHTML;
+          }
+          holder.classList.add('translated');
+          // update cache
+          readerCacheSetBlock(idx, txt);
+        }
+
+        btn.addEventListener('click', async ()=>{
+          if (inProgress) return;
+          if (allDone){
+            // Toggle view
+            const cur = mdEl?.getAttribute('data-force-view') || 'translated';
+            const next = (cur === 'translated') ? 'original' : 'translated';
+            mdEl?.setAttribute('data-force-view', next);
+            try{ const lab=btn.querySelector('.label'); if(lab) lab.textContent = (next === 'translated') ? tShowOriginal : tShowTranslation; }catch{}
+            try{ if (__readerTransCache) __readerTransCache.forceView = next; }catch{}
+            return;
+          }
+          inProgress = true;
+          try{ btn.classList.add('busy'); btn.setAttribute('disabled','true'); btn.querySelector('.label').textContent = tLblWorking; }catch{}
+          try{ setProgressPct((preDoneBase/Math.max(1,overallTotal))*100, `${preDoneBase}/${overallTotal}`); }catch{}
+          try{
+            // target language
+            let outLang = 'zh';
+            try{
+              const got = await chrome.storage.sync.get({ output_lang: 'zh' });
+              const v = String(got?.output_lang || 'zh').toLowerCase();
+              outLang = (v==='en' || v==='english' || v==='en-us') ? 'en' : 'zh';
+            }catch{}
+            const targetName = (outLang==='en') ? 'English' : 'Chinese (Simplified)';
+
+            // Build work list skipping cached results
+            readerCacheEnsure(title, markdown, blocks.length);
+            const todo = [];
+            for (let i=0;i<blocks.length;i++){ if (!__readerTransCache.translated[i]) todo.push(i); }
+            if (todo.length === 0){
+              allDone = true;
+              try{ mdEl?.setAttribute('data-force-view', __readerTransCache.forceView || 'translated'); }catch{}
+              try{ const lab=btn.querySelector('.label'); if(lab) lab.textContent = (__readerTransCache.forceView || 'translated') === 'translated' ? tShowOriginal : tShowTranslation; btn.removeAttribute('disabled'); }catch{}
+              return;
+            }
+
+            let done = 0; const total = todo.length;
+            const CONCURRENCY = 3;
+            let nextIndex = 0;
+            async function runWorker(){
+              while(true){
+                const k = nextIndex++;
+                if (k >= total) break;
+                const i = todo[k];
+                const b = blocks[i];
+                try{ await translateBlock(i, b, targetName); }
+                catch(e){ console.warn('Block translate error', i, e); /* keep original */ }
+                finally{
+                  done++;
+                  const doneOverall = preDoneBase + done;
+                  const pct = (doneOverall/Math.max(1,overallTotal))*100;
+                  try{ setProgressPct(pct, `${doneOverall}/${overallTotal}`); }catch{}
+                }
+              }
+            }
+            const workers = Array.from({length: Math.min(CONCURRENCY, Math.max(1,total))}, ()=> runWorker());
+            await Promise.all(workers);
+            allDone = true;
+            try{ if (__readerTransCache){ __readerTransCache.done = true; __readerTransCache.forceView = 'translated'; } }catch{}
+            try{ mdEl?.setAttribute('data-force-view', __readerTransCache?.forceView || 'translated'); }catch{}
+            try{ btn.querySelector('.label').textContent = tShowOriginal; btn.removeAttribute('disabled'); btn.classList.remove('busy'); }catch{}
+            try{ setProgressPct(100, `${overallTotal}/${overallTotal}`); setTimeout(()=>{ try{ setProgressPct(0, ''); }catch{} }, 400); }catch{}
+          }catch(e){
+            try{ btn.removeAttribute('disabled'); btn.querySelector('.label').textContent = (currentLangCache==='en' ? 'Retry Translate' : '重试翻译'); btn.classList.remove('busy'); }catch{}
+            try{ setProgressPct(0, `0/${overallTotal}`); }catch{}
+            try{ alert((currentLangCache==='en' ? 'Translate failed: ' : '翻译失败：') + (e?.message || String(e))); }catch{}
+          }finally{ inProgress = false; }
+        });
+      }
     }catch{}
   }
 

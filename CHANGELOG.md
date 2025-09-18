@@ -572,3 +572,11 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 你问我答细节：增大气泡间距；提问输入区配色与卡片统一；亮色模式下输入框采用白色底，易于辨认。
 - 滚动体验：阻止你问我答浮窗的滚动链路传导到侧边面板（overscroll-behavior: contain）；滚动到顶/底时的上下留白更合适。
 - 交互：当你问我答浮窗在前台时，背后“摘要/可读正文”卡片不再触发悬浮上浮；关闭浮窗后恢复。
+## 2.2.6 — Reader Translate Improvements
+
+- Reader Mode: Added Translate Original button with per-paragraph progressive translation. Each block replaces in place as soon as it’s done, so users don’t wait for the whole article.
+- Provider selector: choose between Free service (Cloudflare Worker + Gemini 2.5‑flash) and the AI provider configured in Settings. The option reflects your current provider (ChatGPT/OpenAI, DeepSeek, Trial, or Custom) and persists across pages.
+- Caching: Re-entering Reader Mode on the same page reuses completed translations; only untranslated blocks are requested again. A one‑click toggle switches between Show Original and Show Translation without new requests.
+- Concurrency + timeout: Parallelize translation (3 concurrent blocks) and raise per-block timeout to 3 minutes to improve reliability on long articles.
+- Integrated progress: The translate button now shows an in‑button progress bar with stronger contrast for better visibility in both light/dark themes.
+- Robustness: Better error surfacing from the free worker path; trims accidental wrappers like <article>…</article> and code fences in responses. Fixed an async usage issue in content scripts.
