@@ -908,6 +908,16 @@
         border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
+      /* Reader mode icon (book) */
+      .reader-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#64748b; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .reader-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2V5Zm14-2h-5v16h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2V5Zm14-2h-5v16h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2Z"/></svg>') center/contain no-repeat;
+      }
+      .reader-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .reader-ind:active{ transform: translateY(0); }
+      .reader-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+      :host([data-theme="dark"]) .reader-ind{ color:#8ca0c4; }
       /* Ad filtering status indicator (shield + check/slash); clickable toggle */
       .adf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#94a3b8; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
       .adf-ind::before{ content:""; position:absolute; inset:0; background: currentColor; 
@@ -1602,7 +1612,7 @@
       <div class="wrap" id="sx-wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div><div id="sx-reader-ind" class="reader-ind" role="button" aria-label="阅读模式" title="阅读模式" tabindex="0"></div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
@@ -2005,6 +2015,10 @@
   // 关闭
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
+  // 阅读模式
+  shadow.getElementById('sx-reader-ind')?.addEventListener('click', async ()=>{
+    try{ await openReaderOverlay(); }catch(e){ console.warn('reader overlay failed', e); }
+  });
   // 元素选择器按钮
   shadow.getElementById('sx-pick-btn')?.addEventListener('click', () => {
     try { startElementPicker(); } catch (e) { console.warn('startElementPicker failed:', e); }
@@ -2128,6 +2142,84 @@
     });
     try{ chrome.storage.sync.get(['float_panel_width']).then(({float_panel_width})=>{ if(Number.isFinite(+float_panel_width)) host.style.width = `${clamp(+float_panel_width)}px`; updateEmptyArrowPosition(); }); }catch{}
   })();
+
+  async function ensureReadable(){
+    try{
+      if (typeof window.__AI_READ_EXTRACT__ === 'function') return true;
+    }catch{}
+    // Ask background to inject content bridge and return payload
+    try{ await chrome.runtime.sendMessage({ type: 'REQUEST_READABLE', ping:true }); }catch{}
+    return typeof window.__AI_READ_EXTRACT__ === 'function';
+  }
+
+  async function fetchReadable(){
+    try{
+      if (await ensureReadable()){
+        try{ return window.__AI_READ_EXTRACT__(); }catch{}
+      }
+      const resp = await chrome.runtime.sendMessage({ type: 'REQUEST_READABLE' });
+      if (resp?.ok) return resp.data;
+    }catch(e){ console.warn('fetchReadable failed', e); }
+    return { title: document.title||'', pageLang: document.documentElement.getAttribute('lang')||'', text:'', markdown:'' };
+  }
+
+  function createReaderOverlay(markdown, title){
+    const existing = document.getElementById('sx-reader-overlay'); if (existing) existing.remove();
+    const ov = document.createElement('div'); ov.id='sx-reader-overlay'; ov.style.position='fixed'; ov.style.inset='0'; ov.style.zIndex='2147483646';
+    const sh = ov.attachShadow({mode:'open'});
+    const theme = shadow.host.getAttribute('data-theme') || 'light';
+    const style = document.createElement('style');
+    style.textContent = `
+      :host{ --bg: #f5f7fb; --scrim: rgba(15,23,42,.55); --surface:#ffffff; --border:#e6eaf2; --text:#0f172a; --primary:#3b82f6; color-scheme: light; }
+      :host([data-theme="dark"]) { --bg:#0b1220; --scrim: rgba(0,0,0,.55); --surface:#111a2e; --border:#1f2a44; --text:#e8eef9; --primary:#8ea2ff; color-scheme: dark; }
+      .scrim{ position:fixed; inset:0; background: var(--scrim); backdrop-filter: blur(2px); }
+      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:auto; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+      .bar{ position:sticky; top:0; display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
+      :host([data-theme="dark"]) .bar{ background: linear-gradient(180deg, rgba(17,26,46,.65), rgba(17,26,46,0)); }
+      .close{ width:28px; height:28px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:grid; place-items:center; }
+      .close:hover{ background: rgba(0,0,0,.06); }
+      :host([data-theme="dark"]) .close:hover{ background: rgba(255,255,255,.08); }
+      .inner{ padding:18px 22px 28px; }
+      .md{ font-size:17px; line-height:1.8; }
+      .md h1{ margin:12px 0 10px; font-size:26px; font-weight:900; }
+      .md h2{ margin:14px 0 8px; font-size:22px; font-weight:800; }
+      .md h3{ margin:12px 0 6px; font-size:18px; font-weight:700; }
+      .md p{ margin:10px 0; }
+      .md a{ color: var(--primary); }
+      .md ul,.md ol{ margin:8px 0 8px 18px; }
+      .md li{ margin:4px 0; }
+      .md blockquote{ margin:14px 0; padding:10px 12px; border-left:3px solid #cfe0ff; border-radius:10px; background: rgba(207,224,255,.22); }
+      :host([data-theme="dark"]) .md blockquote{ border-left-color:#2a3f66; background: rgba(26,34,52,.55); }
+      .md code{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.92em; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:6px; padding:0 .35em; }
+      .md pre{ margin:10px 0; padding:12px; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:12px; overflow:auto; line-height:1.6; }
+      .md img{ display:block; margin:10px 0; border-radius:12px; max-width:100%; height:auto; }
+    `;
+    sh.appendChild(style);
+    const root = document.createElement('div'); sh.appendChild(root);
+    sh.host.setAttribute('data-theme', theme);
+    root.innerHTML = `
+      <div class="scrim"></div>
+      <div class="wrap" role="dialog" aria-modal="true" aria-label="阅读模式">
+        <div class="bar"><button class="close" aria-label="关闭">✕</button></div>
+        <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
+      </div>`;
+    const close = () => { try{ ov.remove(); host.style.display=''; }catch{} };
+    root.querySelector('.close')?.addEventListener('click', close);
+    sh.querySelector('.scrim')?.addEventListener('click', close);
+    document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
+    document.documentElement.appendChild(ov);
+    // auto-focus close for accessibility
+    try{ sh.querySelector('.close')?.focus(); }catch{}
+  }
+
+  async function openReaderOverlay(){
+    const data = await fetchReadable();
+    const md = data?.markdown || '';
+    const title = data?.title || '';
+    createReaderOverlay(md, title);
+    // hide sidepanel while reading
+    try{ host.style.display='none'; }catch{}
+  }
 
   // 关闭 notice 清理
   shadow.addEventListener('click',(e)=>{

@@ -704,6 +704,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg?.type === "REQUEST_READABLE") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tab?.id;
+        if (!tabId) return safeReply({ ok:false, error:'No active tab' });
+        await injectIfNeeded(tabId);
+        const data = await getPageRawByTabId(tabId);
+        safeReply({ ok:true, data });
+      } catch (e) {
+        safeReply({ ok:false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
   // 未处理的消息：让其它监听器接管（返回 false）
   return false;
 });
