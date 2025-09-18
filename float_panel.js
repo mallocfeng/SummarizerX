@@ -835,6 +835,7 @@
         --card-radius: 14px;
 
         --primary: #3b82f6;       /* indigo/azure */
+        --reader-accent: #f59e0b; /* reader icon accent (amber) */
         --primary-600: #2563eb;   /* darker */
         --accent: #22c55e;        /* success */
         --danger: #ef4444;        /* danger */
@@ -908,31 +909,17 @@
         border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
-      /* Reader mode icon (book) */
-      .reader-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#64748b; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      /* Reader mode icon (book, clearer silhouette) */
+      .reader-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color: var(--reader-accent); opacity:1; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
       .reader-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
-        /* Obvious article icon: page with text lines */
-        -webkit-mask: url('data:image/svg+xml;utf8,
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M5 2h10l4 4v16H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
-            <path d="M15 2v4h4"/>
-            <path d="M7 9h10"/>
-            <path d="M7 13h10"/>
-            <path d="M7 17h7"/>
-          </svg>') center/contain no-repeat;
-        mask: url('data:image/svg+xml;utf8,
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M5 2h10l4 4v16H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>
-            <path d="M15 2v4h4"/>
-            <path d="M7 9h10"/>
-            <path d="M7 13h10"/>
-            <path d="M7 17h7"/>
-          </svg>') center/contain no-repeat;
+        /* heroicons 24/solid book-open path (silhouette) */
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.25a.75.75 0 0 0 1 .707A8.237 8.237 0 0 1 6 18.75c1.995 0 3.823.707 5.25 1.886V4.533ZM12.75 20.636A8.214 8.214 0 0 1 18 18.75c.966 0 1.89.166 2.75.47a.75.75 0 0 0 1-.708V4.262a.75.75 0 0 0-.5-.707A9.735 9.735 0 0 0 18 3a9.707 9.707 0 0 0-5.25 1.533v16.103Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.25a.75.75 0 0 0 1 .707A8.237 8.237 0 0 1 6 18.75c1.995 0 3.823.707 5.25 1.886V4.533ZM12.75 20.636A8.214 8.214 0 0 1 18 18.75c.966 0 1.89.166 2.75.47a.75.75 0 0 0 1-.708V4.262a.75.75 0 0 0-.5-.707A9.735 9.735 0 0 0 18 3a9.707 9.707 0 0 0-5.25 1.533v16.103Z"/></svg>') center/contain no-repeat;
       }
       .reader-ind:hover{ transform: translateY(-1px); opacity:1; }
       .reader-ind:active{ transform: translateY(0); }
       .reader-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
-      :host([data-theme="dark"]) .reader-ind{ color:#8ca0c4; }
+      :host([data-theme="dark"]) .reader-ind{ color: var(--reader-accent); }
       /* Ad filtering status indicator (shield + check/slash); clickable toggle */
       .adf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#94a3b8; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
       .adf-ind::before{ content:""; position:absolute; inset:0; background: currentColor; 
@@ -968,6 +955,19 @@
       :host([data-theme="dark"]) .adf-ind .adf-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
       :host([data-theme="dark"]) .adf-ind .adf-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
       .adf-ind .adf-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+
+      /* Reader tooltip */
+      .reader-ind .reader-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .reader-ind .reader-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      .reader-ind .reader-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+      :host([data-theme="dark"]) .reader-ind .reader-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .reader-ind .reader-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
       .title{ font-size:14px; font-weight:800; letter-spacing:.2px; color:var(--text); }
 
@@ -1003,7 +1003,7 @@
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; }
+      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; overscroll-behavior: contain; }
       .container .section:last-child{ margin-bottom:8px; }
       .container .section:first-child{ margin-top:4px; }
       /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
@@ -1292,6 +1292,7 @@
         --text:#e8eef9;
         --muted:#c2cde3;
         --primary:#8ea2ff;
+        --reader-accent:#fbbf24; /* brighter amber for dark */
         --primary-600:#7b8cff;
         --candy-az: rgba(142,162,255,.14);
         --candy-vi: rgba(123,140,255,.12);
@@ -1736,6 +1737,11 @@
     const mode=themeOverride||'auto';
     const theme=(mode==='light'||mode==='dark')? mode: computeTheme();
     if (shadow.host.getAttribute('data-theme')!==theme) shadow.host.setAttribute('data-theme',theme);
+    // Also sync theme to reader overlay if it's open
+    try{
+      const ov = document.getElementById('sx-reader-overlay');
+      if (ov && ov.getAttribute('data-theme') !== theme) ov.setAttribute('data-theme', theme);
+    }catch{}
   }
   function markThemeButtonsActive(shadow){
     shadow.getElementById('sx-theme')?.querySelectorAll('.theme-btn').forEach(b=>{
@@ -2030,10 +2036,42 @@
   // 关闭
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
+  // Prevent scroll from chaining to page when hovering panel body
+  (function bindPanelScrollContainment(){
+    try{
+      const container = shadow.getElementById('sx-container');
+      if (!container) return;
+      const onWheel = (e)=>{
+        try{
+          const dy = e.deltaY || 0;
+          const atTop = container.scrollTop <= 0;
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+          else { e.stopPropagation(); }
+        }catch{}
+      };
+      container.addEventListener('wheel', onWheel, { passive:false });
+      let lastY = 0;
+      container.addEventListener('touchstart', (e)=>{ try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{} }, { passive:true });
+      container.addEventListener('touchmove', (e)=>{
+        try{
+          if (!e.touches || !e.touches[0]) return;
+          const y = e.touches[0].clientY; const dy = lastY ? (lastY - y) : 0; // positive -> scroll down
+          const atTop = container.scrollTop <= 0;
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+          else { e.stopPropagation(); }
+          lastY = y;
+        }catch{}
+      }, { passive:false });
+    }catch{}
+  })();
   // 阅读模式
   shadow.getElementById('sx-reader-ind')?.addEventListener('click', async ()=>{
     try{ await openReaderOverlay(); }catch(e){ console.warn('reader overlay failed', e); }
   });
+  // Ensure reader tooltip
+  try{ ensureReaderIndicatorTooltip(shadow); }catch{}
   // 元素选择器按钮
   shadow.getElementById('sx-pick-btn')?.addEventListener('click', () => {
     try { startElementPicker(); } catch (e) { console.warn('startElementPicker failed:', e); }
@@ -2185,17 +2223,19 @@
     const theme = shadow.host.getAttribute('data-theme') || 'light';
     const style = document.createElement('style');
     style.textContent = `
-      :host{ --bg: #f5f7fb; --scrim: rgba(15,23,42,.55); --surface:#ffffff; --border:#e6eaf2; --text:#0f172a; --primary:#3b82f6; color-scheme: light; }
+      :host{ --bg: #f5f7fb; --scrim: rgba(15,23,42,.55); --surface:#ffffff; --border:#e6eaf2; --text:#0f172a; --primary:#3b82f6; --bar-h:44px; color-scheme: light; }
       :host, :host *{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif !important; }
       :host([data-theme="dark"]) { --bg:#0b1220; --scrim: rgba(0,0,0,.55); --surface:#111a2e; --border:#1f2a44; --text:#e8eef9; --primary:#8ea2ff; color-scheme: dark; }
       .scrim{ position:fixed; inset:0; background: var(--scrim); backdrop-filter: blur(2px); }
-      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:auto; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing:border-box; scrollbar-gutter: stable; }
-      .bar{ position:sticky; top:0; display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 12px; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
+      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:hidden; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); display:flex; flex-direction:column; }
+      .bar{ position:absolute; top:0; left:0; right:0; height: var(--bar-h); display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px; box-sizing:border-box; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
+      .body{ flex:1 1 auto; overflow:auto; padding-top: var(--bar-h); scrollbar-gutter: stable both-edges; overscroll-behavior: contain; }
       :host([data-theme="dark"]) .bar{ background: linear-gradient(180deg, rgba(17,26,46,.65), rgba(17,26,46,0)); }
       .close{ width:28px; height:28px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:grid; place-items:center; }
       .close:hover{ background: rgba(0,0,0,.06); }
       :host([data-theme="dark"]) .close:hover{ background: rgba(255,255,255,.08); }
-      .inner{ padding:18px 22px 28px; }
+      /* Double current horizontal padding for wider side spacing */
+      .inner{ padding:20px 60px 30px; }
       .md{ font-size:17px; line-height:1.8; }
       .md h1{ margin:12px 0 10px; font-size:26px; font-weight:900; }
       .md h2{ margin:14px 0 8px; font-size:22px; font-weight:800; }
@@ -2212,28 +2252,56 @@
     `;
     sh.appendChild(style);
     const root = document.createElement('div'); sh.appendChild(root);
-    const syncTheme = ()=>{ try{ const t=shadow.host.getAttribute('data-theme')||'light'; sh.host.setAttribute('data-theme', t); }catch{} };
     sh.host.setAttribute('data-theme', theme);
     root.innerHTML = `
       <div class="scrim"></div>
       <div class="wrap" role="dialog" aria-modal="true" aria-label="阅读模式">
         <div class="bar"><button class="close" aria-label="关闭">✕</button></div>
-        <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
+        <div class="body">
+          <div class="inner"><div class="md">${renderMarkdown((title?`# ${escapeHtml(title)}\n\n`:'') + (markdown||''))}</div></div>
+        </div>
       </div>`;
-    const close = () => { try{ if (mo) mo.disconnect(); ov.remove(); host.style.display=''; }catch{} };
+    const close = () => { try{ ov.remove(); host.style.display=''; }catch{} };
     root.querySelector('.close')?.addEventListener('click', close);
     sh.querySelector('.scrim')?.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
     document.documentElement.appendChild(ov);
-    // Mirror panel theme changes dynamically
-    let mo = null;
-    try{
-      mo = new MutationObserver(()=> syncTheme());
-      mo.observe(shadow.host, { attributes:true, attributeFilter:['data-theme'] });
-    }catch{}
-    syncTheme();
     // auto-focus close for accessibility
     try{ sh.querySelector('.close')?.focus(); }catch{}
+
+    // Prevent scroll chaining: when user continues to scroll at edges, don't scroll page
+    try{
+      const scroller = sh.querySelector('.body');
+      const scrim = sh.querySelector('.scrim');
+      const stopIfEdge = (e)=>{
+        if (!scroller) return;
+        const dy = e.deltaY || 0;
+        const atTop = scroller.scrollTop <= 0;
+        const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+        // Always stop propagation so it never reaches the page
+        if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+        else { e.stopPropagation(); }
+      };
+      // Wheel (mouse/trackpad/autoscroll)
+      sh.addEventListener('wheel', stopIfEdge, { passive:false, capture:true });
+      // Touch: block when at edges
+      let lastY = 0;
+      sh.addEventListener('touchstart', (e)=>{ try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{} }, { passive:true, capture:true });
+      sh.addEventListener('touchmove', (e)=>{
+        try{
+          if (!scroller || !e.touches || !e.touches[0]) return;
+          const y = e.touches[0].clientY; const dy = lastY ? (lastY - y) : 0; // positive dy means scroll down
+          const atTop = scroller.scrollTop <= 0;
+          const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+          else { e.stopPropagation(); }
+          lastY = y;
+        }catch{}
+      }, { passive:false, capture:true });
+      // Also absorb wheel on scrim area so background never scrolls while overlay is open
+      scrim?.addEventListener('wheel', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
+      scrim?.addEventListener('touchmove', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
+    }catch{}
   }
 
   async function openReaderOverlay(){
@@ -2285,6 +2353,16 @@
       const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
       const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
       try{ await updateAdblockIndicator(shadow); }catch{}
+      // Reader icon tooltip text
+      try{
+        ensureReaderIndicatorTooltip(shadow);
+        const rid = shadow.getElementById('sx-reader-ind');
+        const tip = rid?.querySelector('.reader-tip');
+        const txt = currentLangCache==='en' ? 'Click to open Reader mode' : '点击切换到阅读模式';
+        if (tip) tip.textContent = txt;
+        try{ rid?.removeAttribute('title'); }catch{}
+        rid?.setAttribute('aria-label', currentLangCache==='en' ? 'Reader mode' : '阅读模式');
+      }catch{}
       const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
       const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
       const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
@@ -2351,6 +2429,24 @@
           try{ clearTimeout(showTid); }catch{}
           hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60);
         };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
+    }catch{}
+  }
+
+  function ensureReaderIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-reader-ind'); if (!el) return;
+      let tip = el.querySelector('.reader-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'reader-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        let showTid = null, hideTid = null;
+        const show = ()=>{ try{ clearTimeout(hideTid); }catch{} showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120); };
+        const hide = ()=>{ try{ clearTimeout(showTid); }catch{} hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60); };
         el.addEventListener('mouseenter', show);
         el.addEventListener('mouseleave', hide);
         el.addEventListener('focus', show);

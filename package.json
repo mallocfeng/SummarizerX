@@ -1,6 +1,6 @@
 {
   "name": "summarizerx-ai-reader",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "A Chrome extension that extracts, cleans, summarizes, and translates webpage content with AI-powered enhancements.",
   "author": "Malloc Feng",
   "license": "MIT",
