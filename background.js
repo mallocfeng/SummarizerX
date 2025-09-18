@@ -452,6 +452,42 @@ async function setVideoAdDNRRulesEnabled(enabled){
   }catch(e){ console.warn('setVideoAdDNRRulesEnabled failed:', e); }
 }
 
+/* ====================== Mixed content: upgrade insecure requests ====================== */
+// Some HTTPS pages (e.g., 163.com articles) still reference HTTP assets from 126.net CDNs,
+// which browsers block as mixed content. Add a safe DNR rule to upgrade scheme to HTTPS.
+async function ensureHttpsUpgradeDynamicRules(){
+  const rules = [
+    {
+      id: 2601,
+      priority: 1,
+      action: { type: 'upgradeScheme' },
+      condition: {
+        regexFilter: '^http://static\\.ws\\.126\\.net/',
+        resourceTypes: ['image','stylesheet','font','media']
+      }
+    },
+    {
+      id: 2602,
+      priority: 1,
+      action: { type: 'upgradeScheme' },
+      condition: {
+        // broader 126.net CDN umbrella (images, css, fonts, media only)
+        regexFilter: '^http://([a-z0-9.-]*\\.)?126\\.net/',
+        resourceTypes: ['image','stylesheet','font','media']
+      }
+    }
+  ];
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const targetIds = rules.map(r => r.id);
+    const toRemove = existing.filter(r => targetIds.includes(r.id)).map(r => r.id);
+    if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules, removeRuleIds: [] });
+  } catch (e) {
+    console.warn('ensureHttpsUpgradeDynamicRules failed:', e);
+  }
+}
+
 /* ====================== SpankBang session rules (site pack) ====================== */
 const SPANKBANG_DOMAINS = ['spankbang.com','www.spankbang.com'];
 
@@ -654,9 +690,11 @@ async function refreshAdultSiteSessionRules(){
 
   chrome.runtime.onInstalled.addListener(async () => {
     try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+    try{ await ensureHttpsUpgradeDynamicRules(); }catch{}
   });
   if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(async () => {
     try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+    try{ await ensureHttpsUpgradeDynamicRules(); }catch{}
   });
 
 // ---- 与浮动面板通信
