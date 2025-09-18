@@ -1,5 +1,60 @@
 // utils_extract.js —— DOM → 高保真 Markdown（优化：抑制无文本 URL 链接 + 过滤导航菜单）
 (function () {
+  // Attempt to expand collapsed content and trigger lazy loaders prior to extraction
+  async function prepareForExtract(){
+    try{
+      // 1) Click common expand buttons/links
+      const MATCH = /(read more|show more|continue reading|expand|see more|load more|阅读全文|展开|显示更多|继续阅读)/i;
+      const candidates = Array.from(document.querySelectorAll('button, a'))
+        .filter(el=>{
+          try{ const t=(el.innerText||'').trim(); return t && MATCH.test(t); }catch{ return false; }
+        })
+        .slice(0,3);
+      for (const el of candidates){ try{ el.click(); }catch{} }
+    }catch{}
+    try{
+      // 2) Remove CSS clamps/truncation
+      const clampSel = [
+        '[style*="line-clamp" i]','[style*="-webkit-line-clamp" i]','[style*="max-height" i]',
+        '.line-clamp','.clamp','.truncate','.collapsed','.ellipsis','.is-collapsed'
+      ].join(',');
+      const els = Array.from(document.querySelectorAll(clampSel));
+      els.forEach(el=>{
+        try{
+          const cs=getComputedStyle(el);
+          const maxH=parseFloat(cs.maxHeight)||0;
+          const hasClamp = /line-clamp/i.test(el.getAttribute('style')||'') || /line-clamp/i.test(cs.display+cs.webkitLineClamp);
+          const hidden = (cs.overflow==='hidden');
+          if (hasClamp || (hidden && maxH>0 && maxH<400)){
+            el.style.setProperty('max-height','none','important');
+            el.style.setProperty('-webkit-line-clamp','unset','important');
+            el.style.setProperty('overflow','visible','important');
+          }
+        }catch{}
+      });
+    }catch{}
+    try{
+      // 3) Force-load lazy images so Readability keeps figure blocks structured
+      const imgs = Array.from(document.querySelectorAll('img'));
+      imgs.forEach(img=>{
+        try{
+          img.loading='eager'; img.decoding='sync';
+          const attrs=['data-src','data-original','data-hi-res-src','data-lazy-src'];
+          for (const a of attrs){ const v=img.getAttribute(a); if (v){ img.setAttribute('src', v); break; } }
+        }catch{}
+      });
+    }catch{}
+    try{
+      // 4) Minimal auto-scroll to trigger IntersectionObserver-based loaders
+      const doc = document.scrollingElement || document.documentElement;
+      const y = (window.scrollY||doc.scrollTop||0);
+      const max = Math.max(0, doc.scrollHeight - window.innerHeight);
+      const mid = Math.min(max, (y+window.innerHeight*1.2)|0);
+      window.scrollTo(0, mid);
+      await new Promise(r=>setTimeout(r, 180));
+      window.scrollTo(0, y);
+    }catch{}
+  }
   // Prefer Mozilla Readability when available
   function tryExtractByReadability(){
     try{
@@ -294,6 +349,7 @@
   }
 
   window.__AI_READ_EXTRACT__ = function () {
+    try{ /* best-effort */ const p=prepareForExtract(); if (p && typeof p.then==='function'){ /* detach */ } }catch{}
     // 1) Prefer Readability (offline, robust) if present
     const byR = tryExtractByReadability();
     if (byR && byR.markdown && byR.markdown.length > 60) return byR;
