@@ -84,7 +84,41 @@
 
     if (FORCE_SKIP_TAG.has(tag)) return "";
 
-    if (["script","style","noscript","iframe","svg","canvas","menu"].includes(tag)) return "";
+    // noscript: some sites (Washington Post) put real <img> inside <noscript>
+    if (tag === 'noscript'){
+      try{
+        const html = node.innerHTML || '';
+        if (!html) return '';
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const pic = tmp.querySelector('picture');
+        const nsImg = tmp.querySelector('img');
+        const pickFromSet = (set)=>{
+          try{
+            const parts = String(set||"").split(',').map(s=>s.trim()).filter(Boolean).map(s=>{
+              const m=s.match(/\s*(\S+)\s+(\d+)w/); return m? { url:m[1], w:parseInt(m[2]) }: { url:s.split(/\s+/)[0], w:0 };
+            });
+            parts.sort((a,b)=> b.w-a.w); return parts.length? parts[0].url: '';
+          }catch{ return ''; }
+        };
+        let url=''; let alt='';
+        if (pic){
+          const s=pic.querySelector('source[srcset]');
+          url = pickFromSet(s?.getAttribute('srcset')||'') || (nsImg?.getAttribute('src')||'');
+          alt = nsImg?.getAttribute('alt')||'';
+        } else if (nsImg){
+          alt = nsImg.getAttribute('alt')||'';
+          url = nsImg.getAttribute('src')||nsImg.getAttribute('data-src')||'';
+        }
+        if (url){
+          try{ url = new URL(url, location.href).href; }catch{}
+          return `![${alt}](${url})`;
+        }
+      }catch{}
+      return '';
+    }
+
+    if (["script","style","iframe","svg","canvas","menu"].includes(tag)) return "";
 
     // <pre>/<code>
     if (tag === "pre") {

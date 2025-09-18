@@ -243,7 +243,8 @@ async function runForTab(tabId) {
     const titleLine = (title && !hasHeadingAtTop) ? `# ${title.trim()}\n\n` : '';
     cleanedMarkdown = (noticeBlock + "\n" + titleLine + body).replace(/\n{3,}/g, "\n\n").trim();
   } else {
-    const clipped = (text || "").slice(0, 20000);
+    // Use baseMarkdown (from Readability/DOM) so images and basic formatting are present for cleaning
+    const clipped = (baseMarkdown || "").slice(0, 20000);
     const sysClean = [
       "You are an article cleaner.",
       "Your job: remove navigation, ads, cookie banners, boilerplate, and duplicate fragments.",
