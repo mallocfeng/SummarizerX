@@ -2678,8 +2678,10 @@
             if (hits){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }
           }catch{}
         };
+        // Use bubble phase so target's own handlers run first (ensures QA ask executes),
+        // then stop the event from escaping to the page.
         ['click','mousedown','mouseup','pointerdown','pointerup'].forEach(t=>{
-          try{ shadow.addEventListener(t, guard, { capture:true }); }catch{}
+          try{ shadow.addEventListener(t, guard, false); }catch{}
         });
         shadow.__sxQuickAskGuard = true;
       }
