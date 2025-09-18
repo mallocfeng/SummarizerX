@@ -1605,13 +1605,22 @@
       :host([data-theme="dark"]) #sx-qa-send:active{ background: rgba(250,204,21,.32); border-color: rgba(250,204,21,.55); }
       :host([data-theme="dark"]) #sx-qa-send:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.20); }
       /* Minimized QA restore icon */
-      .qa-restore{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; border:1px solid var(--border); background: var(--surface-2); display:none; place-items:center; cursor:pointer; color:#334155; margin-top:0; align-self:center; transition: box-shadow .18s ease, transform .18s ease, background-color .18s ease; }
+      .qa-restore{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; border:1px solid var(--border); background: var(--surface-2); display:none; place-items:center; cursor:pointer; color:#334155; margin-top:0; align-self:center; transition: box-shadow .18s ease, transform .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease; }
       .qa-restore svg{ width:16px; height:16px; display:block; stroke:currentColor; }
-      .qa-restore:hover{ filter: brightness(1.05); box-shadow: 0 0 0 6px rgba(59,130,246,.10); }
       .qa-restore[aria-hidden="false"]{ display:grid; }
-      :host([data-theme="dark"]) .qa-restore{ border-color:#27344b; background:#0f172a; color:#e2ebf8; }
+      /* Light theme: match ask area warm palette */
+      :host([data-theme="light"]) .qa-restore{ background:#fef3c7; border-color:#fcd34d; color:#7c4a02; }
+      :host([data-theme="light"]) .qa-restore:hover{ background:#fde68a; border-color:#f59e0b; box-shadow: 0 0 0 6px rgba(234,179,8,.16); }
+      :host([data-theme="light"]) .qa-restore:active{ background:#fcd34d; border-color:#f59e0b; }
+      :host([data-theme="light"]) .qa-restore:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.28); }
+      /* Dark theme: warm tint to align with ask area */
+      :host([data-theme="dark"]) .qa-restore{ border-color: rgba(250,204,21,.38); background: rgba(250,204,21,.16); color:#f8f5e3; }
+      :host([data-theme="dark"]) .qa-restore:hover{ background: rgba(250,204,21,.22); border-color: rgba(250,204,21,.50); box-shadow: 0 0 0 6px rgba(250,204,21,.18); }
+      :host([data-theme="dark"]) .qa-restore:active{ background: rgba(250,204,21,.32); border-color: rgba(250,204,21,.55); }
+      :host([data-theme="dark"]) .qa-restore:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.20); }
       .qa-restore.flash{ animation: qaRestorePulse 1.05s ease-in-out 3; }
-      @keyframes qaRestorePulse{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(59,130,246,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(59,130,246,.18); } }
+      /* Pulse ring color switched from blue to warm amber to match ask area */
+      @keyframes qaRestorePulse{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(234,179,8,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(234,179,8,.22); } }
       .qa-restore.flash-done{ animation: qaRestorePulseDone 1.05s ease-in-out 3; }
       @keyframes qaRestorePulseDone{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(34,197,94,.22); } }
 
