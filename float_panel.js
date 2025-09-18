@@ -2635,7 +2635,7 @@
           .quick-ask{ margin-top:14px; padding-top:10px; border-top:1px dashed var(--border); }
           .quick-ask .title{ font-size:12px; color:#56627a; margin-bottom:6px; }
           :host([data-theme="dark"]) .quick-ask .title{ color:#9fb0d0; }
-          .quick-ask .qitem{ display:block; font-size:14px; color:#1e40af; text-decoration:underline; text-underline-offset:3px; margin:6px 0; cursor:pointer; }
+          .quick-ask .qitem{ display:block; font-size:14px; color:#1e40af; text-decoration:underline; text-underline-offset:3px; margin:6px 0; cursor:pointer; background:none; border:0; padding:0; text-align:left; }
           .quick-ask .qitem:hover{ color:#0f172a; }
           :host([data-theme="dark"]) .quick-ask .qitem{ color:#93c5fd; }
           :host([data-theme="dark"]) .quick-ask .qitem:hover{ color:#e2ebf8; }
@@ -2652,7 +2652,7 @@
       inner.querySelectorAll('.qitem').forEach(n=>n.remove());
       // append new
       list.forEach(q=>{
-        const a=document.createElement('a'); a.href='#'; a.className='qitem'; a.textContent=q; a.setAttribute('role','button'); a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
+        const a=document.createElement('button'); a.type='button'; a.className='qitem'; a.textContent=q; a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
         // Prevent any default navigation (including about:blank) and bubbling to underlying links
         const ask = ()=>{
           try{
@@ -2662,9 +2662,9 @@
             qaSend?.click();
           }catch{}
         };
-        a.addEventListener('click', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} ask(); });
-        a.addEventListener('auxclick', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} }); // block middle-click
-        a.addEventListener('mousedown', (ev)=>{ if (ev.button!==0){ try{ ev.preventDefault(); ev.stopPropagation(); }catch{} } });
+        a.addEventListener('click', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} ask(); });
+        a.addEventListener('auxclick', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} }); // block middle-click
+        a.addEventListener('mousedown', (ev)=>{ if (ev.button!==0){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} } });
         inner.appendChild(a);
       });
     }catch{}
