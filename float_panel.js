@@ -3487,6 +3487,72 @@
       `;
       document.head.appendChild(style);
 
+      // 站点定制修复 + 通用徽标修复：确保页首黑色字标在深色底上可读
+      try {
+        const host = location.hostname || '';
+        const fixes = [];
+        // 通用：明显的“logo”图片或 alt 包含站点名的图片
+        fixes.push(`
+          /* Generic wordmark/logo lightening on dark background */
+          header img[alt*="logo" i],
+          header img[src*="logo" i],
+          [role="banner"] img[alt*="logo" i],
+          [role="banner"] img[src*="logo" i]{
+            filter: invert(1) brightness(1.15) contrast(1.05) !important;
+          }
+          /* Inline SVGs that use explicit black fills — make them light */
+          header svg [fill="#000" i], header svg [fill="#000000" i],
+          [role="banner"] svg [fill="#000" i], [role="banner"] svg [fill="#000000" i]{
+            fill: #eaeef5 !important;
+          }
+          header svg [stroke="#000" i], [role="banner"] svg [stroke="#000" i]{
+            stroke: #eaeef5 !important;
+          }
+          /* As a fallback, invert large top-of-page SVG/IMG likely to be mastheads */
+          header svg, [role="banner"] svg, header img, [role="banner"] img{
+            /* only large ones will get overridden by the class below */
+          }
+        `);
+        // 纽约时报：页首字标为黑色字形 SVG/PNG
+        if (/nytimes\.com$/i.test(host)) {
+          fixes.push(`
+            /* NYTimes masthead */
+            header svg, header a[href^="/"] svg, [data-testid*="masthead" i] svg{
+              /* do not blanket-invert all icons; restrict by size via :where selector is not arithmetic-capable — we rely on class below */
+            }
+            /* target common containers around the nameplate */
+            header a img[alt*="New York Times" i],
+            header img[alt="The New York Times"],
+            [data-testid*="masthead" i] img,
+            [data-testid*="masthead" i] svg{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+          `);
+        }
+        // 华盛顿邮报：黑色字标 SVG
+        if (/(^|\.)washingtonpost\.com$/i.test(host)) {
+          fixes.push(`
+            /* Washington Post masthead */
+            header svg[aria-label*="Washington" i],
+            header a[aria-label*="Washington" i] svg,
+            header img[alt*="Washington Post" i]{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+            /* common header logo wrappers */
+            header [data-qa*="header-logo" i] svg,
+            header [data-qa*="header-logo" i] img{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+          `);
+        }
+        if (fixes.length) {
+          const fixStyle = document.createElement('style');
+          fixStyle.id = 'sx-force-dark-fixes';
+          fixStyle.textContent = fixes.join('\n');
+          document.head.appendChild(fixStyle);
+        }
+      } catch {}
+
       // 智能本地加深：仅为明显浅底的容器加暗色基底（避免一刀切破坏）
       try{
         const MEDIA = new Set(['IMG','VIDEO','CANVAS','SVG','IFRAME','EMBED','OBJECT','PICTURE']);
@@ -3573,6 +3639,7 @@
       if (existingStyle) {
         existingStyle.remove();
       }
+      try{ const fs = document.getElementById('sx-force-dark-fixes'); fs && fs.remove(); }catch{}
       // 清理智能标记与观察器
       try{ document.querySelectorAll('.sx-dark-bg').forEach(el=>el.classList.remove('sx-dark-bg')); }catch{}
       try{ document.querySelectorAll('.sx-dark-border').forEach(el=>el.classList.remove('sx-dark-border')); }catch{}
@@ -3624,7 +3691,10 @@
       // 调用旧版注入函数作为回退
       try{ applyForceDarkMode(true); }catch{}
     };
-    const disableFallback = () => { try{ const s=document.getElementById('sx-force-dark-mode'); s && s.remove(); }catch{} };
+    const disableFallback = () => {
+      try{ const s=document.getElementById('sx-force-dark-mode'); s && s.remove(); }catch{}
+      try{ const fs=document.getElementById('sx-force-dark-fixes'); fs && fs.remove(); }catch{}
+    };
 
     if (enabled) {
       (async()=>{
@@ -3634,6 +3704,42 @@
           disableFallback();
           try{ applyForceDarkMode(false); }catch{}
           postToggle(true);
+          // 注入轻量修复样式，弥补个别站点（如 NYTimes、WaPo）字标在暗底不反白的问题
+          try{
+            const host = location.hostname || '';
+            const css = [];
+            css.push(`
+              /* Generic wordmark/logo lightening on dark background (Dark Reader path) */
+              header img[alt*="logo" i], header img[src*="logo" i],
+              [role="banner"] img[alt*="logo" i], [role="banner"] img[src*="logo" i]{
+                filter: invert(1) brightness(1.15) contrast(1.05) !important;
+              }
+              header svg [fill="#000" i], header svg [fill="#000000" i],
+              [role="banner"] svg [fill="#000" i], [role="banner"] svg [fill="#000000" i]{ fill:#eaeef5 !important; }
+              header svg [stroke="#000" i], [role="banner"] svg [stroke="#000" i]{ stroke:#eaeef5 !important; }
+            `);
+            if (/nytimes\.com$/i.test(host)){
+              css.push(`
+                header a img[alt*="New York Times" i], header img[alt="The New York Times"],
+                [data-testid*="masthead" i] img, [data-testid*="masthead" i] svg{
+                  filter: invert(1) brightness(1.18) contrast(1.05) !important;
+                }
+              `);
+            }
+            if (/(^|\.)washingtonpost\.com$/i.test(host)){
+              css.push(`
+                header svg[aria-label*="Washington" i], header a[aria-label*="Washington" i] svg,
+                header img[alt*="Washington Post" i], header [data-qa*="header-logo" i] svg,
+                header [data-qa*="header-logo" i] img{
+                  filter: invert(1) brightness(1.18) contrast(1.05) !important;
+                }
+              `);
+            }
+            const tag = document.createElement('style');
+            tag.id = 'sx-force-dark-fixes';
+            tag.textContent = css.join('\n');
+            document.head.appendChild(tag);
+          }catch{}
           // 等待桥接标志，失败则回退
           let tries = 0;
           const check = ()=>{

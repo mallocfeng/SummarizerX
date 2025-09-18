@@ -10,6 +10,7 @@
 - Theme sync: Overlay now follows the panel theme (Auto/Light/Dark) in real time when toggled from the side panel.
 - Icon polish: Replaced the book glyph with a clearer open‑book silhouette and switched to a distinct reader accent color that stands out on both light/dark themes; added a tooltip for the reader icon.
  - Ad Filtering indicator: OFF state is now a red shield with a white slash; ON remains a green shield with a check. Colors adapt to light/dark themes. Tooltip remains fast and prominent.
+ - Fix: Force Dark Mode — masthead wordmarks now stay readable on nytimes.com and washingtonpost.com. The header logos are selectively lightened (invert/brightness) and black SVG fills are mapped to light text in both the Dark Reader path and our local fallback. Scope is limited to header/logo selectors to avoid over‑inversion of inline icons.
 
 ### 中文
 - 新增：阅读模式（从侧栏标题行的小书图标进入）；居中浮窗，带磨砂标题栏；滚动事件被容器吸收不影响背景；两侧留白更宽；与外观（自动/浅色/深色）实时联动。
@@ -19,6 +20,7 @@
 - 主题联动：从侧边栏切换外观（自动/浅色/深色）时，阅读浮窗的配色即时同步。
 - 图标优化：更换更易识别的“打开的书”图标，并用更醒目的阅读强调色，在明暗主题下都有良好对比；为图标新增悬浮提示。
  - 广告过滤指示：关闭态改为红色盾牌 + 白色斜杠，开启态保持绿色带对勾；两种主题下对比清晰，提示气泡依旧醒目。
+ - 修复：强制深色模式下，nytimes.com 与 washingtonpost.com 页首字标（The New York Times / The Washington Post）在暗底上自动反白，显著提升可读性。该修复同时覆盖 Dark Reader 动态引擎与本地回退样式，选择器仅作用于页首 logo，避免误伤站内其他图标。
 
 ## v2.2.3-beta - 2025-09-17
 
