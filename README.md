@@ -227,4 +227,6 @@ MIT License © 2025 [Malloc Feng](https://github.com/mallocfeng)
 ## 🙏 Credits / 致谢
 
 - Force Dark Mode is powered by the excellent open‑source project Dark Reader (MIT): https://github.com/darkreader/darkreader. Thank you to the Dark Reader team and contributors. The upstream LICENSE is included at `vendor/DARKREADER_LICENSE`.
+- Readable Body extraction (offline, non‑AI) uses Mozilla Readability (Apache‑2.0): https://github.com/mozilla/readability. Many thanks to the Mozilla Readability authors and contributors. The upstream LICENSE is included at `vendor/READABILITY_LICENSE`.
 - 强制深色模式基于优秀的开源项目 Dark Reader（MIT）：https://github.com/darkreader/darkreader。感谢 Dark Reader 团队与所有贡献者。上游 LICENSE 已包含于 `vendor/DARKREADER_LICENSE`。
+- 可读正文（离线、本地快速模式）集成了 Mozilla Readability（Apache‑2.0）：https://github.com/mozilla/readability。感谢 Readability 的作者与所有贡献者。上游 LICENSE 已包含于 `vendor/READABILITY_LICENSE`。

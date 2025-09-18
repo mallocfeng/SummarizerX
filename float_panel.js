@@ -78,6 +78,17 @@
       .replace(/^##\s?(.*)$/gm,'<h2>$1</h2>')
       .replace(/^#\s?(.*)$/gm,'<h1>$1</h1>');
 
+    // Images: convert Markdown ![alt](src) to HTML <img>
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, src) => {
+      try{
+        const s = String(src||'').trim();
+        const safe = /^(https?:|data:image\/|blob:|\/|\.|#)/i.test(s) ? s : '';
+        const a = (alt||'').trim();
+        if (!safe) return '';
+        return `<img src="${safe}" alt="${a}" loading="lazy">`;
+      }catch{ return ''; }
+    });
+
     html = html.replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm,(block)=>{
       const items = block.split('\n').map(l=>l.replace(/^(?:- |\* )/,'').trim()).filter(Boolean);
       return `<ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
@@ -1144,7 +1155,7 @@
       .md table{ width:100%; border-collapse:collapse; display:block; overflow:auto; margin:10px 0; border-radius:10px; }
       .md thead th{ background:#f0f5ff; color:var(--text); font-weight:800; }
       .md th, .md td{ border:1px solid #e5e7eb; padding:8px 10px; text-align:left; vertical-align:top; }
-      .md img{ display:block; margin:8px 0; border-radius:8px; }
+      .md img{ display:block; margin:8px 0; border-radius:8px; max-width:100%; height:auto; }
       .md hr{ border:0; border-top:1px solid #e6e8f0; margin:12px 0; }
 
       /* content progressive reveal */

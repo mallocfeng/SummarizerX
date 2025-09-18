@@ -35,6 +35,8 @@ async function injectIfNeeded(tabId) {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "PING_EXTRACTOR" });
     if (ping?.ok) return;
   } catch {}
+  // Inject Readability (offline content extraction) first, then our extractor helpers and bridge
+  try { await chrome.scripting.executeScript({ target: { tabId }, files: ["vendor/Readability.js"] }); } catch {}
   try { await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] }); } catch {}
   try { await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }); } catch {}
 }
@@ -200,7 +202,10 @@ async function runForTab(tabId) {
     const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
     const BODY_LIMIT = 50000;
     const body = (baseMarkdown ? String(baseMarkdown) : "").slice(0, BODY_LIMIT);
-    cleanedMarkdown = (noticeBlock + "\n" + body).replace(/\n{3,}/g, "\n\n").trim();
+    // Prepend title as H1 when body doesn't already start with a heading
+    const hasHeadingAtTop = /^\s*#{1,6}\s+/.test(body);
+    const titleLine = (title && !hasHeadingAtTop) ? `# ${title.trim()}\n\n` : '';
+    cleanedMarkdown = (noticeBlock + "\n" + titleLine + body).replace(/\n{3,}/g, "\n\n").trim();
   } else {
     const clipped = (text || "").slice(0, 20000);
     const sysClean = [

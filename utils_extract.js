@@ -1,5 +1,33 @@
 // utils_extract.js —— DOM → 高保真 Markdown（优化：抑制无文本 URL 链接 + 过滤导航菜单）
 (function () {
+  // Prefer Mozilla Readability when available
+  function tryExtractByReadability(){
+    try{
+      const R = window.Readability;
+      if (!R || typeof R !== 'function') return null;
+      // Clone to avoid side-effects and strip our own floating panel if present
+      const docClone = document.cloneNode(true);
+      try{ docClone.getElementById('sx-float-panel')?.remove(); }catch{}
+      const article = new R(docClone, { keepClasses:false }).parse();
+      if (!article) return null;
+      // Convert Readability HTML to Markdown using our Markdown generator.
+      // Create a temporary container attached to the live DOM so visibility checks won't drop nodes.
+      const tmp = document.createElement('div');
+      tmp.setAttribute('data-sx-readable-root','1');
+      tmp.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:1px;height:1px;overflow:hidden;';
+      tmp.innerHTML = article.content || '';
+      document.documentElement.appendChild(tmp);
+      try{
+        const markdown = extractMarkdown(tmp);
+        const title = article.title || (document.title || '');
+        const pageLang = document.documentElement.getAttribute('lang') || '';
+        const text = (article.textContent || '').trim();
+        return { title, pageLang, text, markdown };
+      } finally {
+        try{ tmp.remove(); }catch{}
+      }
+    }catch{ return null; }
+  }
   const BAD_RE = /nav|aside|footer|header|form|menu|banner|complementary|advert|ads|promo|subscribe|breadcrumb|pagination|comment|related|toc|newsletter|cookie/i;
   const GOOD_RE = /article|main|content|post|entry|markdown|doc|read|story|article-body|post-body|prose|md/i;
   const BLOCK_CONTAINER = new Set(["div", "section", "article", "main", "body", "figure"]);
@@ -13,6 +41,7 @@
 
   function isVisible(el) {
     if (!(el instanceof Element)) return false;
+    try{ if (el.closest && el.closest('[data-sx-readable-root]')) return true; }catch{}
     const style = window.getComputedStyle(el);
     if (!style) return false;
     if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
@@ -208,6 +237,10 @@
   }
 
   window.__AI_READ_EXTRACT__ = function () {
+    // 1) Prefer Readability (offline, robust) if present
+    const byR = tryExtractByReadability();
+    if (byR && byR.markdown && byR.markdown.length > 60) return byR;
+    // 2) Fallback to heuristic DOM→Markdown
     const root = pickRoot();
     const title = document.title || (document.querySelector("h1")?.innerText || "");
     const pageLang = document.documentElement.getAttribute("lang") || "";
