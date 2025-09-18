@@ -932,8 +932,8 @@
         -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
         mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
       }
-      /* Off: add a slash overlay */
-      .adf-ind:not(.on)::after{ content:""; position:absolute; inset:0; background: currentColor; opacity:.9;
+      /* Off: add a slash overlay (white over red shield) */
+      .adf-ind:not(.on)::after{ content:""; position:absolute; inset:0; background: #ffffff; opacity:.95;
         -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
         mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
       }
@@ -942,6 +942,9 @@
       .adf-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
       :host([data-theme="dark"]) .adf-ind{ color:#7d8fb0; }
       :host([data-theme="dark"]) .adf-ind.on{ color:#22c55e; }
+      /* Off state: red shield (light/dark) */
+      .adf-ind:not(.on){ color: var(--danger); }
+      :host([data-theme="dark"]) .adf-ind:not(.on){ color: var(--danger); }
 
       /* Ad filtering tooltip (fast, prominent) */
       .adf-ind .adf-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;

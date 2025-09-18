@@ -8,6 +8,7 @@
 - Padding: Increased inner horizontal padding for more comfortable reading, with responsive behavior preserved.
 - Theme sync: Overlay now follows the panel theme (Auto/Light/Dark) in real time when toggled from the side panel.
 - Icon polish: Replaced the book glyph with a clearer open‑book silhouette and switched to a distinct reader accent color that stands out on both light/dark themes; added a tooltip for the reader icon.
+ - Ad Filtering indicator: OFF state is now a red shield with a white slash; ON remains a green shield with a check. Colors adapt to light/dark themes. Tooltip remains fast and prominent.
 
 ### 中文
 - 阅读模式浮窗：标题栏保持磨砂半透明并始终可见；垂直滚动条仅出现在正文区域，不再遮挡关闭按钮。
@@ -15,6 +16,7 @@
 - 边距：增大正文左右内边距，阅读更舒适（保留自适应）。
 - 主题联动：从侧边栏切换外观（自动/浅色/深色）时，阅读浮窗的配色即时同步。
 - 图标优化：更换更易识别的“打开的书”图标，并用更醒目的阅读强调色，在明暗主题下都有良好对比；为图标新增悬浮提示。
+ - 广告过滤指示：关闭态改为红色盾牌 + 白色斜杠，开启态保持绿色带对勾；两种主题下对比清晰，提示气泡依旧醒目。
 
 ## v2.2.3-beta - 2025-09-17
 

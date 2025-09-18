@@ -21,6 +21,7 @@ Current beta: v2.2.5-beta (dev/next branch)
 ### ✨ Features
 
 - 📰 Clean Content Extraction: Remove ads, navigation, and clutter for focused reading  
+- 📖 Reader Mode Overlay: One‑click clean reading view in a centered dialog with a frosted header, separate vertical scrollbar (never covering the Close button), live theme sync (Auto/Light/Dark), and contained scrolling that doesn’t move the page. Open it via the small book icon in the panel title bar.  
 - 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click  
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
@@ -28,8 +29,8 @@ Current beta: v2.2.5-beta (dev/next branch)
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
  - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
- - 💬 Page Q&A Chat (beta): Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
- - 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
+- 💬 Page Q&A Chat (beta): Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
+- 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability (now powered by Dark Reader’s dynamic engine; see Credits)
@@ -127,6 +128,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 ### ✨ 功能亮点
 
 - 📰 干净的内容提取：去除广告、导航和杂乱内容，专注阅读  
+- 📖 阅读模式浮窗：一键打开居中的干净阅读视图，带磨砂标题栏；正文拥有独立的垂直滚动条（不会遮住关闭按钮），并与侧栏外观（自动/浅色/深色）实时联动；滚动事件被容器吸收，不会带动背景页面。点击侧栏标题行的小书图标即可打开。  
 - 🤖 AI 驱动的摘要与翻译：一键生成简洁摘要或翻译  
 - ⚙️ 个性化设置：自定义提示词、模式、快捷键和界面偏好  
 - 📑 浮动面板：无需跳转页面即可查看摘要  
