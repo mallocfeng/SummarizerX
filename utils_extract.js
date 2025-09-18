@@ -372,10 +372,15 @@
     let started = false;
     for (const b of blocks) {
       const t = b.trim();
-      const linkRatio = (t.match(/\]\(https?:\/\/[^)]+\)/g) || []).length / Math.max(1, t.split(/\s+/).length);
+      // Treat image tokens as content; do not penalize them as "linky" nav
+      const imgTokens = (t.match(/!\[[^\]]*\]\([^)]+\)/g) || []).length;
+      const linkTokensAll = (t.match(/\[[^\]]+\]\(https?:\/\/[^)]+\)/g) || []).length;
+      const linkOnly = Math.max(0, linkTokensAll - imgTokens);
+      const linkRatio = linkOnly / Math.max(1, t.split(/\s+/).length);
       const isVeryShort = t.length < 20;
       const looksLikeNav = linkRatio > 0.5 && t.length < 160;
-      if (!started && (isVeryShort || looksLikeNav)) continue;
+      const hasImage = imgTokens > 0;
+      if (!started && !hasImage && (isVeryShort || looksLikeNav)) continue;
       started = true;
       cleaned.push(t);
     }
