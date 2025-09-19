@@ -282,6 +282,150 @@ async function runForTab(tabId) {
   });
 }
 
+// Run pipeline for provided raw text/markdown (e.g., from PDF)
+async function runForText(tabId, { title = '', text = '', url = '', pageLang = '', markdown = null } = {}) {
+  const cfg = await getSettings();
+  const isTrial = (cfg.aiProvider === "trial");
+  if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
+  if (isTrial) {
+    try {
+      const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+      if (!trial_consent) {
+        try { await chrome.storage.sync.set({ need_trial_consent_focus: true }); } catch {}
+        try { await chrome.runtime.openOptionsPage(); } catch {}
+        throw new Error("试用模式需先同意通过代理传输页面内容。请在设置页勾选同意，或切换到其他平台。");
+      }
+    } catch {}
+  }
+
+  await setState(tabId, { status: "running" });
+
+  const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text || "");
+  const rawTextMd = textToMarkdown(typeof text === "string" ? text : "");
+  const baseMarkdown = (() => {
+    if (typeof markdown === "string" && markdown.trim()) {
+      return markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    if (typeof cfg?.markdown === "string" && cfg.markdown.trim()) {
+      return cfg.markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    return rawTextMd;
+  })();
+
+  const quickMd = baseMarkdown;
+  const sysForSummary = buildSystemPrompt({
+    custom: cfg.system_prompt_custom,
+    preset: cfg.system_prompt_preset,
+    finalLang,
+    task: cfg.task_mode
+  });
+  let summaryPrompt =
+    `Based on the content below, produce:\n` +
+    `1) 3–5 key bullet points\n` +
+    `2) One-sentence conclusion or recommendation\n` +
+    `3) 3–6 keywords\n\n` +
+    `Content:\n${quickMd.slice(0, 18000)}`;
+  summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
+  const summaryFast = await chatCompletion({
+    baseURL: cfg.baseURL,
+    apiKey: cfg.apiKey || "trial",
+    model: cfg.model_summarize,
+    system: sysForSummary,
+    prompt: summaryPrompt,
+    temperature: 0.1
+  });
+
+  let quickQuestions = [];
+  try {
+    const qsPrompt = enforceUserLang(
+      `From the content below, generate 3 likely questions a reader may ask.\n`+
+      `Rules: return EXACTLY 3 lines, one question per line, no numbering, no quotes.\n\n`+
+      `Content:\n${quickMd.slice(0, 12000)}`,
+      finalLang,
+      false
+    );
+    const qsOut = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey: cfg.apiKey || 'trial',
+      model: cfg.model_summarize,
+      system: sysForSummary,
+      prompt: qsPrompt,
+      temperature: 0.6
+    });
+    quickQuestions = String(qsOut || '')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^[-*\d\.\)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  } catch {}
+
+  await setState(tabId, {
+    status: "partial",
+    summary: summaryFast,
+    cleaned: "",
+    quickQuestions,
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode,
+      source: 'pdf'
+    }
+  });
+
+  // Cleaned body
+  let cleanedMarkdown = "";
+  if (cfg.extract_mode === "fast") {
+    const NOTICE_ZH = "当前“正文提取方式”为**本地快速模式**，以下正文为**原文**显示。若希望按目标语言显示正文，请在设置中将“正文提取方式”切换为 **AI 清洗模式**。";
+    const NOTICE_EN = "Extract mode is **Local Fast**. The readable body below is shown **in the original language**. If you want the body to follow the target language, switch “Extract Mode” to **AI Clean** in Settings.";
+    const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
+    const BODY_LIMIT = 50000;
+    const body = (baseMarkdown ? String(baseMarkdown) : "").slice(0, BODY_LIMIT);
+    const hasHeadingAtTop = /^\s*#{1,6}\s+/.test(body);
+    const titleLine = (title && !hasHeadingAtTop) ? `# ${title.trim()}\n\n` : '';
+    cleanedMarkdown = (noticeBlock + "\n" + titleLine + body).replace(/\n{3,}/g, "\n\n").trim();
+  } else {
+    const clipped = (baseMarkdown || "").slice(0, 20000);
+    const sysClean = [
+      "You are an article cleaner.",
+      "Your job: remove navigation, ads, cookie banners, boilerplate, and duplicate fragments.",
+      "PRESERVE the ORIGINAL sentences and wording. DO NOT paraphrase or summarize.",
+      "Keep headings, lists, blockquotes, code fences, links, images, and tables.",
+      "For images: include them as Markdown ![alt](url) using the original alt text when available.",
+      "Output clean Markdown of the main body only.",
+      langLineEn(finalLang, true),
+      langLineNative(finalLang)
+    ].join("\n");
+    const promptClean = `Title: ${title || "(none)"}\nURL: ${url || "pdf://local"}\n\nRaw content (possibly noisy):\n${clipped}\n\nReturn ONLY the cleaned main body as Markdown.`;
+    cleanedMarkdown = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey:  cfg.apiKey || "trial",
+      model:   cfg.model_extract,
+      system:  sysClean,
+      prompt:  promptClean,
+      temperature: 0.0
+    });
+  }
+
+  await setState(tabId, {
+    status: "done",
+    summary: summaryFast,
+    cleaned: cleanedMarkdown,
+    quickQuestions,
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode,
+      source: 'pdf'
+    }
+  });
+}
+
 /* --------------------------------------------------------------- */
 // uBO-style network redirection/blocking for video ads on news/portal sites
 // We use MV3 Declarative Net Request to:
@@ -752,9 +896,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
     (async () => {
-      await setState(msg.tabId, { status: "running" });
+      await setState(msg.tabId, { status: "running", meta: { source: 'page' } });
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
+        await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
+      });
+    })();
+    return true;
+  }
+
+  if (msg?.type === "PANEL_RUN_FOR_TEXT" && typeof msg.tabId === "number" && msg.payload && typeof msg.payload === 'object') {
+    (async () => {
+      await setState(msg.tabId, { status: "running", meta: { source: 'pdf' } });
+      safeReply({ ok: true });
+      runForText(msg.tabId, msg.payload).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
       });
     })();
@@ -1251,8 +1406,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           } catch {}
         }
 
-        // Get page raw
-        const raw = await getPageRawByTabId(tabId);
+        // Determine source: prefer explicit PDF payload from panel if provided
+        const pdf = (msg && typeof msg.pdf === 'object') ? msg.pdf : null;
+        const usePdf = !!(pdf && typeof pdf.text === 'string' && pdf.text.trim());
+        const raw = usePdf
+          ? { title: pdf.title || '(PDF)', url: pdf.url || 'pdf://local', text: pdf.text || '', pageLang: pdf.pageLang || '', markdown: pdf.markdown || null }
+          : await getPageRawByTabId(tabId);
         const finalLang = resolveFinalLang(cfg.output_lang || 'auto', raw.pageLang, raw.text || '');
         const pageMd = (typeof raw.markdown === 'string' && raw.markdown.trim()) ? raw.markdown : textToMarkdown(String(raw.text || ''));
         const clipped = pageMd.slice(0, 20000);
@@ -1273,7 +1432,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const content = String(it?.content||'').slice(0, 2000);
           return `${role}: ${content}`;
         }).join('\n');
-        const prompt = `Title: ${raw.title || '(untitled)'}\nURL: ${raw.url || ''}\n\nPAGE CONTENT (Markdown):\n${clipped}\n\nCHAT SO FAR (if any):\n${hist || '(none)'}\n\nQUESTION:\n${q}\n\nInstructions: Answer ONLY using the page content above.`;
+        const prompt = `Title: ${raw.title || '(untitled)'}\nURL: ${raw.url || ''}\n\nPAGE CONTENT (Markdown):\n${clipped}\n\nCHAT SO FAR (if any):\n${hist || '(none)'}\n\nQUESTION:\n${q}\n\nInstructions: Answer ONLY using the ${usePdf ? 'PDF' : 'page'} content above.`;
 
         // Mark QA busy to reflect in-flight state across tab switches
         try { await setQAUI(tabId, { qaBusy: true }); } catch {}
@@ -1295,7 +1454,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           prev.push({ role: 'user', content: q });
           prev.push({ role: 'assistant', content: txt });
           await setQAUI(tabId, { hist: prev, qaBusy: false });
-          const urlKey = 'sx_qa_hist_v1:' + String(raw.url || '').split('#')[0];
+        const urlKey = 'sx_qa_hist_v1:' + String(raw.url || '').split('#')[0];
           try { await chrome.storage.local.set({ [urlKey]: { hist: prev, updatedAt: Date.now() } }); } catch {}
         } catch {}
 

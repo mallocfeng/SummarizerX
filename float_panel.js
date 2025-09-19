@@ -889,14 +889,14 @@
       @media (prefers-reduced-motion: reduce){
         .wrap.fx-enter, .wrap.fx-enter .appbar, .wrap.fx-enter .footer{ animation: none; }
       }
-      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; z-index:10; }
+      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; z-index:10; touch-action: none; }
       .dragbar::after{ content:""; position:absolute; top:0; bottom:0; right:-1px; width:2px; background:linear-gradient(180deg, rgba(102,112,133,.20), rgba(102,112,133,.02)); opacity:0; transition: opacity .15s ease; }
       .dragbar:hover::after, .wrap.dragging .dragbar::after{ opacity:.9; }
       .wrap.dragging{ cursor:col-resize; }
 
       /* ===== Top bar ===== */
       .appbar{
-        flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
+        flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; gap:14px;
         /* raised glass bar */
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
@@ -921,6 +921,17 @@
       .reader-ind:active{ transform: translateY(0); }
       .reader-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
       :host([data-theme="dark"]) .reader-ind{ color: var(--reader-accent); }
+
+      /* PDF import icon (document) */
+      .pdf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#ef4444; opacity:1; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .pdf-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 7.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5L19 7.5Z"/><path d="M13 3v4a1 1 0 0 0 1 1h4"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 7.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5L19 7.5Z"/><path d="M13 3v4a1 1 0 0 0 1 1h4"/></svg>') center/contain no-repeat;
+      }
+      .pdf-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .pdf-ind:active{ transform: translateY(0); }
+      .pdf-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
+      :host([data-theme="dark"]) .pdf-ind{ color:#f97316; }
       /* Ad filtering status indicator (shield + check/slash); clickable toggle */
       .adf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#94a3b8; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
       .adf-ind::before{ content:""; position:absolute; inset:0; background: currentColor; 
@@ -972,6 +983,47 @@
       .reader-ind .reader-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
       :host([data-theme="dark"]) .reader-ind .reader-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
       :host([data-theme="dark"]) .reader-ind .reader-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+
+      /* PDF tooltip (re-use same style class name for simplicity) */
+      .pdf-ind .reader-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .pdf-ind .reader-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      .pdf-ind .reader-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+      :host([data-theme="dark"]) .pdf-ind .reader-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .pdf-ind .reader-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+
+      /* PDF icon halo pulse to draw attention (yellow) */
+      .pdf-ind.halo-pulse{ animation: pdfHalo 1.05s ease-in-out 3; }
+      @keyframes pdfHalo{
+        0%,100%{ box-shadow: 0 0 0 0 rgba(234,179,8,0); transform: translateY(0) scale(1); }
+        50%{ box-shadow: 0 0 0 10px rgba(234,179,8,.24); transform: translateY(-1px) scale(1.06); }
+      }
+
+      /* PDF panel */
+      .pdf-panel{ display:flex; flex-direction:column; gap:12px; }
+      /* When collapsed, hide only the rendered canvas area; keep dropzone + toolbar visible */
+      #sx-pdf.pdf-collapsed #sx-pdf-view{ display:none !important; }
+      .pdf-dropzone{ border:2px dashed var(--border); border-radius:10px; padding:18px; text-align:center; color: var(--muted); cursor:pointer; background: var(--surface-2); }
+      .pdf-dropzone:hover{ border-color:#93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.18) inset; }
+      .pdf-dropzone.drag{ border-color:#60a5fa; background: rgba(59,130,246,.05); color:#1e3a8a; }
+      .pdf-drop-hint{ font-size:13px; font-weight:700; }
+      .pdf-dropzone.dnd-off{ cursor: default; opacity:.96; }
+      .pdf-toolbar{ display:flex; align-items:center; gap:6px; flex-wrap: wrap; }
+      .pdf-toolbar .sep{ width:1px; height:16px; background: var(--border); margin: 0 2px; }
+      .pdf-toolbar .pdf-nav-btn{ min-width:auto; width:26px; height:26px; padding:0; display:grid; place-items:center; border-radius:8px; }
+      .pdf-toolbar .pdf-nav-btn svg{ width:14px; height:14px; display:block; stroke: currentColor; fill: none; stroke-width: 2; }
+      .pdf-toolbar input[type="number"]{ width:56px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background: var(--surface); color: var(--text); font-weight:700; }
+      .pdf-toolbar input[type="number"]:focus{ outline:none; box-shadow: 0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
+      .pdf-toolbar input[type="text"]{ width:120px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background: var(--surface); color: var(--text); font-weight:700; }
+      .pdf-toolbar input[type="text"]:focus{ outline:none; box-shadow: 0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
+      .pdf-toolbar input:disabled{ opacity:.55; cursor:not-allowed; background: var(--surface-2); }
+      .pdf-view{ display:block; overflow:auto; }
+      .pdf-error{ color: var(--danger); font-weight: 700; padding: 8px 10px; background: rgba(244,63,94,.08); border:1px solid rgba(244,63,94,.32); border-radius:8px; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
       .title{ font-size:14px; font-weight:800; letter-spacing:.2px; color:var(--text); }
 
@@ -1012,7 +1064,8 @@
       .container .section:first-child{ margin-top:0; }
       /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
       .wrap.is-empty #sx-summary,
-      .wrap.is-empty #sx-cleaned{ display:none !important; }
+      .wrap.is-empty #sx-cleaned,
+      .wrap.is-empty #sx-pdf{ display:none !important; }
       .wrap.is-empty .container{ flex:0 0 auto; height:66px; overflow:hidden; padding-top:0; padding-bottom:0; }
       .wrap.is-empty .section{ margin:0 !important; }
       /* While expanding, allow the middle to grow smoothly */
@@ -1641,7 +1694,7 @@
       <div class="wrap" id="sx-wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div><div id="sx-reader-ind" class="reader-ind" role="button" aria-label="阅读模式" title="阅读模式" tabindex="0"></div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div><div id="sx-reader-ind" class="reader-ind" role="button" aria-label="阅读模式" title="阅读模式" tabindex="0"></div><div id="sx-pdf-ind" class="pdf-ind" role="button" aria-label="导入 PDF" title="导入 PDF" tabindex="0"></div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
@@ -1651,6 +1704,9 @@
         <div id="sx-progress" class="progress hidden"><div class="bar"></div></div>
         <div class="container" id="sx-container">
           <div class="empty-illus" id="sx-empty-arrow" aria-hidden="true"></div>
+          <section class="section">
+            <div id="sx-pdf" class="card card-head" data-title="PDF 预览" style="display:none"></div>
+          </section>
           <section class="section">
             <div id="sx-chat" class="card card-head" data-title="你问我答" style="display:none">
               <div class="chat-list" id="sx-chat-list"></div>
@@ -1870,6 +1926,35 @@
             alert.className='alert'; alert.innerHTML=`<button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${currentLangCache==='en'?'Failed to copy image to clipboard':'复制图片到剪贴板失败'}</p></div>`;
             box.insertBefore(alert, box.querySelector('.md'));
           }catch{}
+          // Runtime recompute pages for robust validation and to avoid closure issues
+          const pagesRuntime = (function(){
+            try{
+              const out = new Set();
+              norm.split(',').filter(Boolean).forEach(seg=>{
+                const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN; let lo=Number.isFinite(b)?Math.min(a,b):a; let hi=Number.isFinite(b)?Math.max(a,b):a; for(let i=lo;i<=hi;i++){ if(i>=1 && i<=totalPages) out.add(i); } }
+              });
+              return Array.from(out).sort((a,b)=>a-b);
+            }catch{ return []; }
+          })();
+          if (!Array.isArray(pagesRuntime) || pagesRuntime.length===0){
+            const msg = currentLangCache==='en'
+              ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.`
+              : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+            try{ const errEl = pdfCard.__pdfElems?.err; if (errEl){ errEl.textContent = msg; errEl.style.display=''; } }catch{}
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          if (hasNumber && hasOutOfBounds){
+            const msg = currentLangCache==='en'
+              ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.`
+              : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+            try{ const errEl = pdfCard.__pdfElems?.err; if (errEl){ errEl.textContent = msg; errEl.style.display=''; } }catch{}
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          // adopt runtime pages
+          try{ pages = pagesRuntime; }catch{}
         } else {
           try{
             const card=this.$refs.card;
@@ -1940,6 +2025,34 @@
     try{ $s.firstElementChild?.classList?.add('revive'); $c.firstElementChild?.classList?.add('revive'); }catch{}
   }
 
+  function setSummaryTitleBySource(meta){
+    try{
+      const isPdf = !!(meta && meta.source === 'pdf');
+      const base = (currentLangCache==='en' ? 'Summary' : '摘要');
+      const label = isPdf ? (currentLangCache==='en' ? 'Summary (PDF)' : '摘要 (PDF)') : base;
+      if (vmSummary && typeof vmSummary.title !== 'undefined'){
+        vmSummary.title = label;
+      } else {
+        const el = (typeof shadow!=='undefined' && shadow && shadow.getElementById) ? shadow.getElementById('sx-summary') : document.getElementById('sx-summary');
+        if (el) el.setAttribute('data-title', label);
+      }
+    }catch{}
+  }
+
+  function setCleanedTitleBySource(meta){
+    try{
+      const isPdf = !!(meta && meta.source === 'pdf');
+      const base = (currentLangCache==='en' ? 'Readable Content' : '可读正文');
+      const label = isPdf ? (currentLangCache==='en' ? 'Readable Content (PDF)' : '可读正文 (PDF)') : base;
+      if (vmCleaned && typeof vmCleaned.title !== 'undefined'){
+        vmCleaned.title = label;
+      } else {
+        const el = (typeof shadow!=='undefined' && shadow && shadow.getElementById) ? shadow.getElementById('sx-cleaned') : document.getElementById('sx-cleaned');
+        if (el) el.setAttribute('data-title', label);
+      }
+    }catch{}
+  }
+
   function applyTrialLabelToFloatButton(shadow){
     const btn = shadow.getElementById('sx-run'); if(!btn) return;
     chrome.storage.sync.get(['aiProvider']).then(async ({ aiProvider })=>{
@@ -1970,7 +2083,7 @@
     const step = async ()=>{
       try{
         const st = await getState(tabId);
-        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); await render(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling(); return; }
+        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} await render(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling(); return; }
         if (st.status==='error'){
           setSummarizing(shadow,false); setLoading(shadow,false);
           const i18n = await loadI18n(); const lang = i18n? await i18n.getCurrentLanguage():'zh';
@@ -1978,8 +2091,8 @@
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${lang==='zh'?'发生错误，请重试。':'An error occurred, please try again.'}</p></div></div>`;
           stopPolling(); return;
         }
-        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); await render(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
-        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{} }
+        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} await render(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
+        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{} }
       }catch{}
       if (Date.now()-start>hardTimeout){ setSummarizing(shadow,false); setLoading(shadow,false); stopPolling(); return; }
       interval = Math.min(maxInterval, Math.round(interval*1.25));
@@ -2142,8 +2255,13 @@
   shadow.getElementById('sx-reader-ind')?.addEventListener('click', async ()=>{
     try{ await openReaderOverlay(); }catch(e){ console.warn('reader overlay failed', e); }
   });
+  // PDF 导入
+  shadow.getElementById('sx-pdf-ind')?.addEventListener('click', async ()=>{
+    try{ await openPdfPanel(); }catch(e){ console.warn('pdf panel failed', e); }
+  });
   // Ensure reader tooltip
   try{ ensureReaderIndicatorTooltip(shadow); }catch{}
+  try{ ensurePdfIndicatorTooltip(shadow); }catch{}
   // 元素选择器按钮
   shadow.getElementById('sx-pick-btn')?.addEventListener('click', () => {
     try { startElementPicker(); } catch (e) { console.warn('startElementPicker failed:', e); }
@@ -2251,12 +2369,16 @@
     let dragging=false;
     function start(){ dragging=true; wrapEl?.classList.add('dragging'); document.documentElement.style.userSelect='none'; try{ updateEmptyArrowPosition(); }catch{} }
     function end(){ dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect=''; window.removeEventListener('mousemove', mm, true); window.removeEventListener('mouseup', mu, true); window.removeEventListener('touchmove', tm, {capture:true, passive:false}); window.removeEventListener('touchend', te, {capture:true}); }
-    const mm=(ev)=>{ if(!dragging) return; ev.preventDefault(); setW(ev.clientX); updateEmptyArrowPosition(); };
+    const mm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
     const mu=()=>{ if(!dragging) return; end(); };
     const tm=(ev)=>{ if(!dragging) return; if(ev.touches && ev.touches[0]) setW(ev.touches[0].clientX); updateEmptyArrowPosition(); ev.preventDefault(); };
     const te=()=>{ if(!dragging) return; end(); };
-    drag?.addEventListener('mousedown',(e)=>{ start(); e.preventDefault(); window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
+    drag?.addEventListener('mousedown',(e)=>{ start(); try{ e.preventDefault(); }catch{} window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
     drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
+    // Pointer events path: more robust on PDF viewer and special pages
+    const pm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
+    const pu=(ev)=>{ if(!dragging) return; try{ drag.releasePointerCapture(ev.pointerId); }catch{} end(); try{ drag.removeEventListener('pointermove', pm, true); }catch{} };
+    drag?.addEventListener('pointerdown', (e)=>{ try{ drag.setPointerCapture(e.pointerId); }catch{} start(); try{ e.preventDefault(); }catch{} drag.addEventListener('pointermove', pm, true); drag.addEventListener('pointerup', pu, { once:true, capture:true }); });
     drag?.addEventListener('dblclick', async ()=>{
       const cur=parseInt(getComputedStyle(host).width,10)||420;
       const target=cur<520? 560: 380;
@@ -2776,6 +2898,16 @@
         try{ rid?.removeAttribute('title'); }catch{}
         rid?.setAttribute('aria-label', currentLangCache==='en' ? 'Reader mode' : '阅读模式');
       }catch{}
+      // PDF icon tooltip text
+      try{
+        ensurePdfIndicatorTooltip(shadow);
+        const pid = shadow.getElementById('sx-pdf-ind');
+        const tip = pid?.querySelector('.reader-tip');
+        const txt = currentLangCache==='en' ? 'Import a PDF and preview page 1' : '导入 PDF 并预览第 1 页';
+        if (tip) tip.textContent = txt;
+        try{ pid?.removeAttribute('title'); }catch{}
+        pid?.setAttribute('aria-label', currentLangCache==='en' ? 'Import PDF' : '导入 PDF');
+      }catch{}
       const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
       // Sync quick-ask heading language if present
       try{
@@ -2787,6 +2919,7 @@
       const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
+      try { shadow.getElementById('sx-pdf')?.setAttribute('data-title', currentLangCache==='zh'?'PDF 预览':'PDF Preview'); } catch {}
       try { shadow.getElementById('sx-chat').setAttribute('data-title', t_qa_title); } catch {}
       try { const i=shadow.getElementById('sx-qa-input'); if(i) i.placeholder=t_qa_ph; } catch {}
       try { const b=shadow.getElementById('sx-qa-send'); if(b) b.textContent=t_qa_send; } catch {}
@@ -2873,6 +3006,613 @@
     }catch{}
   }
 
+  function ensurePdfIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-pdf-ind'); if (!el) return;
+      let tip = el.querySelector('.reader-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'reader-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        let showTid = null, hideTid = null;
+        const show = ()=>{ try{ clearTimeout(hideTid); }catch{} showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120); };
+        const hide = ()=>{ try{ clearTimeout(showTid); }catch{} hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60); };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
+      const txt = currentLangCache==='en' ? 'Import a PDF and preview page 1' : '导入 PDF 并预览第 1 页';
+      tip.textContent = txt;
+      try{ el.removeAttribute('title'); }catch{}
+      el.setAttribute('aria-label', currentLangCache==='en' ? 'Import PDF' : '导入 PDF');
+    }catch{}
+  }
+
+  async function openPdfPanel(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      // hide others to create a focused interface
+      try{ shadow.getElementById('sx-chat').style.display = 'none'; }catch{}
+      try{ shadow.getElementById('sx-summary').style.display = 'none'; }catch{}
+      try{ shadow.getElementById('sx-cleaned').style.display = 'none'; }catch{}
+      // build once
+      if (!card.__built){ buildPdfPanel(card); card.__built = true; }
+      card.style.display = '';
+
+      // If sidepanel is folded, expand it similarly to summarize flow
+      const wrapEl = shadow.getElementById('sx-wrap');
+      const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
+      try{
+        if (wasEmpty){
+          wrapEl.classList.remove('fx-intro');
+          wrapEl.classList.add('expanding');
+          const container = shadow.getElementById('sx-container');
+          const wrapRect = wrapEl.getBoundingClientRect();
+          const appbar = shadow.querySelector('.appbar');
+          const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
+          const appH = appbar ? appbar.getBoundingClientRect().height : 0;
+          const footH = footer ? footer.getBoundingClientRect().height : 0;
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
+          container.style.willChange = 'height';
+          container.style.contain = 'layout style';
+          container?.style.setProperty('--sx-target', target + 'px');
+          let done = false; const finish = ()=>{
+            if (done) return; done = true;
+            try{
+              wrapEl.classList.remove('is-empty');
+              wrapEl.classList.remove('expanding');
+              card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 700);
+              try{ updateEmptyArrowPosition(); }catch{}
+            }catch{}
+          };
+          container?.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 900);
+        } else {
+          // play subtle pull-in when already expanded
+          card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 700);
+        }
+      }catch{}
+
+      // scroll into view after potential expand
+      try{ card.scrollIntoView({ behavior:'smooth', block:'start' }); }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch(e){ console.warn('openPdfPanel failed', e); }
+  }
+
+  function collapseSidepanelToInitial(){
+    try{
+      const wrapEl = shadow.getElementById('sx-wrap');
+      const container = shadow.getElementById('sx-container');
+      if (!wrapEl || !container) return;
+      // Prepare for smooth collapse: lock current height as start value
+      const curH = container.getBoundingClientRect().height;
+      wrapEl.classList.add('is-empty');
+      wrapEl.classList.add('expanding');
+      container.style.willChange = 'height';
+      container.style.contain = 'layout style';
+      container.style.setProperty('--sx-target', Math.max(0, Math.round(curH)) + 'px');
+      // next frame: set target to collapsed height (66px defined in CSS)
+      requestAnimationFrame(()=>{
+        try{
+          container.style.setProperty('--sx-target', '66px');
+          const finish = ()=>{
+            try{
+              wrapEl.classList.remove('expanding');
+              // keep is-empty to retain collapsed state
+              updateEmptyArrowPosition();
+            }catch{}
+          };
+          container.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 700);
+        }catch{}
+      });
+    }catch{}
+  }
+
+  function hidePdfPanel(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      // remove resize listener if any
+      try{ if (card.__onResize) window.removeEventListener('resize', card.__onResize); }catch{}
+      try{ if (card.__unbindDnD) { card.__unbindDnD(); card.__unbindDnD = null; } }catch{}
+      // hide card
+      card.style.display = 'none';
+      // collapse whole sidepanel to initial (folded) state
+      collapseSidepanelToInitial();
+      // restore QA placeholder and URL to page context
+      try{
+        const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this page…':'基于当前网页提问…'); }
+        const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = location.href; qu.title = location.href; }
+      }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch{}
+  }
+
+  function buildPdfPanel(card){
+    try{
+      const t_close = currentLangCache==='en'?'Close':'关闭';
+      const t_hint = currentLangCache==='en'?'Drop a PDF here, or click to choose':'拖放 PDF 到此，或点击选择';
+      card.innerHTML = `
+        <div class="card-tools"><button id="sx-pdf-close" class="tbtn" title="${t_close}">${t_close}</button></div>
+        <div class="pdf-panel" id="sx-pdf-panel">
+          <div class="pdf-dropzone" id="sx-pdf-dropzone" tabindex="0">
+            <div class="pdf-drop-hint" id="sx-pdf-hint">${t_hint}</div>
+            <input type="file" id="sx-pdf-input" accept="application/pdf" style="display:none" />
+            <div style="margin-top:8px">
+              <button id="sx-pdf-load-url" class="tbtn" type="button" style="display:none"></button>
+            </div>
+          </div>
+          <div class="pdf-error" id="sx-pdf-range-error" role="alert" style="display:none"></div>
+          <div class="pdf-toolbar" id="sx-pdf-toolbar" style="display:none">
+            <button class="tbtn pdf-nav-btn" id="sx-pdf-prev" type="button" aria-label="${currentLangCache==='en'?'Previous page':'上一页'}" title="${currentLangCache==='en'?'Previous page':'上一页'}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="tbtn pdf-nav-btn" id="sx-pdf-next" type="button" aria-label="${currentLangCache==='en'?'Next page':'下一页'}" title="${currentLangCache==='en'?'Next page':'下一页'}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="sep" aria-hidden="true"></span>
+            <label for="sx-pdf-page" class="pdf-page-label">${currentLangCache==='en'?'Page:':'页码：'}</label>
+            <input id="sx-pdf-page" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            <span class="pdf-page-total">/ <span id="sx-pdf-total">1</span></span>
+            <span class="sep" aria-hidden="true"></span>
+            <label for="sx-pdf-pages" class="pdf-pages-label">${currentLangCache==='en'?'Range:':'范围：'}</label>
+            <input id="sx-pdf-pages" type="text" placeholder="${currentLangCache==='en'?'e.g., 1-3,5':'例如: 1-3,5'}" />
+          </div>
+          <div class="pdf-view" id="sx-pdf-view" style="display:none">
+            <canvas id="sx-pdf-canvas"></canvas>
+          </div>
+          <div class="pdf-error" id="sx-pdf-error" role="alert" style="display:none"></div>
+        </div>
+      `;
+      const closeBtn = card.querySelector('#sx-pdf-close');
+      closeBtn?.addEventListener('click', hidePdfPanel);
+      const drop = card.querySelector('#sx-pdf-dropzone');
+      const input = card.querySelector('#sx-pdf-input');
+      const toolbar = card.querySelector('#sx-pdf-toolbar');
+      const prevBtn = card.querySelector('#sx-pdf-prev');
+      const nextBtn = card.querySelector('#sx-pdf-next');
+      const pageInput = card.querySelector('#sx-pdf-page');
+      const totalSpan = card.querySelector('#sx-pdf-total');
+      const pagesInput = card.querySelector('#sx-pdf-pages');
+      const loadUrlBtn = card.querySelector('#sx-pdf-load-url');
+      const view = card.querySelector('#sx-pdf-view');
+      const canvas = card.querySelector('#sx-pdf-canvas');
+      const err = card.querySelector('#sx-pdf-error');
+      const rangeErr = card.querySelector('#sx-pdf-range-error');
+      const hint = card.querySelector('#sx-pdf-hint');
+
+      // expose for other handlers
+      card.__pdfElems = { drop, input, toolbar, prevBtn, nextBtn, pageInput, totalSpan, pagesInput, loadUrlBtn, view, canvas, err, rangeErr, hint };
+      try{ card.__pdfElems.parsePageRanges = parsePageRanges; }catch{}
+      card.__input = input;
+
+      const showErr = (msg)=>{ try{ err.textContent = msg; err.style.display=''; }catch{} };
+      const clearErr = ()=>{ try{ err.textContent=''; err.style.display='none'; }catch{} };
+      const setTitle = (txt)=>{ try{ card.setAttribute('data-title', txt); }catch{} };
+
+      const updateControls = ()=>{
+        try{
+          const num = card.__pageNum||1, total = card.__numPages||1;
+          if (pageInput) pageInput.value = String(num);
+          if (totalSpan) totalSpan.textContent = String(total);
+          if (prevBtn) prevBtn.disabled = num<=1;
+          if (nextBtn) nextBtn.disabled = num>=total;
+        }catch{}
+      };
+
+      const parsePageRanges = (txt)=>{
+        try{
+          const total = card.__numPages||1;
+          let s = String(txt||'').trim(); if (!s) return null; // null => use current page
+          // Normalize common CJK punctuation and dash variants
+          s = s.replace(/[、，]/g, ',');
+          const out = new Set();
+          s.split(/[,]/).map(x=>x.trim()).filter(Boolean).forEach(seg=>{
+            // remove spaces inside and normalize range separators (ASCII hyphen, en/em dashes, fullwidth minus, tildes, 至/到)
+            let norm = seg.replace(/\s+/g,'').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-');
+            const m = norm.match(/^(\d+)-(\d+)$/);
+            if (m){
+              let a = parseInt(m[1],10), b = parseInt(m[2],10);
+              if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+              if (a>b) [a,b] = [b,a];
+              for (let i=a; i<=b; i++){ if (i>=1 && i<=total) out.add(i); }
+            } else {
+              const n = parseInt(norm,10); if (Number.isFinite(n) && n>=1 && n<=total) out.add(n);
+            }
+          });
+          return Array.from(out).sort((a,b)=>a-b);
+        }catch{ return []; }
+      };
+
+      const renderPage = async (num)=>{
+        clearErr();
+        try{
+          if (!card.__pdfDoc) return;
+          // Cancel any ongoing render
+          try{ card.__renderTask?.cancel(); }catch{}
+          const pdf = card.__pdfDoc;
+          const page = await pdf.getPage(num);
+          // compute scale to fit width
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const containerWidth = Math.max(320, card.clientWidth - 28);
+          const viewport0 = page.getViewport({ scale: 1 });
+          const scale = Math.max(0.5, Math.min(3.0, containerWidth / viewport0.width));
+          const viewport = page.getViewport({ scale });
+          const ctx = canvas.getContext('2d', { alpha:false });
+          canvas.width = Math.floor(viewport.width * dpr);
+          canvas.height = Math.floor(viewport.height * dpr);
+          canvas.style.width = Math.floor(viewport.width) + 'px';
+          canvas.style.height = Math.floor(viewport.height) + 'px';
+          const renderContext = { canvasContext: ctx, viewport, transform: dpr !== 1 ? [dpr,0,0,dpr,0,0] : undefined };
+          const task = page.render(renderContext);
+          card.__renderTask = task;
+          await task.promise;
+          card.__pageNum = num;
+          updateControls();
+        }catch(e){
+          if (e && e.name === 'RenderingCancelledException') return;
+          showErr((currentLangCache==='en'?'Failed to render page: ':'渲染页面失败：') + (e?.message||e));
+        }
+      };
+
+      const gotoPage = async (num)=>{
+        try{ expandPdfCard(); }catch{}
+        const total = card.__numPages||1;
+        if (num < 1 || num > total){
+          showErr(currentLangCache==='en' ? `Page out of range (1-${total})` : `页码超出范围（1-${total}）`);
+          updateControls();
+          return;
+        }
+        await renderPage(num);
+        try{ view.style.display = ''; }catch{}
+        try{ toolbar.style.display = ''; }catch{}
+        try{ updateRunButtonState(shadow); }catch{}
+      };
+
+      // When range has value, disable single page input; re-enable when cleared
+      let rangeGotoTid = null;
+      const updatePageInputState = ()=>{
+        try{
+          const hasRange = !!(pagesInput && String(pagesInput.value||'').trim());
+          if (pageInput){
+            pageInput.disabled = hasRange;
+            pageInput.setAttribute('aria-disabled', hasRange ? 'true' : 'false');
+            pageInput.title = hasRange ? (currentLangCache==='en'?'Disabled when Range is filled':'填写范围时禁用页码') : '';
+          }
+          // If range present and a PDF is loaded, preview the first page in the range
+          try{ clearTimeout(rangeGotoTid); }catch{}
+          if (hasRange && card.__pdfDoc){
+            const arr = parsePageRanges(pagesInput.value);
+            if (Array.isArray(arr) && arr.length){
+              rangeGotoTid = setTimeout(()=>{ try{ gotoPage(arr[0]); }catch{} }, 240);
+            }
+          }
+        }catch{}
+      };
+      pagesInput?.addEventListener('input', ()=>{ updatePageInputState(); try{ updateRunButtonState(shadow); }catch{} });
+      pagesInput?.addEventListener('change', ()=>{ updatePageInputState(); try{ const arr = parsePageRanges(pagesInput.value); if (Array.isArray(arr) && arr.length) gotoPage(arr[0]); updateRunButtonState(shadow); }catch{} });
+      updatePageInputState();
+
+      const handleFiles = async (file)=>{
+        clearErr();
+        if (!file){ showErr(currentLangCache==='en'?'No file selected':'未选择文件'); return; }
+        if (!/\.pdf($|\?)/i.test(file.name) && file.type !== 'application/pdf'){
+          showErr(currentLangCache==='en'?'Please choose a PDF file':'请选择 PDF 文件'); return;
+        }
+        try{
+          const ab = await file.arrayBuffer();
+          card.__pdfName = file?.name || 'document.pdf';
+          try{ const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this PDF…':'基于当前 PDF 提问…'); } }catch{}
+          try{ const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = (currentLangCache==='en'?'PDF: ':'PDF：') + (card.__pdfName||'document.pdf'); qu.title = qu.textContent; } }catch{}
+          // Lazy import pdf.js
+          let pdfjs;
+          try{
+            pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs'));
+          }catch(impErr){
+            showErr((currentLangCache==='en'?'Failed to load PDF library: ':'加载 PDF 库失败：') + (impErr?.message||impErr));
+            return;
+          }
+          try{
+            // Set worker src (requires vendor/pdfjs/pdf.worker.mjs to exist)
+            pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs');
+          }catch{}
+          const loadingTask = pdfjs.getDocument({ data: ab });
+          const pdf = await loadingTask.promise;
+          card.__pdfDoc = pdf;
+          card.__pageNum = 1;
+          card.__numPages = pdf.numPages || 1;
+          try{ toolbar.style.display = ''; }catch{}
+          try{ view.style.display = ''; }catch{}
+          setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览');
+          updateControls();
+          await renderPage(1);
+          try{ updateRunButtonState(shadow); }catch{}
+          try{
+            const msg = currentLangCache==='en'
+              ? 'Use the toolbar to flip pages. After selecting the page or range, click "Extract & Summarize" to analyze.'
+              : '使用上/下一页或输入页码翻页。完成页码或范围选择后，点击“提取并摘要”按钮进行内容分析。';
+            hint.textContent = msg;
+          }catch{}
+        }catch(e){
+          // common worker error hint
+          const needWorker = /GlobalWorkerOptions\.workerSrc|WorkerMessageHandler|worker/i.test(e?.message||'');
+          if (needWorker){
+            showErr(currentLangCache==='en'?
+              'Missing pdf.worker.mjs. Please add vendor/pdfjs/pdf.worker.mjs to the extension.' :
+              '缺少 pdf.worker.mjs。请将文件复制到 vendor/pdfjs/pdf.worker.mjs 后重试。');
+          }else{
+            showErr((currentLangCache==='en'?'Failed to render PDF: ':'渲染 PDF 失败：') + (e?.message||e));
+          }
+        }
+      };
+
+      drop?.addEventListener('click', (ev)=>{ try{ if (ev && ev.target && ev.target.closest && ev.target.closest('#sx-pdf-load-url')) return; }catch{} input?.click(); });
+      input?.addEventListener('change', ()=>{ const f = input.files && input.files[0]; if (f) handleFiles(f); });
+      // Robust DnD: handle enter/over/leave/drop and also capture at host to prevent page navigation
+      const onEnter = (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }catch{} };
+      const onOver  = (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }catch{} };
+      const onLeave = ()=>{ try{ drop.classList.remove('drag'); }catch{} };
+      const onDrop  = (ev)=>{
+        try{
+          ev.preventDefault(); ev.stopPropagation(); drop.classList.remove('drag');
+          const dt = ev.dataTransfer;
+          const file = dt && dt.files && dt.files[0] ? dt.files[0] : null;
+          if (file) { handleFiles(file); return; }
+          // Fallback: if a URL was dropped and looks like a PDF, try load via URL
+          try{
+            const url = dt?.getData('text/uri-list') || dt?.getData('text/plain') || '';
+            if (/^https?:\/\/.*\.pdf(\b|[?#])/i.test(url)){
+              (async ()=>{
+                let pdfjs; try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch{ return; }
+                try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+                const loadingTask = pdfjs.getDocument({ url });
+                const pdf = await loadingTask.promise;
+                card.__pdfDoc = pdf; card.__pageNum = 1; card.__numPages = pdf.numPages||1; card.__pdfName = (new URL(url)).pathname.split('/').pop()||'document.pdf';
+                try{ toolbar.style.display=''; view.style.display=''; setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览'); updateControls(); await renderPage(1); updateRunButtonState(shadow); }catch{}
+              })();
+            }
+          }catch{}
+        }catch{}
+      };
+      drop?.addEventListener('dragenter', onEnter, { capture:true });
+      drop?.addEventListener('dragover',  onOver,  { capture:true });
+      drop?.addEventListener('dragleave', onLeave);
+      drop?.addEventListener('drop',      onDrop,  { capture:true });
+
+      // Global capture on window/document to robustly suppress default page navigation when dropping files
+      const globalOver = (ev)=>{
+        try{
+          const path = ev.composedPath ? ev.composedPath() : [];
+          const hit = path && path.indexOf(drop) !== -1;
+          let inside = hit;
+          if (!inside){
+            const r = drop.getBoundingClientRect();
+            const x = ev.clientX, y = ev.clientY;
+            inside = (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
+          }
+          if (inside){ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }
+        }catch{}
+      };
+      const globalDrop = (ev)=>{
+        try{
+          const path = ev.composedPath ? ev.composedPath() : [];
+          const hit = path && path.indexOf(drop) !== -1;
+          let inside = hit;
+          if (!inside){
+            const r = drop.getBoundingClientRect();
+            const x = ev.clientX, y = ev.clientY;
+            inside = (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
+          }
+          if (inside){ onDrop(ev); }
+        }catch{}
+      };
+      try{
+        window.addEventListener('dragover', globalOver, { capture:true });
+        window.addEventListener('drop',     globalDrop, { capture:true });
+        document.addEventListener('dragover', globalOver, { capture:true });
+        document.addEventListener('drop',     globalDrop, { capture:true });
+        // Keep a reference for possible cleanup
+        card.__unbindDnD = ()=>{
+          try{ window.removeEventListener('dragover', globalOver, { capture:true }); }catch{}
+          try{ window.removeEventListener('drop',     globalDrop, { capture:true }); }catch{}
+          try{ document.removeEventListener('dragover', globalOver, { capture:true }); }catch{}
+          try{ document.removeEventListener('drop',     globalDrop, { capture:true }); }catch{}
+        };
+      }catch{}
+
+      // Toolbar events
+      prevBtn?.addEventListener('click', ()=>{
+        try{
+          if (pagesInput){ pagesInput.value = ''; }
+          try{ updatePageInputState(); }catch{}
+          gotoPage((card.__pageNum||1) - 1);
+        }catch{}
+      });
+      nextBtn?.addEventListener('click', ()=>{
+        try{
+          if (pagesInput){ pagesInput.value = ''; }
+          try{ updatePageInputState(); }catch{}
+          gotoPage((card.__pageNum||1) + 1);
+        }catch{}
+      });
+      pageInput?.addEventListener('keydown', (ev)=>{
+        try{
+          if (ev.key === 'Enter'){
+            ev.preventDefault();
+            const n = parseInt(pageInput.value, 10);
+            if (Number.isFinite(n)) gotoPage(n); else showErr(currentLangCache==='en'?'Invalid page number':'页码无效');
+          }
+        }catch{}
+      });
+      pageInput?.addEventListener('input', ()=>{ try{ updateRunButtonState(shadow); }catch{} });
+      pageInput?.addEventListener('blur', ()=>{
+        try{
+          const n = parseInt(pageInput.value, 10);
+          if (Number.isFinite(n)) gotoPage(n); else updateControls();
+        }catch{}
+      });
+
+      // Load from current URL when directly viewing a PDF
+      try{
+        const isPdf = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+        if (isPdf && loadUrlBtn){
+          loadUrlBtn.style.display='';
+          loadUrlBtn.textContent = currentLangCache==='en' ? 'Load this PDF (from URL)' : '从当前页面加载 PDF';
+          // On Chrome's built-in PDF viewer page, drag-and-drop to web content is intercepted by the viewer.
+          // Make this explicit in UI and suggest the two supported actions.
+          try{
+            drop.classList.add('dnd-off');
+            const msg = currentLangCache==='en'
+              ? 'Tip: On PDF viewer pages, drag & drop is blocked by the browser. Click the button below or choose a file. After choosing the page or range, click "Extract & Summarize" to analyze the content.'
+              : '提示：浏览器的 PDF 查看器会拦截拖拽。请点击下方按钮“从当前页面加载 PDF”，或点击选择本地文件。完成页码或范围选择后，点击“提取并摘要”按钮完成内容分析。';
+            if (hint) hint.textContent = msg;
+          }catch{}
+          loadUrlBtn.addEventListener('click', async (ev)=>{
+            try{ ev.preventDefault(); ev.stopPropagation(); }catch{}
+            clearErr();
+            try{
+              let pdfjs;
+              try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch(e){ showErr((currentLangCache==='en'?'Failed to load PDF library: ':'加载 PDF 库失败：') + (e?.message||e)); return; }
+              try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+              const loadingTask = pdfjs.getDocument({ url: location.href });
+              const pdf = await loadingTask.promise;
+              card.__pdfDoc = pdf; card.__pageNum = 1; card.__numPages = pdf.numPages||1;
+              card.__pdfName = (location.pathname.split('/').pop()||'document.pdf');
+              try{ toolbar.style.display=''; }catch{}
+              try{ view.style.display=''; }catch{}
+              setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览');
+              updateControls();
+              await renderPage(1);
+              try{ updateRunButtonState(shadow); }catch{}
+              try{
+                const msg = currentLangCache==='en'
+                  ? 'Use the toolbar to flip pages. After selecting the page or range, click "Extract & Summarize" to analyze.'
+                  : '使用上/下一页或输入页码翻页。完成页码或范围选择后，点击“提取并摘要”按钮进行内容分析。';
+                if (hint) hint.textContent = msg;
+              }catch{}
+            }catch(e){ showErr((currentLangCache==='en'?'Failed to open current PDF: ':'加载当前 PDF 失败：') + (e?.message||e)); }
+          });
+        }
+      }catch{}
+
+      // Re-render on resize to keep width-fit
+      let rtid = null;
+      const onResize = ()=>{
+        try{ clearTimeout(rtid); }catch{}
+        rtid = setTimeout(()=>{ try{ if (card.__pdfDoc && card.style.display !== 'none') renderPage(card.__pageNum||1); }catch{} }, 120);
+      };
+      try{ window.addEventListener('resize', onResize, { passive:true }); card.__onResize = onResize; }catch{}
+
+      // Expand on any user interaction when collapsed
+      const maybeExpand = (ev)=>{
+        try{
+          if (!card.classList.contains('pdf-collapsed')) return;
+          // ignore clicks on the close button
+          if (ev && ev.target && ev.target.closest && ev.target.closest('#sx-pdf-close')) return;
+          expandPdfCard();
+        }catch{}
+      };
+      try{ card.addEventListener('click', maybeExpand); }catch{}
+      try{ card.addEventListener('focusin', maybeExpand); }catch{}
+    }catch(e){ console.warn('buildPdfPanel failed', e); }
+  }
+
+  function collapsePdfCard(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      card.classList.add('pdf-collapsed');
+    }catch{}
+  }
+
+  function expandPdfCard(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      if (card.classList.contains('pdf-collapsed')){
+        card.classList.remove('pdf-collapsed');
+        try{ card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 600); }catch{}
+      }
+    }catch{}
+  }
+
+  // Hide only the PDF card (keep sidepanel open), and restore QA context to page
+  function hidePdfCardSoft(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      card.style.display = 'none';
+      try{
+        const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this page…':'基于当前网页提问…'); }
+        const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = location.href; qu.title = location.href; }
+      }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch{}
+  }
+
+  // If current tab is a PDF URL, briefly flash the PDF import icon to prompt user.
+  function flashPdfIconIfPdfUrl(shadow){
+    try{
+      if (shadow.__sxPdfHaloShown) return;
+      const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+      if (!isPdfUrl) return;
+      const el = shadow.getElementById('sx-pdf-ind'); if (!el) return;
+      shadow.__sxPdfHaloShown = true;
+      el.classList.add('halo-pulse');
+      const clear = ()=>{ try{ el.classList.remove('halo-pulse'); }catch{} };
+      // Safety clear after ~3 pulses
+      setTimeout(clear, 3400);
+      try{ el.addEventListener('animationend', clear, { once:true }); }catch{}
+    }catch{}
+  }
+
+  // Enable/disable the Run button based on PDF context and inputs
+  function updateRunButtonState(shadow){
+    try{
+      const btn = shadow.getElementById('sx-run'); if (!btn) return;
+      // Default: enabled unless current tab is a PDF URL and PDF card not ready/invalid
+      let disable = false;
+      const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+      if (isPdfUrl){
+        // In PDF tab, default to disabled until we positively validate conditions
+        disable = true;
+        const card = shadow.getElementById('sx-pdf');
+        const open = !!card && card.style.display !== 'none';
+        const loaded = !!card?.__pdfDoc;
+        if (open && loaded){
+          // Validate inputs: if range present, must parse to non-empty list; else page must be valid
+          const pagesInput = card.__pdfElems?.pagesInput;
+          const pageInput = card.__pdfElems?.pageInput;
+          const parse = card.__pdfElems?.parsePageRanges;
+          const total = card.__numPages || 1;
+          const hasRange = !!(pagesInput && String(pagesInput.value||'').trim());
+          if (hasRange){
+            try{
+              const arr = parse ? parse(pagesInput.value) : [];
+              if (Array.isArray(arr) && arr.length>0) {
+                disable = false;
+              } else {
+                // Fallback: if user entered something that looks like pages/ranges (contains digits), allow click
+                // Parsing might fail temporarily while typing; run-time will re-parse before extraction.
+                const looksLikeRange = /\d/.test(String(pagesInput.value||''));
+                disable = !looksLikeRange;
+              }
+            }catch{ 
+              const looksLikeRange = /\d/.test(String(pagesInput.value||''));
+              disable = !looksLikeRange; 
+            }
+          } else {
+            const n = parseInt(pageInput?.value, 10);
+            disable = !(Number.isFinite(n) && n>=1 && n<=total);
+          }
+        } else {
+          disable = true;
+        }
+      }
+      // Also keep disabled during summarizing state
+      btn.disabled = !!(disable || summarizing);
+    }catch{}
+  }
+
   function setLoading(shadow,loading){
     const runBtn=shadow.getElementById('sx-run');
     const bar=shadow.getElementById('sx-progress');
@@ -2882,6 +3622,8 @@
       else{ runBtn.textContent = currentLangCache==='en' ? 'Extract & Summarize':'提取并摘要'; }
     }
     if (bar) bar.classList.toggle('hidden', !loading);
+    // After toggling loading state, re-evaluate whether Run should remain enabled
+    try{ updateRunButtonState(shadow); }catch{}
   }
 
   // ==== Vue 挂载（如果可用）====
@@ -2968,6 +3710,8 @@
             const qaInput = shadow.getElementById('sx-qa-input');
             const qaSend  = shadow.getElementById('sx-qa-send');
             if (qaInput){ qaInput.value = q; qaInput.dispatchEvent(new Event('input', {bubbles:true})); }
+            // mark this turn as triggered from quick-ask so chat can jump to the new question reliably
+            try{ shadow.__sxFromQuickAsk = Date.now(); }catch{}
             qaSend?.click();
           }catch{}
         };
@@ -3168,7 +3912,11 @@
         const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
         chatCard.style.minWidth = '0px';
         chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
-        chatCard.style.height = (savedGeom?.height? Math.max(260, Math.min(1100, Math.round(savedGeom.height))) : chatCard.style.height);
+        // Clamp height to visible container area above QA bar
+        const maxHByCont = Math.max(260, Math.min(1100, Math.floor((getContainerBounds().contRect.height - getQABottomGap()) - 10)));
+        const wantH = savedGeom?.height? Math.max(260, Math.min(1100, Math.round(savedGeom.height))) : parseInt(getComputedStyle(chatCard).height)||360;
+        const h = Math.max(260, Math.min(maxHByCont, wantH));
+        chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
         try{ chatCard._qaHasRestored = true; chatCard._qaSizeLocked = true; }catch{}
         if (savedGeom && savedGeom.custom){
           // Clamp left within current bounds
@@ -3179,7 +3927,7 @@
           chatCard.style.left = left + 'px';
           // keep previous top if possible
           try{
-            const topMax = (containerEl.scrollTop + contRect.height) - 10 - (savedGeom.height||chatCard.getBoundingClientRect().height);
+            const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
             const topMin = containerEl.scrollTop;
             const top = Math.max(topMin, Math.min(topMax, Math.round(savedGeom.top)));
             chatCard.style.top = top + 'px';
@@ -3271,7 +4019,9 @@
           const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
           chatCard.style.minWidth = '0px';
           chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
-          const h = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+          const maxHByCont = Math.max(260, Math.min(1100, Math.floor((contRect.height - getQABottomGap()) - 10)));
+          const wantH = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+          const h = Math.max(260, Math.min(maxHByCont, wantH));
           chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
           if (ui.lastGeom.custom){
             const maxLeft = innerRightAbs - width;
@@ -3309,6 +4059,9 @@
         // keep a gap above the QA bar; adjust with latest overall upward shift (+2px)
         chatCard.style.setProperty('--qa-bottom', (qaH + 19) + 'px');
       }catch{}
+    };
+    const getQABottomGap = ()=>{
+      try{ const qaBar = shadow.getElementById('sx-qa-area'); const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60; return (qaH + 19); }catch{ return 72; }
     };
     try{ window.addEventListener('resize', ()=>{ requestAnimationFrame(()=>{ updateQABottomVar(); clampFloatWithinContainer(); }); }, { passive:true }); }catch{}
 
@@ -3521,6 +4274,10 @@
     }catch{}
 
     const showChat = (withRise)=>{
+      // If user previously minimized, restore using saved geometry instead of default sizing
+      try{
+        if (chatMinimized) { restoreChat(); return; }
+      }catch{}
       chatCard.style.display='';
       if (hasSummarizeTriggered){
         ensureChatTools();
@@ -3606,8 +4363,11 @@
         const margin = 8;
         const uTop = offsetWithin(userBubble, chatList);
         const aBottom = offsetWithin(aiBubble, chatList) + (aiBubble.getBoundingClientRect().height || 0);
-        let desired = Math.min(uTop - margin, aBottom - H + margin);
-        if (!Number.isFinite(desired)) desired = uTop - margin;
+        // Ensure the AI bubble bottom is visible, while keeping the user bubble near the top margin.
+        const desiredTop = uTop - margin;
+        const desiredBottom = aBottom - H + margin;
+        let desired = Math.max(desiredBottom, desiredTop);
+        if (!Number.isFinite(desired)) desired = Math.max(0, desiredTop);
         chatList.scrollTo({ top: Math.max(0, desired), behavior: 'auto' });
       }catch{}
     };
@@ -3661,6 +4421,21 @@
       const aiBubble = appendBubble('ai', '', true);
       // After both bubbles are in, adjust viewport to show user bubble and as much of AI as possible
       try{ adjustChatViewport(userBubble, aiBubble); requestAnimationFrame(()=>adjustChatViewport(userBubble, aiBubble)); }catch{}
+      // If triggered from quick-ask, force a second pass scroll anchoring on the freshly created bubble
+      try{
+        if (shadow.__sxFromQuickAsk){
+          const delay = 100; // wait for layout/size to settle
+          setTimeout(()=>{
+            try{
+          // Only adjust the chat's own scroller; do not move the sidepanel container.
+          // A second pass ensures the typing bubble is fully visible without clipping.
+          adjustChatViewport(userBubble, aiBubble);
+          requestAnimationFrame(()=>{ try{ adjustChatViewport(userBubble, aiBubble); }catch{} });
+            }catch{}
+          }, delay);
+          try{ delete shadow.__sxFromQuickAsk; }catch{}
+        }
+      }catch{}
       // Clear the input so user text doesn't linger
       try{ qaInput.value=''; qaInput.style.height=''; }catch{}
       // During loading, hide other cards only if summarize hasn't been triggered
@@ -3704,7 +4479,66 @@
       // Global progress bar like summarize
       try{ setLoading(shadow, true); }catch{}
       try{
-        const resp = await chrome.runtime.sendMessage({ type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) });
+        // If a PDF is loaded (even if the card is hidden), pass current selection (range or current page) to background for QA.
+        let qaMsg = { type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) };
+        try{
+          const pdfCard = shadow.getElementById('sx-pdf');
+          const pdfLoaded = !!pdfCard?.__pdfDoc;
+          if (pdfLoaded){
+            let pages = null;
+            try{
+              const pagesInput = pdfCard.__pdfElems?.pagesInput;
+              const parse = pdfCard.__pdfElems?.parsePageRanges;
+              const val = pagesInput?.value || '';
+              if (val && parse){ pages = parse(val); }
+            }catch{}
+            if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+            let text = '';
+            for (const num of pages){
+              try{
+                const page = await pdfCard.__pdfDoc.getPage(num);
+                const tc = await page.getTextContent();
+                const chunks = [];
+                for (const it of (tc.items||[])){
+                  const s = (it && typeof it.str === 'string') ? it.str : '';
+                  if (s) chunks.push(s);
+                }
+                if (chunks.length){
+                  if (text) text += '\n\n';
+                  text += (currentLangCache==='en'?`[Page ${num}]`:`[第 ${num} 页]`) + '\n' + chunks.join('\n');
+                }
+              }catch{}
+            }
+            if (text){ qaMsg.pdf = { title: pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档'), text, url: 'pdf://local', pageLang: '' }; }
+          } else {
+            // Fallback: If current tab is a PDF URL, try to read page 1 quickly for QA
+            try{
+              const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+              if (isPdfUrl){
+                let pdfjs;
+                try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch{}
+                if (pdfjs){
+                  try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+                  const loadingTask = pdfjs.getDocument({ url: location.href });
+                  const pdf = await loadingTask.promise;
+                  const page = await pdf.getPage(1);
+                  const tc = await page.getTextContent();
+                  const chunks = [];
+                  for (const it of (tc.items||[])){
+                    const s = (it && typeof it.str === 'string') ? it.str : '';
+                    if (s) chunks.push(s);
+                  }
+                  const text = chunks.join('\n');
+                  if (text){
+                    const name = (location.pathname.split('/').pop()||'document.pdf');
+                    qaMsg.pdf = { title: name, text, url: location.href, pageLang: '' };
+                  }
+                }
+              }
+            }catch{}
+          }
+        }catch{}
+        const resp = await chrome.runtime.sendMessage(qaMsg);
         if (!resp?.ok) throw new Error(resp?.error || 'QA failed');
         // If user minimized during processing, do not auto-pop the chat back
         if (!chatMinimized) {
@@ -3878,6 +4712,27 @@
           return;
         }
       } catch {}
+      // 检查是否在 PDF 预览态
+      const pdfCard = shadow.getElementById('sx-pdf');
+      const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
+      const pdfLoaded = !!pdfCard?.__pdfDoc;
+      const isPdfMode = pdfOpen && pdfLoaded;
+
+      // 若已打开 PDF 卡片但尚未加载文档，提示并中止
+      if (pdfOpen && !pdfLoaded){
+        const box=shadow.getElementById('sx-summary');
+        const msg = currentLangCache==='en' ? 'Please load a PDF first, then click Summarize.' : '请先加载 PDF 文件，然后再点击“提取并摘要”。';
+        box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+        setSummarizing(shadow,false); setLoading(shadow,false);
+        return;
+      }
+
+      // 若使用 PDF 源，确保摘要与正文卡片可见
+      if (isPdfMode){
+        try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+      }
+
       // Handle folded (empty) state: expand middle first, then reveal cards
       const wrapEl = shadow.getElementById('sx-wrap');
       const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
@@ -3894,8 +4749,118 @@
       if (!wasEmpty) skeleton(shadow);
 
       const tabId=await getActiveTabId(); if(!tabId) throw new Error('未找到活动标签页');
-      const resp=await chrome.runtime.sendMessage({type:'PANEL_RUN_FOR_TAB', tabId});
-      if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+
+      // 在进入运行态前，立即根据来源设置摘要/正文标题（loading 期间也显示 PDF 标记）
+      try{ const meta = { source: isPdfMode ? 'pdf' : 'page' }; setSummaryTitleBySource(meta); setCleanedTitleBySource(meta); }catch{}
+
+      // 使用 PDF 文本运行或网页抓取
+      if (isPdfMode){
+        // 解析范围：为空则默认当前页
+        const pagesInput = pdfCard.__pdfElems?.pagesInput;
+        let pages = null;
+        try{
+          pages = pagesInput ? (function(){ const v = pagesInput.value||''; const fn = pdfCard.__pdfElems?.parsePageRanges || parsePageRanges; return fn ? fn(v) : null; })() : null;
+        }catch{}
+        const rawRange = String(pagesInput?.value||'').trim();
+        const totalPages = pdfCard.__numPages || 1;
+        // 校验：若用户填写了范围但解析为空，或范围中包含超出总页数的页码，则报错
+        if (rawRange){
+          // Recompute pages at runtime and show errors in PDF card area
+          try{
+            const errEl = pdfCard.__pdfElems?.rangeErr; if (errEl){ errEl.textContent=''; errEl.style.display='none'; }
+            const norm0 = rawRange.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+            let hasNumber0=false, hasOutOfBounds0=false; const out0 = new Set();
+            norm0.split(',').filter(Boolean).forEach(seg=>{
+              const m=seg.match(/^(\d+)(?:-(\d+))?$/);
+              if (m){
+                hasNumber0=true; const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN; let lo=Number.isFinite(b)?Math.min(a,b):a; let hi=Number.isFinite(b)?Math.max(a,b):a;
+                if (lo<1 || hi>totalPages) hasOutOfBounds0=true;
+                for (let i=lo;i<=hi;i++){ if(i>=1 && i<=totalPages) out0.add(i); }
+              }
+            });
+            const arr0 = Array.from(out0).sort((a,b)=>a-b);
+            if (!arr0.length){
+              const msg = currentLangCache==='en' ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.` : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+              if (errEl){ errEl.textContent = msg; errEl.style.display=''; }
+              setSummarizing(shadow,false); setLoading(shadow,false);
+              return;
+            }
+            if (hasNumber0 && hasOutOfBounds0){
+              const msg = currentLangCache==='en' ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.` : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+              if (errEl){ errEl.textContent = msg; errEl.style.display=''; }
+              setSummarizing(shadow,false); setLoading(shadow,false);
+              return;
+            }
+            pages = arr0;
+          }catch{}
+          // Detect any numbers in raw input and whether any are out of [1..total]
+          const norm = rawRange.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+          let hasNumber=false, hasOutOfBounds=false;
+          try{
+            norm.split(',').filter(Boolean).forEach(seg=>{
+              const m=seg.match(/^(\d+)(?:-(\d+))?$/);
+              if (m){
+                hasNumber=true; const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN;
+                const lo = Number.isFinite(b)? Math.min(a,b) : a; const hi = Number.isFinite(b)? Math.max(a,b) : a;
+                if (lo<1 || hi>totalPages) hasOutOfBounds=true;
+              }
+            });
+          }catch{}
+          if (!Array.isArray(pages) || pages.length===0){
+            const box=shadow.getElementById('sx-summary');
+            const msg = currentLangCache==='en'
+              ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.`
+              : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+            box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          if (hasNumber && hasOutOfBounds){
+            const box=shadow.getElementById('sx-summary');
+            const msg = currentLangCache==='en'
+              ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.`
+              : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+            box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+        }
+        if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+        // 提取所选页文本（顺序串行）
+        let text = '';
+        try{
+          for (const num of pages){
+            const page = await pdfCard.__pdfDoc.getPage(num);
+            const tc = await page.getTextContent();
+            const chunks = [];
+            for (const it of (tc.items||[])){
+              const s = (it && typeof it.str === 'string') ? it.str : '';
+              if (s) chunks.push(s);
+            }
+            if (chunks.length){
+              if (text) text += '\n\n';
+              text += (currentLangCache==='en'?`[Page ${num}]`:`[第 ${num} 页]`) + '\n' + chunks.join('\n');
+            }
+          }
+          if (!text){ throw new Error(currentLangCache==='en'?'No text extracted from selected pages':'所选页面未能提取到文本'); }
+        }catch(e){
+          const box=shadow.getElementById('sx-summary');
+          const msg = (currentLangCache==='en'?'Failed to read PDF text: ':'读取 PDF 文本失败：') + (e?.message||e);
+          box.innerHTML = `<div class=\"alert\"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+          setSummarizing(shadow,false); setLoading(shadow,false);
+          return;
+        }
+        const title = pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档');
+        const url = 'pdf://local';
+        const payload = { title, text, url, pageLang: '', markdown: null };
+        const resp = await chrome.runtime.sendMessage({ type:'PANEL_RUN_FOR_TEXT', tabId, payload });
+        if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+        // hide PDF preview area entirely to surface summary cards
+        try{ hidePdfCardSoft(); }catch{}
+      } else {
+        const resp=await chrome.runtime.sendMessage({type:'PANEL_RUN_FOR_TAB', tabId});
+        if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+      }
 
       // After expansion, reveal cards and play pull-in animation
       if (wasEmpty){
@@ -3967,6 +4932,8 @@
     applyThemeWithOverride(shadow); markThemeButtonsActive(shadow);
 
     await updateUIText();
+    try{ updateRunButtonState(shadow); }catch{}
+    try{ flashPdfIconIfPdfUrl(shadow); }catch{}
     applyTrialLabelToFloatButton(shadow);
     try{ await updateAdblockIndicator(shadow); }catch{}
     try{ bindAdblockIndicatorToggle(shadow); }catch{}
@@ -3982,6 +4949,7 @@
       // Pre-mark summarize as triggered if panel state indicates it
       try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
       if (st.status==='running'){
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
@@ -3991,12 +4959,14 @@
         setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
       }
       else if (st.status==='done'){
         setSummarizing(shadow,false);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
       }
       else { await setEmpty(shadow); }
@@ -4060,13 +5030,16 @@
               const availW = Math.max(0, innerRightAbs - innerLeftAbs);
               return { contRect, innerLeftAbs, innerRightAbs, availW };
             };
+            const getQABottomGapLocal = ()=>{ try{ const qaBar = shadow.getElementById('sx-qa-area'); const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60; return (qaH + 19); }catch{ return 72; } };
             const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
             const hardMaxW = 1400;
             const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
             const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
             chatCard.style.minWidth = '0px';
             chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
-            const h = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+            const maxHByCont = Math.max(260, Math.min(1100, Math.floor((contRect.height - getQABottomGapLocal()) - 10)));
+            const wantH = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+            const h = Math.max(260, Math.min(maxHByCont, wantH));
             chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
             if (ui.lastGeom.custom){
               const maxLeft = innerRightAbs - width;
