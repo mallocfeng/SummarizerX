@@ -1,5 +1,53 @@
 # Changelog
 
+## v2.3.0 - 2025-01-XX
+
+### English
+- **PDF AI Summarization**: Major new feature supporting both local PDF files and online PDF URLs
+  - Import PDFs via drag-and-drop or file picker in the floating side panel
+  - Preview PDF pages with navigation controls (previous/next page, direct page input)
+  - Select specific page ranges for AI summarization (e.g., "1-3,5" or "10-15")
+  - Real-time page range validation with clear error messages
+  - PDF text extraction and AI processing with the same providers (OpenAI, DeepSeek, Trial, Custom)
+  - Integrated PDF.js for robust PDF rendering and text extraction
+- **PDF Panel UI**: Dedicated PDF preview card with modern interface
+  - Collapsible PDF panel with smooth animations
+  - Page navigation toolbar with current page indicator
+  - Range input with placeholder examples and validation
+  - Error handling with user-friendly messages in both languages
+  - Theme-aware styling (light/dark mode support)
+- **Error Handling**: Improved PDF range validation and error clearing
+  - Clear previous error messages when correcting page ranges
+  - Automatic error clearing when starting new summarization runs
+  - Bilingual error messages for better user guidance
+- **Performance**: Optimized PDF processing with local PDF.js integration
+  - No external dependencies for PDF handling
+  - Efficient text extraction from PDF pages
+  - Memory management for large PDF files
+
+### 中文
+- **PDF AI 摘要**：重大新功能，支持本地 PDF 文件和在线 PDF 链接
+  - 在浮动侧边栏中通过拖拽或文件选择器导入 PDF
+  - 预览 PDF 页面，支持导航控制（上一页/下一页、直接输入页码）
+  - 选择特定页面范围进行 AI 摘要（例如："1-3,5" 或 "10-15"）
+  - 实时页面范围验证，提供清晰的错误提示
+  - PDF 文本提取和 AI 处理，支持所有现有提供商（OpenAI、DeepSeek、试用、自定义）
+  - 集成 PDF.js 实现稳定的 PDF 渲染和文本提取
+- **PDF 面板界面**：专用的 PDF 预览卡片，采用现代化界面
+  - 可折叠的 PDF 面板，带有流畅动画
+  - 页面导航工具栏，显示当前页码指示器
+  - 范围输入框，带有示例占位符和验证
+  - 错误处理，提供中英双语用户友好提示
+  - 主题感知样式（支持明暗模式）
+- **错误处理**：改进的 PDF 范围验证和错误清除
+  - 修正页面范围时清除之前的错误消息
+  - 开始新的摘要运行时自动清除错误
+  - 双语错误消息，提供更好的用户指导
+- **性能**：通过本地 PDF.js 集成优化 PDF 处理
+  - PDF 处理无外部依赖
+  - 高效的 PDF 页面文本提取
+  - 大文件的内存管理
+
 ## v2.2.5-beta - 2025-09-18
 
 ### English

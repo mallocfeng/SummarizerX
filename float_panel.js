@@ -3291,8 +3291,8 @@
           }
         }catch{}
       };
-      pagesInput?.addEventListener('input', ()=>{ updatePageInputState(); try{ updateRunButtonState(shadow); }catch{} });
-      pagesInput?.addEventListener('change', ()=>{ updatePageInputState(); try{ const arr = parsePageRanges(pagesInput.value); if (Array.isArray(arr) && arr.length) gotoPage(arr[0]); updateRunButtonState(shadow); }catch{} });
+      pagesInput?.addEventListener('input', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } updateRunButtonState(shadow); }catch{} });
+      pagesInput?.addEventListener('change', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } const arr = parsePageRanges(pagesInput.value); if (Array.isArray(arr) && arr.length) gotoPage(arr[0]); updateRunButtonState(shadow); }catch{} });
       updatePageInputState();
 
       const handleFiles = async (file)=>{
@@ -4718,6 +4718,15 @@
       const pdfLoaded = !!pdfCard?.__pdfDoc;
       const isPdfMode = pdfOpen && pdfLoaded;
 
+      // 清除上一次 PDF 错误提示（若存在），避免在新一轮运行时残留
+      if (isPdfMode){
+        try{
+          const els = pdfCard.__pdfElems;
+          if (els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; }
+          if (els?.err){ els.err.textContent=''; els.err.style.display='none'; }
+        }catch{}
+      }
+
       // 若已打开 PDF 卡片但尚未加载文档，提示并中止
       if (pdfOpen && !pdfLoaded){
         const box=shadow.getElementById('sx-summary');
@@ -5157,18 +5166,24 @@
         const st=await getState(curId);
         try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
         if (st.status==='running'){
+          // 面板进入运行态时隐藏任何 PDF 错误提示
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
           setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{}
         }
         else if (st.status==='partial'){
+          // 收到部分结果时也确保清理 PDF 错误
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
           setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); await renderCards(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
         }
         else if (st.status==='done'){
+          // 完成时确保不显示任何旧的 PDF 错误
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
           setSummarizing(shadow,false);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');

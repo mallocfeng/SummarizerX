@@ -14,14 +14,20 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.2.6 (dev/next branch)
+Current beta: v2.3.0 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
 ### ✨ Features
 
 - 📰 Clean Content Extraction: Remove ads, navigation, and clutter for focused reading  
-- 📖 Reader Mode Overlay: One‑click clean reading view in a centered dialog with a frosted header, separate vertical scrollbar (never covering the Close button), live theme sync (Auto/Light/Dark), and contained scrolling that doesn’t move the page. Open it via the small book icon in the panel title bar.  
+- 📖 Reader Mode Overlay: One‑click clean reading view in a centered dialog with a frosted header, separate vertical scrollbar (never covering the Close button), live theme sync (Auto/Light/Dark), and contained scrolling that doesn't move the page. Open it via the small book icon in the panel title bar.  
+- 📄 **PDF AI Summarization**: Import and process PDF files (local or online URLs) with AI-powered summarization
+  - Drag-and-drop or file picker to import PDFs in the floating panel
+  - Preview PDF pages with navigation controls and page range selection
+  - Select specific pages for summarization (e.g., "1-3,5" or "10-15")
+  - Real-time validation with clear error messages
+  - Integrated PDF.js for robust rendering and text extraction
 - 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click  
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
@@ -84,6 +90,7 @@ Current beta: v2.2.6 (dev/next branch)
 - Click the **Summary** icon in the toolbar to open the floating panel  
 - Select text or let it auto-extract the main content  
 - Choose summarize or translate options  
+- **For PDFs**: Click the PDF icon in the panel header, drag-and-drop a PDF file, then select page ranges for AI summarization
 - Customize prompts and modes in settings  
 - Use the new **right-click menu** to translate selected text instantly
  - Use **Translate full page** from the right-click menu to insert translations below each paragraph as quote blocks; switch back via **Show original**
@@ -122,7 +129,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 ## 中文简介
 
 当前稳定版：v1.9.1 (main分支)
-当前测试版：v2.2.1-beta (dev/next分支)
+当前测试版：v2.3.0 (dev/next分支)
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 
@@ -130,6 +137,12 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 - 📰 干净的内容提取：去除广告、导航和杂乱内容，专注阅读  
 - 📖 阅读模式浮窗：一键打开居中的干净阅读视图，带磨砂标题栏；正文拥有独立的垂直滚动条（不会遮住关闭按钮），并与侧栏外观（自动/浅色/深色）实时联动；滚动事件被容器吸收，不会带动背景页面。点击侧栏标题行的小书图标即可打开。  
+- 📄 **PDF AI 摘要**：导入并处理 PDF 文件（本地或在线链接），支持 AI 驱动的摘要功能
+  - 在浮动面板中通过拖拽或文件选择器导入 PDF
+  - 预览 PDF 页面，支持导航控制和页面范围选择
+  - 选择特定页面进行摘要（例如："1-3,5" 或 "10-15"）
+  - 实时验证，提供清晰的错误提示
+  - 集成 PDF.js 实现稳定的渲染和文本提取
 - 🤖 AI 驱动的摘要与翻译：一键生成简洁摘要或翻译  
 - ⚙️ 个性化设置：自定义提示词、模式、快捷键和界面偏好  
 - 📑 浮动面板：无需跳转页面即可查看摘要  
@@ -192,10 +205,11 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 点击工具栏中的 **Summary** 图标，打开浮动面板  
 - 选中文本或自动提取正文  
 - 选择摘要或翻译功能  
+- **PDF 处理**：点击面板标题栏的 PDF 图标，拖拽 PDF 文件或选择文件，然后选择页面范围进行 AI 摘要
 - 在设置中自定义提示词和模式  
 - 使用新增的 **右键菜单翻译** 功能，立即翻译所选文本
  - 在网页空白处右键选择 **全文翻译**，系统会在每段原文下方插入引用块译文；需要恢复时选择 **显示原文**
- - 使用 **全文翻译** 右键菜单，在原文下方以引用块展示译文，并可在“全文翻译 / 显示原文”间切换
+ - 使用 **全文翻译** 右键菜单，在原文下方以引用块展示译文，并可在"全文翻译 / 显示原文"间切换
 
 ### ⚙️ 设置说明
 
