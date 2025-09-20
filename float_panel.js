@@ -2285,10 +2285,12 @@
   })();
   // 阅读模式
   shadow.getElementById('sx-reader-ind')?.addEventListener('click', async ()=>{
+    if (summarizing) return; // Block during processing
     try{ await openReaderOverlay(); }catch(e){ console.warn('reader overlay failed', e); }
   });
   // PDF 导入
   shadow.getElementById('sx-pdf-ind')?.addEventListener('click', async ()=>{
+    if (summarizing) return; // Block during processing
     try{ await openPdfPanel(); }catch(e){ console.warn('pdf panel failed', e); }
   });
   // Ensure reader tooltip
@@ -3299,6 +3301,7 @@
     try{
       const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
       const toggle = async ()=>{
+        if (summarizing) return; // Block during processing
         try{
           const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
           const next = !adblock_enabled;
@@ -4151,7 +4154,37 @@
       if (qaSend) qaSend.disabled = blocked;
     }catch{}
   }
-  function setSummarizing(shadow, on){ summarizing = !!on; updateQAControls(shadow); }
+  function setSummarizing(shadow, on){ 
+    summarizing = !!on; 
+    updateQAControls(shadow);
+    // Disable/enable indicator buttons during processing
+    updateIndicatorButtons(shadow, !on);
+  }
+
+  // Update indicator buttons (adblock, reader, PDF) enabled/disabled state
+  function updateIndicatorButtons(shadow, enabled){
+    try{
+      const adfInd = shadow.getElementById('sx-adf-ind');
+      const readerInd = shadow.getElementById('sx-reader-ind');
+      const pdfInd = shadow.getElementById('sx-pdf-ind');
+      
+      if (adfInd){
+        adfInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        adfInd.style.opacity = enabled ? '1' : '0.5';
+        adfInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+      if (readerInd){
+        readerInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        readerInd.style.opacity = enabled ? '1' : '0.5';
+        readerInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+      if (pdfInd){
+        pdfInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        pdfInd.style.opacity = enabled ? '1' : '0.5';
+        pdfInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+    }catch{}
+  }
   function setupQABar(shadow){
     const qaInput = shadow.getElementById('sx-qa-input');
     const qaSend = shadow.getElementById('sx-qa-send');
