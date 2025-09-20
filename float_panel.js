@@ -2400,17 +2400,45 @@
     }
     let dragging=false;
     function start(){ dragging=true; wrapEl?.classList.add('dragging'); document.documentElement.style.userSelect='none'; try{ updateEmptyArrowPosition(); }catch{} }
-    function end(){ dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect=''; window.removeEventListener('mousemove', mm, true); window.removeEventListener('mouseup', mu, true); window.removeEventListener('touchmove', tm, {capture:true, passive:false}); window.removeEventListener('touchend', te, {capture:true}); }
+    function end(){
+      dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect='';
+      // Mouse/touch fallback cleanup
+      window.removeEventListener('mousemove', mm, true);
+      window.removeEventListener('mouseup', mu, true);
+      try{ window.removeEventListener('touchmove', tm, {capture:true, passive:false}); }catch{}
+      try{ window.removeEventListener('touchend', te, {capture:true}); }catch{}
+      // Pointer events cleanup
+      try{ window.removeEventListener('pointermove', pm, true); }catch{}
+      try{ window.removeEventListener('pointerup', pu, true); }catch{}
+      try{ window.removeEventListener('pointercancel', pc, true); }catch{}
+      try{ drag.removeEventListener('lostpointercapture', pc, { capture:true }); }catch{}
+    }
     const mm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
     const mu=()=>{ if(!dragging) return; end(); };
     const tm=(ev)=>{ if(!dragging) return; if(ev.touches && ev.touches[0]) setW(ev.touches[0].clientX); updateEmptyArrowPosition(); ev.preventDefault(); };
     const te=()=>{ if(!dragging) return; end(); };
-    drag?.addEventListener('mousedown',(e)=>{ start(); try{ e.preventDefault(); }catch{} window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
-    drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
+    const hasPointer = (typeof window !== 'undefined') && ('PointerEvent' in window);
+    // Mouse/touch fallback path (older browsers). In Chrome we prefer Pointer Events.
+    if (!hasPointer){
+      drag?.addEventListener('mousedown',(e)=>{ start(); try{ e.preventDefault(); }catch{} window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
+      drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
+    }
     // Pointer events path: more robust on PDF viewer and special pages
     const pm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
-    const pu=(ev)=>{ if(!dragging) return; try{ drag.releasePointerCapture(ev.pointerId); }catch{} end(); try{ drag.removeEventListener('pointermove', pm, true); }catch{} };
-    drag?.addEventListener('pointerdown', (e)=>{ try{ drag.setPointerCapture(e.pointerId); }catch{} start(); try{ e.preventDefault(); }catch{} drag.addEventListener('pointermove', pm, true); drag.addEventListener('pointerup', pu, { once:true, capture:true }); });
+    const pu=(ev)=>{ if(!dragging) return; try{ drag.releasePointerCapture(ev.pointerId); }catch{} end(); };
+    const pc=(ev)=>{ if(!dragging) return; end(); };
+    if (hasPointer){
+      drag?.addEventListener('pointerdown', (e)=>{
+        start();
+        try{ drag.setPointerCapture(e.pointerId); }catch{}
+        try{ e.preventDefault(); }catch{}
+        // Track moves on window to avoid missing events when leaving handle
+        window.addEventListener('pointermove', pm, true);
+        window.addEventListener('pointerup', pu, { once:true, capture:true });
+        window.addEventListener('pointercancel', pc, { once:true, capture:true });
+        drag.addEventListener('lostpointercapture', pc, { once:true });
+      });
+    }
     drag?.addEventListener('dblclick', async ()=>{
       const cur=parseInt(getComputedStyle(host).width,10)||420;
       const target=cur<520? 560: 380;
