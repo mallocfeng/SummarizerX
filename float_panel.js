@@ -44,6 +44,7 @@
                .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
                .replace(/\*(.+?)\*/g,'<em>$1</em>')
                .replace(/`([^`]+?)`/g,'<code>$1</code>')
+               .replace(/\^([^^]+)\^/g,'<sup>$1</sup>')
                .replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm,(block)=>{
                   const items = block.split(/\n/).map(l=>l.replace(/^(?:- |\* )/,'').trim()).filter(Boolean);
                   return `<ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
@@ -103,7 +104,9 @@
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/\*(.+?)\*/g,'<em>$1</em>')
       .replace(/`([^`]+?)`/g,'<code>$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Superscript: convert caret markers like ^6^ to <sup>6</sup>
+      .replace(/\^(\d{1,3})\^/g,'<sup>$1</sup>');
 
     html = html.replace(/\n{2,}/g,'<br><br>');
     html = html.replace(/(?:<br\s*\/?>\s*){3,}/gi,'<br><br>');
@@ -2905,20 +2908,246 @@
           }
         }catch{}
         if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
-        // Extract text for the selected pages (sequential to preserve order)
+        // Extract text for the selected pages with enhanced formatting
         let text = '';
         try{
           for (const num of pages){
             const page = await pdfCard.__pdfDoc.getPage(num);
             const tc = await page.getTextContent();
-            const chunks = [];
-            for (const it of (tc.items||[])){
-              const s = (it && typeof it.str === 'string') ? it.str : '';
-              if (s) chunks.push(s);
+            
+            // Enhanced text extraction with formatting preservation
+            const textItems = [];
+            const pageWidth = page.view[2] - page.view[0]; // Get page width
+            
+            // First pass: collect all text items with their positions
+            for (const item of (tc.items||[])){
+              if (!item || typeof item.str !== 'string' || !item.str.trim()) continue;
+              
+              const str = item.str;
+              const x = item.transform ? item.transform[4] : 0;
+              const y = item.transform ? item.transform[5] : 0;
+              const fontSize = item.transform ? Math.abs(item.transform[0]) : 12;
+              const fontName = item.fontName || '';
+              const width = item.width || 0;
+              
+              textItems.push({
+                str: str,
+                x: x,
+                y: y,
+                fontSize: fontSize,
+                fontName: fontName,
+                width: width
+              });
             }
-            if (chunks.length){
+            
+            // Sort by Y position (top to bottom), then by X position (left to right)
+            textItems.sort((a, b) => {
+              const yDiff = Math.abs(a.y - b.y);
+              if (yDiff > 2) return b.y - a.y; // Different lines, sort by Y
+              return a.x - b.x; // Same line, sort by X
+            });
+            
+            // Group items into lines and process formatting
+            const lines = [];
+            let currentLine = [];
+            let lastY = null;
+            
+            for (const item of textItems) {
+              // Check if this is a new line
+              if (lastY !== null && Math.abs(item.y - lastY) > 2) {
+                if (currentLine.length > 0) {
+                  lines.push(currentLine);
+                  currentLine = [];
+                }
+              }
+              currentLine.push(item);
+              lastY = item.y;
+            }
+            if (currentLine.length > 0) {
+              lines.push(currentLine);
+            }
+            
+            // Process each line for formatting and structure
+            const formattedChunks = [];
+            
+            for (const line of lines) {
+              if (line.length === 0) continue;
+              
+              // Detect column structure (left/right layout)
+              const leftItems = [];
+              const rightItems = [];
+              const centerThreshold = pageWidth * 0.4; // 40% from left as threshold
+              
+              for (const item of line) {
+                if (item.x < centerThreshold) {
+                  leftItems.push(item);
+                } else {
+                  rightItems.push(item);
+                }
+              }
+              
+              // Process left and right columns separately
+              const processColumn = (items) => {
+                if (items.length === 0) return '';
+                
+                let columnText = '';
+                let lastX = -1;
+                
+                for (const item of items) {
+                  // Add space if there's a gap between items
+                  if (lastX > 0 && item.x - lastX > 5) {
+                    columnText += ' ';
+                  }
+                  
+                  // Detect formatting
+                  let formattedStr = item.str;
+                  
+                  // Detect superscript/subscript (smaller font size): only wrap short numeric markers
+                  if (item.fontSize < 8) {
+                    const t = String(item.str||'').trim();
+                    if (/^\d{1,3}$/.test(t)) formattedStr = `^${t}^`;
+                    else formattedStr = t || item.str;
+                  }
+                  // Detect heading-like formatting (larger font size)
+                  else if (item.fontSize > 14) {
+                    formattedStr = `**${item.str}**`;
+                  }
+                  // Detect bold-like formatting
+                  else if (item.fontName.toLowerCase().includes('bold') || 
+                           item.fontName.toLowerCase().includes('black')) {
+                    formattedStr = `**${item.str}**`;
+                  }
+                  // Detect italic-like formatting
+                  else if (item.fontName.toLowerCase().includes('italic') || 
+                           item.fontName.toLowerCase().includes('oblique')) {
+                    formattedStr = `*${item.str}*`;
+                  }
+                  
+                  columnText += formattedStr;
+                  lastX = item.x + item.width;
+                }
+                
+                return columnText.trim();
+              };
+              
+              let leftText = processColumn(leftItems);
+              let rightText = processColumn(rightItems);
+
+              // If left looks like a superscripted heading captured (short small-font run before a title), drop it
+              // Example: "^New features available with iOS 26^" — only numeric superscripts should remain
+              if (/\^[^\d^][\s\S]*?\^$/.test(leftText)){
+                leftText = leftText.replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              }
+              if (/\^[^\d^][\s\S]*?\^$/.test(rightText)){
+                rightText = rightText.replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              }
+              
+              // Combine columns with smart superscript handling and artifact filtering
+              let lineText = '';
+              if (leftText && rightText) {
+                // Check if both columns have the same superscript number
+                const leftSupMatch = leftText.match(/\^(\d+)\^/);
+                const rightSupMatch = rightText.match(/\^(\d+)\^/);
+                
+                if (leftSupMatch && rightSupMatch && leftSupMatch[1] === rightSupMatch[1]) {
+                  // Same superscript in both columns, keep only one
+                  const supNum = leftSupMatch[1];
+                  const cleanLeft = leftText.replace(/\^\d+\^/g, '').trim();
+                  const cleanRight = rightText.replace(/\^\d+\^/g, '').trim();
+                  lineText = `${cleanLeft} | ${cleanRight} ^${supNum}^`;
+                } else {
+                  // Different or no superscripts, keep both
+                  lineText = `${leftText} | ${rightText}`;
+                }
+                // If one side degenerates into just a small number or punct, drop it
+                if (/^\(?\d{1,3}\)?[\.:]?$/.test(leftText) && rightText.length>2) lineText = rightText;
+                if (/^\(?\d{1,3}\)?[\.:]?$/.test(rightText) && leftText.length>2) lineText = leftText;
+              } else if (leftText) {
+                lineText = leftText;
+              } else if (rightText) {
+                lineText = rightText;
+              }
+              
+              if (lineText.trim()) {
+                formattedChunks.push(lineText.trim());
+              }
+            }
+            
+            // Post-process to improve formatting
+            const processedChunks = [];
+            for (let i = 0; i < formattedChunks.length; i++) {
+              let chunk = String(formattedChunks[i]||'').trim();
+              
+              // Clean up excessive bold/italic markers
+              chunk = chunk.replace(/\*\*\*\*/g, '').replace(/\*\*\*/g, '**');
+              
+              // Handle isolated numbers (likely page numbers/figure labels)
+              if (/^\(?\d{1,3}\)?[\.:]?$/.test(chunk)) {
+                // Skip isolated small numbers (likely page numbers or footnotes)
+                continue;
+              }
+              
+              // Clean up duplicate superscript markers
+              chunk = chunk.replace(/\^\^/g, '^');
+              
+              // Handle superscript numbers (footnotes, references) - already handled with ^ markers
+              
+              // Detect and format list items (avoid false positives like single-digit artifacts)
+              if (/^\d{1,2}[\.\)]\s/.test(chunk)) {
+                // Numbered list
+                chunk = `- ${chunk.replace(/^\d{1,2}[\.\)]\s/, '')}`;
+              } else if (chunk.match(/^[•·▪▫‣⁃]\s/)) {
+                // Bullet list
+                chunk = `- ${chunk.replace(/^[•·▪▫‣⁃]\s/, '')}`;
+              } else if (chunk.match(/^[-*]\s/)) {
+                // Already formatted list
+                chunk = chunk;
+              }
+              
+              // Detect potential headings (short lines with bold formatting)
+              if (chunk.match(/^\*\*[^*]+\*\*$/) && chunk.length < 100) {
+                // Convert to proper heading
+                chunk = chunk.replace(/^\*\*(.+)\*\*$/, '### $1');
+              }
+              
+              // Detect potential code blocks or technical content
+              if (chunk.match(/^[A-Z_][A-Z0-9_]*\s*[=:]/) || 
+                  chunk.match(/^[a-z]+\.[a-z]+\(/) ||
+                  chunk.match(/^[A-Z][a-z]+[A-Z][a-z]+/) ||
+                  chunk.match(/^[0-9]+\.[0-9]+\.[0-9]+/)) {
+                chunk = `\`${chunk}\``;
+              }
+              
+              // Detect URLs and email addresses
+              chunk = chunk.replace(/(https?:\/\/[^\s]+)/g, '[$1]($1)');
+              chunk = chunk.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '[$1](mailto:$1)');
+              
+              // Detect potential quotes or emphasized text
+              if (chunk.match(/^[""''].*[""'']$/) && chunk.length > 10) {
+                chunk = `> ${chunk.replace(/^[""''](.*)[""'']$/, '$1')}`;
+              }
+              
+              // Clean up column separators that might be too prominent
+              chunk = chunk.replace(/\s*\|\s*/g, ' | ');
+              
+              // Clean up duplicate superscripts in column separators
+              chunk = chunk
+                // numeric duplicates around column pipe
+                .replace(/\^(\d{1,3})\^\s*\|\s*\^\1\^/g, '^$1^')
+                // numeric duplicates separated by spaces
+                .replace(/\^(\d{1,3})\^\s+\^\1\^/g, '^$1^')
+                // remove non-numeric caret-wrapped texts mistakenly marked
+                .replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              
+              // Only add non-empty chunks
+              if (chunk.trim()) {
+                processedChunks.push(chunk);
+              }
+            }
+            
+            if (processedChunks.length){
               if (text) text += '\n\n';
-              text += (currentLangCache==='en'?`## Page ${num}`:`## 第 ${num} 页`) + '\n' + chunks.join('\n');
+              text += (currentLangCache==='en'?`## Page ${num}`:`## 第 ${num} 页`) + '\n\n' + processedChunks.join('\n\n');
             }
           }
         }catch{}
@@ -3842,6 +4071,10 @@
   const chatHistory = [];
   let chatBubblesUI = [];
   let qaTxn = 0; // cancel token for in-flight QA
+  // Track last QA source to auto-switch context between PDF and page
+  let lastQASource = null; // 'pdf' | 'page' | null
+  // Track last summary source so Q&A can follow summarize source even if PDF panel is hidden
+  let lastSummarySource = null; // 'pdf' | 'page' | null
 
   // Persist lightweight QA UI state per-tab via background session storage
   async function saveQAUIState(part){
@@ -4508,6 +4741,22 @@
         try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
         try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
       }
+      // Determine current QA source (pdf vs page) and reset history if switching
+      try{
+        const pdfCard = shadow.getElementById('sx-pdf');
+        const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
+        const pdfLoaded = !!pdfCard?.__pdfDoc;
+        const nowSource = (pdfOpen && pdfLoaded) ? 'pdf' : 'page';
+        if (lastQASource !== nowSource){
+          // Clear chat UI and history when switching sources
+          try{ chatList.innerHTML = ''; }catch{}
+          while (chatHistory.length) chatHistory.pop();
+          chatBubblesUI = [];
+          try{ saveQAUIState({ bubbles: [], hist: [] }); }catch{}
+          lastQASource = nowSource;
+        }
+      }catch{}
+
       const userHtml = escapeHtml(q);
       const userBubble = appendBubble('user', userHtml, false);
       // Append AI pending bubble
@@ -4572,12 +4821,14 @@
       // Global progress bar like summarize
       try{ setLoading(shadow, true); }catch{}
       try{
-        // If a PDF is loaded (even if the card is hidden), pass current selection (range or current page) to background for QA.
+        // Decide QA source: follow last summarize source if present; otherwise fall back to current PDF visibility
         let qaMsg = { type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) };
         try{
           const pdfCard = shadow.getElementById('sx-pdf');
+          const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
           const pdfLoaded = !!pdfCard?.__pdfDoc;
-          if (pdfLoaded){
+          const usePdfNow = (lastSummarySource === 'pdf') || (pdfOpen && pdfLoaded);
+          if (usePdfNow){
             let pages = null;
             try{
               const pagesInput = pdfCard.__pdfElems?.pagesInput;
@@ -4874,6 +5125,8 @@
           }catch{}
         }
         setSummaryTitleBySource(meta); setCleanedTitleBySource(meta);
+        // Record summarize source for QA to follow
+        try{ lastSummarySource = meta.source; }catch{}
       }catch{}
 
       // 使用 PDF 文本运行或网页抓取

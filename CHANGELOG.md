@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.3.1 - 2025-01-XX
+
+### English
+- **Bug Fix**: Fixed Q&A chat context switching between PDF and web page content
+  - Q&A now correctly follows the last summarization source (PDF or web page)
+  - Chat context automatically switches when changing between PDF and web page summarization
+  - Prevents confusion when PDF panel is hidden but PDF content should still be used for Q&A
+  - Improved chat history management when switching content sources
+
+### 中文
+- **错误修复**: 修复了PDF和网页内容之间的问答聊天上下文切换问题
+  - 问答现在正确跟随最后一次摘要的来源（PDF或网页）
+  - 在PDF和网页摘要之间切换时，聊天上下文自动切换
+  - 防止PDF面板隐藏时仍应使用PDF内容进行问答的混淆
+  - 改进了切换内容源时的聊天历史管理
+
 ## v2.3.0 - 2025-01-XX
 
 ### English
