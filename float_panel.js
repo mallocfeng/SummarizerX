@@ -2029,7 +2029,12 @@
     try{
       const isPdf = !!(meta && meta.source === 'pdf');
       const base = (currentLangCache==='en' ? 'Summary' : '摘要');
-      const label = isPdf ? (currentLangCache==='en' ? 'Summary (PDF)' : '摘要 (PDF)') : base;
+      let label = isPdf ? (currentLangCache==='en' ? 'Summary (PDF)' : '摘要 (PDF)') : base;
+      // Append pages label when provided (for PDF summaries)
+      try{
+        const extra = meta && typeof meta.pagesLabel === 'string' ? meta.pagesLabel.trim() : '';
+        if (isPdf && extra){ label = `${label} ${extra}`; }
+      }catch{}
       if (vmSummary && typeof vmSummary.title !== 'undefined'){
         vmSummary.title = label;
       } else {
@@ -2037,6 +2042,30 @@
         if (el) el.setAttribute('data-title', label);
       }
     }catch{}
+  }
+
+  // Build a human-friendly pages label for PDF ranges, respecting language
+  function formatPdfPagesLabel(pages){
+    try{
+      if (!Array.isArray(pages) || pages.length===0) return '';
+      const sorted = Array.from(new Set(pages)).sort((a,b)=>a-b);
+      const segs = [];
+      let start = null, prev = null;
+      for (const n of sorted){
+        if (start===null){ start = n; prev = n; continue; }
+        if (n === prev + 1){ prev = n; continue; }
+        segs.push(start===prev ? `${start}` : `${start}–${prev}`);
+        start = n; prev = n;
+      }
+      if (start!==null){ segs.push(start===prev ? `${start}` : `${start}–${prev}`); }
+      if (currentLangCache==='en'){
+        return segs.length===1 && !segs[0].includes('–') ? `Page ${segs[0]}` : `Pages ${segs.join(',')}`;
+      } else {
+        const zhSegs = segs.map(s=>s.replace('–','-'));
+        if (zhSegs.length===1 && !zhSegs[0].includes('-')) return `第${zhSegs[0]}页`;
+        return `第${zhSegs.join('，')}页`;
+      }
+    }catch{ return ''; }
   }
 
   function setCleanedTitleBySource(meta){
@@ -2840,6 +2869,69 @@
         saveQAUIState({ lastGeom, float });
       }
     }catch{}
+    // If a PDF is loaded in the sidepanel, build Reader content from the selected PDF pages
+    try{
+      const pdfCard = shadow.getElementById('sx-pdf');
+      const pdfLoaded = !!pdfCard?.__pdfDoc;
+      if (pdfLoaded){
+        // Decide pages from range input or current page
+        let pages = null;
+        try{
+          const pagesInput = pdfCard.__pdfElems?.pagesInput;
+          const parse = pdfCard.__pdfElems?.parsePageRanges;
+          const val = String(pagesInput?.value||'').trim();
+          if (val && typeof parse === 'function'){ pages = parse(val); }
+          // Fallback: robust on-the-fly normalization like Run button
+          if ((!Array.isArray(pages) || pages.length===0) && val){
+            try{
+              const totalPages = pdfCard.__numPages || 1;
+              const norm = val.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+              const out = new Set();
+              norm.split(',').filter(Boolean).forEach(seg=>{
+                const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                if (m){
+                  const a = parseInt(m[1],10);
+                  const b = m[2] ? parseInt(m[2],10) : NaN;
+                  let lo = Number.isFinite(b) ? Math.min(a,b) : a;
+                  let hi = Number.isFinite(b) ? Math.max(a,b) : a;
+                  if (Number.isFinite(lo) && Number.isFinite(hi)){
+                    for (let i=lo;i<=hi;i++){ if (i>=1 && i<=totalPages) out.add(i); }
+                  }
+                }
+              });
+              const arr = Array.from(out).sort((a,b)=>a-b);
+              if (arr.length) pages = arr;
+            }catch{}
+          }
+        }catch{}
+        if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+        // Extract text for the selected pages (sequential to preserve order)
+        let text = '';
+        try{
+          for (const num of pages){
+            const page = await pdfCard.__pdfDoc.getPage(num);
+            const tc = await page.getTextContent();
+            const chunks = [];
+            for (const it of (tc.items||[])){
+              const s = (it && typeof it.str === 'string') ? it.str : '';
+              if (s) chunks.push(s);
+            }
+            if (chunks.length){
+              if (text) text += '\n\n';
+              text += (currentLangCache==='en'?`## Page ${num}`:`## 第 ${num} 页`) + '\n' + chunks.join('\n');
+            }
+          }
+        }catch{}
+        const pdfTitle = pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档');
+        const mdFromPdf = text; // let createReaderOverlay add the title once
+        if (mdFromPdf && mdFromPdf.trim()){
+          createReaderOverlay(mdFromPdf, pdfTitle);
+          try{ host.style.display='none'; }catch{}
+          return;
+        }
+      }
+    }catch{}
+
     const data = await fetchReadable();
     const md = data?.markdown || '';
     const title = data?.title || '';
@@ -4362,13 +4454,20 @@
         const H = chatList.clientHeight || 0; if (H<=0) return;
         const margin = 8;
         const uTop = offsetWithin(userBubble, chatList);
-        const aBottom = offsetWithin(aiBubble, chatList) + (aiBubble.getBoundingClientRect().height || 0);
-        // Ensure the AI bubble bottom is visible, while keeping the user bubble near the top margin.
-        const desiredTop = uTop - margin;
-        const desiredBottom = aBottom - H + margin;
-        let desired = Math.max(desiredBottom, desiredTop);
-        if (!Number.isFinite(desired)) desired = Math.max(0, desiredTop);
-        chatList.scrollTo({ top: Math.max(0, desired), behavior: 'auto' });
+        // Anchor the viewport to the user bubble near the top; do not force-scroll to AI bottom.
+        const desiredTop = Math.max(0, uTop - margin);
+        chatList.scrollTo({ top: desiredTop, behavior: 'auto' });
+      }catch{}
+    };
+
+    // In embedded (non-floating) mode: keep viewport anchored at the user question bubble
+    const scrollUserNearTop = (userBubble)=>{
+      try{
+        const scroller = shadow.getElementById('sx-container');
+        if (!scroller || !userBubble) return;
+        let offset = 0; let n = userBubble;
+        while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
+        scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
       }catch{}
     };
     const appendBubble = (role, html, pending=false)=>{
@@ -4377,13 +4476,7 @@
       b.innerHTML = pending ? `<span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>` : html;
       chatList.appendChild(b);
       try{ b.classList.add('pull-in'); setTimeout(()=>b.classList.remove('pull-in'), 500); }catch{}
-      try{
-        const scroller = shadow.getElementById('sx-container');
-        // In floating mode, avoid jumping container scroll; the window is already visible
-        if (!chatCard.classList.contains('qa-float')){
-          scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-        }
-      }catch{}
+      try{ if (!chatCard.classList.contains('qa-float')) scrollUserNearTop(b); }catch{}
       try{
         // Update UI snapshot (store empty html for pending AI; will be filled on finish)
         chatBubblesUI.push({ role, html: pending ? '' : String(html||'') });
@@ -4489,8 +4582,30 @@
             try{
               const pagesInput = pdfCard.__pdfElems?.pagesInput;
               const parse = pdfCard.__pdfElems?.parsePageRanges;
-              const val = pagesInput?.value || '';
-              if (val && parse){ pages = parse(val); }
+              const val = String(pagesInput?.value||'').trim();
+              if (val && typeof parse === 'function'){ pages = parse(val); }
+              // Robust fallback normalization when parse returns empty
+              if ((!Array.isArray(pages) || pages.length===0) && val){
+                try{
+                  const totalPages = pdfCard.__numPages || 1;
+                  const norm = val.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+                  const out = new Set();
+                  norm.split(',').filter(Boolean).forEach(seg=>{
+                    const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                    if (m){
+                      const a = parseInt(m[1],10);
+                      const b = m[2] ? parseInt(m[2],10) : NaN;
+                      let lo = Number.isFinite(b) ? Math.min(a,b) : a;
+                      let hi = Number.isFinite(b) ? Math.max(a,b) : a;
+                      if (Number.isFinite(lo) && Number.isFinite(hi)){
+                        for (let i=lo;i<=hi;i++){ if (i>=1 && i<=totalPages) out.add(i); }
+                      }
+                    }
+                  });
+                  const arr = Array.from(out).sort((a,b)=>a-b);
+                  if (arr.length) pages = arr;
+                }catch{}
+              }
             }catch{}
             if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
             let text = '';
@@ -4559,25 +4674,9 @@
           for (let i=chatBubblesUI.length-1; i>=0; i--){ if (chatBubblesUI[i]?.role==='ai'){ chatBubblesUI[i].html = html; break; } }
           saveQAUIState({ bubbles: chatBubblesUI });
         }catch{}
-        // After answer renders, adjust again to show as much as possible while keeping question visible
+        // After answer renders, keep viewport anchored at the user bubble (both modes)
         try{ adjustChatViewport(userBubble, aiBubble); setTimeout(()=>adjustChatViewport(userBubble, aiBubble), 50); }catch{}
-        // Keep viewport anchored near the user question; do not auto-jump in floating mode
-        try{
-          if (!chatCard.classList.contains('qa-float')){
-            const scroller = shadow.getElementById('sx-container');
-            const vh = scroller?.clientHeight || 0;
-            const bh = aiBubble?.getBoundingClientRect().height || 0;
-            if (scroller && aiBubble){
-              if (bh >= vh - 12){
-                let offset = 0; let n = aiBubble;
-                while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
-                scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
-              } else {
-                scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-              }
-            }
-          }
-        }catch{}
+        try{ if (!chatCard.classList.contains('qa-float')) scrollUserNearTop(userBubble); }catch{}
         // track history
         chatHistory.push({ role:'user', content: q });
         chatHistory.push({ role:'assistant', content: ans });
@@ -4760,7 +4859,22 @@
       const tabId=await getActiveTabId(); if(!tabId) throw new Error('未找到活动标签页');
 
       // 在进入运行态前，立即根据来源设置摘要/正文标题（loading 期间也显示 PDF 标记）
-      try{ const meta = { source: isPdfMode ? 'pdf' : 'page' }; setSummaryTitleBySource(meta); setCleanedTitleBySource(meta); }catch{}
+      try{
+        const meta = { source: isPdfMode ? 'pdf' : 'page' };
+        if (isPdfMode){
+          // Compute pages label for title when summarizing from PDF
+          try{
+            const pagesInput = pdfCard.__pdfElems?.pagesInput;
+            const parse = pdfCard.__pdfElems?.parsePageRanges;
+            const val = String(pagesInput?.value||'').trim();
+            let pagesMeta = null;
+            if (val && typeof parse === 'function') pagesMeta = parse(val);
+            if (!Array.isArray(pagesMeta) || pagesMeta.length===0){ pagesMeta = [pdfCard.__pageNum || 1]; }
+            meta.pagesLabel = formatPdfPagesLabel(pagesMeta);
+          }catch{}
+        }
+        setSummaryTitleBySource(meta); setCleanedTitleBySource(meta);
+      }catch{}
 
       // 使用 PDF 文本运行或网页抓取
       if (isPdfMode){
@@ -4861,7 +4975,8 @@
         }
         const title = pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档');
         const url = 'pdf://local';
-        const payload = { title, text, url, pageLang: '', markdown: null };
+        const pagesLabel = (function(){ try{ return formatPdfPagesLabel(pages); }catch{ return ''; } })();
+        const payload = { title, text, url, pageLang: '', markdown: null, pagesLabel };
         const resp = await chrome.runtime.sendMessage({ type:'PANEL_RUN_FOR_TEXT', tabId, payload });
         if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
         // hide PDF preview area entirely to surface summary cards

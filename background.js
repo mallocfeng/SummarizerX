@@ -283,7 +283,7 @@ async function runForTab(tabId) {
 }
 
 // Run pipeline for provided raw text/markdown (e.g., from PDF)
-async function runForText(tabId, { title = '', text = '', url = '', pageLang = '', markdown = null } = {}) {
+async function runForText(tabId, { title = '', text = '', url = '', pageLang = '', markdown = null, pagesLabel = undefined } = {}) {
   const cfg = await getSettings();
   const isTrial = (cfg.aiProvider === "trial");
   if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
@@ -298,7 +298,7 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     } catch {}
   }
 
-  await setState(tabId, { status: "running" });
+  await setState(tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
 
   const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text || "");
   const rawTextMd = textToMarkdown(typeof text === "string" ? text : "");
@@ -371,7 +371,8 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       output_lang: finalLang,
       extract_mode: cfg.extract_mode,
       task_mode: cfg.task_mode,
-      source: 'pdf'
+      source: 'pdf',
+      pagesLabel
     }
   });
 
@@ -421,7 +422,8 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       output_lang: finalLang,
       extract_mode: cfg.extract_mode,
       task_mode: cfg.task_mode,
-      source: 'pdf'
+      source: 'pdf',
+      pagesLabel
     }
   });
 }
@@ -907,7 +909,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg?.type === "PANEL_RUN_FOR_TEXT" && typeof msg.tabId === "number" && msg.payload && typeof msg.payload === 'object') {
     (async () => {
-      await setState(msg.tabId, { status: "running", meta: { source: 'pdf' } });
+      // Allow optional pages label to appear on the summary card title
+      const pagesLabel = (typeof msg.payload.pagesLabel === 'string') ? msg.payload.pagesLabel : undefined;
+      await setState(msg.tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
       safeReply({ ok: true });
       runForText(msg.tabId, msg.payload).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
