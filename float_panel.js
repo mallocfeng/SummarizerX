@@ -2630,6 +2630,51 @@
     // Bind Export PDF using pdf-lib (no print dialog)
     try{
       const exportBtn = sh.getElementById('sx-reader-export');
+      try{
+        // Ensure tooltip is available even if title is ignored by platform
+        const tipText = tExportPdfLbl;
+        exportBtn.setAttribute('title', tipText);
+        const showTip = ()=>{
+          try{
+            const rect = exportBtn.getBoundingClientRect();
+            const tip = document.createElement('div');
+            tip.id = 'sx-reader-export-tip';
+            tip.textContent = tipText;
+            tip.style.position = 'fixed';
+            tip.style.left = Math.round(rect.left + rect.width/2) + 'px';
+            tip.style.top = Math.round(rect.bottom + 10) + 'px';
+            tip.style.transform = 'translateX(-50%)';
+            tip.style.zIndex = '2147483647';
+            // Theme-aware colors: increase contrast in dark mode
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark){
+              tip.style.background = 'rgba(30,41,59,.98)'; // slate-800 almost opaque
+              tip.style.color = '#f8fafc';
+              tip.style.border = '1px solid rgba(148,163,184,.35)'; // slate-400
+              tip.style.boxShadow = '0 8px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06)';
+              tip.style.textShadow = '0 1px 1px rgba(0,0,0,.5)';
+            } else {
+              tip.style.background = 'rgba(17,24,39,.92)';
+              tip.style.color = '#ffffff';
+              tip.style.border = '1px solid rgba(0,0,0,.1)';
+              tip.style.boxShadow = '0 6px 18px rgba(0,0,0,.25)';
+            }
+            tip.style.padding = '6px 10px';
+            tip.style.borderRadius = '8px';
+            tip.style.fontSize = '12px';
+            tip.style.lineHeight = '1';
+            tip.style.pointerEvents = 'none';
+            tip.style.whiteSpace = 'nowrap';
+            document.body.appendChild(tip);
+            exportBtn.__sxTip = tip;
+          }catch{}
+        };
+        const hideTip = ()=>{ try{ exportBtn.__sxTip?.remove(); exportBtn.__sxTip=null; }catch{} };
+        exportBtn.addEventListener('mouseenter', showTip);
+        exportBtn.addEventListener('mouseleave', hideTip);
+        exportBtn.addEventListener('blur', hideTip);
+        exportBtn.addEventListener('click', hideTip);
+      }catch{}
       if (exportBtn){
         exportBtn.addEventListener('click', async ()=>{
           try{
@@ -2661,8 +2706,42 @@
               }));
             }
             try{ await inlineImages(clone); }catch{}
+            let imgMap = null; // will be initialized after we attach to DOM and dedupe
             const wrap = document.createElement('div'); wrap.style.position='fixed'; wrap.style.left='-99999px'; wrap.style.top='0'; wrap.style.pointerEvents='none'; wrap.style.background='#fff';
             wrap.appendChild(clone); document.body.appendChild(wrap);
+            // After attached, dedupe vertically-adjacent duplicate images (e.g., CN/EN duplicated blocks)
+            try{
+              const imgs = Array.from(clone.querySelectorAll('img'));
+              let last = null;
+              for (const el of imgs){
+                try{
+                  const src = el.getAttribute('src')||''; if(!src){ last = el; continue; }
+                  if (last){
+                    const prevSrc = last.getAttribute('src')||'';
+                    if (src && prevSrc && src === prevSrc){
+                      const r1 = last.getBoundingClientRect(); const r2 = el.getBoundingClientRect();
+                      const near = Math.abs((r2.top||0) - (r1.bottom||0)) < 64; // stacked closely
+                      if (near){ try{ el.remove(); }catch{} continue; }
+                    }
+                  }
+                  last = el;
+                }catch{ last = el; }
+              }
+            }catch{}
+            // Preload images after dedupe
+            try{
+              imgMap = new WeakMap();
+              const nodes = Array.from(clone.querySelectorAll('img'));
+              await Promise.all(nodes.map(el=> new Promise((res)=>{
+                try{
+                  const src = el.getAttribute('src')||''; if(!src){ res(); return; }
+                  const im = new Image();
+                  im.onload = ()=>{ try{ imgMap.set(el, im); }catch{} res(); };
+                  im.onerror = ()=> res();
+                  im.src = src;
+                }catch{ res(); }
+              })));
+            }catch{}
             // Try simplified rendering approach - direct canvas rendering without SVG
             const rect = clone.getBoundingClientRect();
             // Use A4 width; final height decided after measurement pass
@@ -2682,7 +2761,7 @@
             // Enhanced text rendering with proper styling and structure
             // Use canvas pixel space pagination to avoid later scaling causing overlap
             // If shouldDraw=false, only measure total height/pages
-            const renderStructuredContent = (element, ctx, x, y, maxWidth, pageHeightPx, topMarginPx, bottomMarginPx, shouldDraw=true) => {
+            const renderStructuredContent = (element, ctx, x, y, maxWidth, pageHeightPx, topMarginPx, bottomMarginPx, shouldDraw=true, imgMapRef=null) => {
               let currentY = y; // y within the current page in canvas pixels
               let pageIndex = 0;
               const getPageBottomLimit = ()=> (pageIndex + 1) * pageHeightPx - bottomMarginPx;
@@ -2782,6 +2861,25 @@
                   
                   // Handle different HTML elements
                   switch (tagName) {
+                    case 'img':{
+                      try{
+                        const im = imgMapRef && imgMapRef.get ? imgMapRef.get(node) : null;
+                        // If image not preloaded, skip gracefully
+                        if (im && im.width && im.height){
+                          // Compute draw size with aspect ratio, bounded by maxWidth
+                          const naturalW = im.naturalWidth || im.width;
+                          const naturalH = im.naturalHeight || im.height;
+                          const drawW = Math.min(maxWidth, Math.max(24, naturalW));
+                          const drawH = Math.max(24, Math.round(drawW * (naturalH / Math.max(1,naturalW))));
+                          // Page break if not enough space
+                          if (currentY + drawH > getPageBottomLimit()){
+                            pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx;
+                          }
+                          if (shouldDraw) ctx.drawImage(im, x, currentY, drawW, drawH);
+                          currentY += drawH + 40; // spacing after image (increase)
+                        }
+                      }catch{}
+                      break; }
                     case 'h1':
                       if (currentY + 40 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
                       currentY += 30; // Extra spacing before title
@@ -2885,11 +2983,11 @@
             const maxWidth = cw - marginCanvasPx*2;
             // First measure to compute total canvas height
             const measureCanvas = document.createElement('canvas'); measureCanvas.width = cw; measureCanvas.height = 1; const measureCtx = measureCanvas.getContext('2d');
-            const measurement = renderStructuredContent(clone, measureCtx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/false);
+            const measurement = renderStructuredContent(clone, measureCtx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/false, imgMap);
             ch = Math.max(pageHeightPx * measurement.pagesUsed, pageHeightPx);
             // Resize real canvas and paint background, then draw
             canvas.height = ch; ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cw,ch); ctx.fillStyle = '#000000';
-            renderStructuredContent(clone, ctx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/true);
+            renderStructuredContent(clone, ctx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/true, imgMap);
             
             const pngDataUrl = canvas.toDataURL('image/png');
             try{ document.body.removeChild(wrap); }catch{}
