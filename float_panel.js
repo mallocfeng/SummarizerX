@@ -3380,6 +3380,15 @@
   async function openPdfPanel(){
     try{
       const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      // Record whether summary/cleaned currently have meaningful content, so we can restore after PDF closes
+      try{
+        const sumEl = shadow.getElementById('sx-summary');
+        const clnEl = shadow.getElementById('sx-cleaned');
+        const hasSkel = !!(sumEl?.querySelector('.skl') || clnEl?.querySelector('.skl'));
+        const sumTextLen = (sumEl ? String(sumEl.textContent||'').replace(/\s+/g,'').length : 0);
+        const clnTextLen = (clnEl ? String(clnEl.textContent||'').replace(/\s+/g,'').length : 0);
+        shadow.__sxHadCardsBeforePdf = !hasSkel && (sumTextLen > 20 || clnTextLen > 20);
+      }catch{}
       // hide others to create a focused interface
       try{ shadow.getElementById('sx-chat').style.display = 'none'; }catch{}
       try{ shadow.getElementById('sx-summary').style.display = 'none'; }catch{}
@@ -3468,8 +3477,17 @@
       try{ if (card.__unbindDnD) { card.__unbindDnD(); card.__unbindDnD = null; } }catch{}
       // hide card
       card.style.display = 'none';
-      // collapse whole sidepanel to initial (folded) state
-      collapseSidepanelToInitial();
+      // If we had existing summary/cleaned content before opening PDF, restore them and keep sidepanel open
+      const hadCards = !!shadow.__sxHadCardsBeforePdf;
+      if (hadCards){
+        try{ const s = shadow.getElementById('sx-summary'); if (s) s.style.display=''; }catch{}
+        try{ const c = shadow.getElementById('sx-cleaned'); if (c) c.style.display=''; }catch{}
+        try{ const wrapEl = shadow.getElementById('sx-wrap'); wrapEl?.classList?.remove('is-empty'); }catch{}
+        try{ updateEmptyArrowPosition(); }catch{}
+      } else {
+        // Otherwise fold back to initial state like first open
+        collapseSidepanelToInitial();
+      }
       // restore QA placeholder and URL to page context
       try{
         const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this page…':'基于当前网页提问…'); }
