@@ -2538,6 +2538,7 @@
     const tClose = (currentLangCache==='en' ? 'Close' : '关闭');
     const tProviderLblFree = (currentLangCache==='en' ? 'Free service (unstable)' : '免费服务（可能不稳定）');
     const tProviderLblSettingsPlaceholder = (currentLangCache==='en' ? 'Use Settings' : '使用设置');
+    const tExportPdfLbl = (currentLangCache==='en' ? 'Export PDF' : '导出 PDF');
     root.innerHTML = `
       <div class="scrim"></div>
       <div class="wrap" role="dialog" aria-modal="true" aria-label="阅读模式">
@@ -2547,6 +2548,14 @@
             <option value="settings" id="sx-reader-provider-s2">${tProviderLblSettingsPlaceholder}</option>
           </select>
           <button class="act" id="sx-reader-translate" aria-label="${tLbl}"><span class="fill" aria-hidden="true"></span><span class="label">${tLbl}</span></button>
+          <button class="act" id="sx-reader-export" aria-label="${tExportPdfLbl}" title="${tExportPdfLbl}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M12 18v-6"/>
+              <path d="M9 15l3 3 3-3"/>
+            </svg>
+          </button>
           <button class="close" aria-label="${tClose}">✕</button>
         </div>
         <div class="body">
@@ -2597,6 +2606,358 @@
     document.documentElement.appendChild(ov);
     // auto-focus close for accessibility
     try{ sh.querySelector('.close')?.focus(); }catch{}
+
+
+    // Helper to ensure pdf-lib is available (tries min and non-min UMD builds)
+    async function ensurePdfLibLoaded(){
+      // Prefer ESM import to avoid isolated world/global leakage
+      if (window.__pdfLibModule) return window.__pdfLibModule;
+      try{
+        const url = chrome.runtime.getURL('vendor/pdf-lib.esm.js');
+        const mod = await import(url);
+        if (mod && (mod.PDFDocument || mod.default)) { window.__pdfLibModule = mod; return mod; }
+      }catch{}
+      if (window.PDFLib || (typeof globalThis!== 'undefined' && globalThis.PDFLib)) return (window.PDFLib||globalThis.PDFLib);
+      const tryLoad = (path)=> new Promise((resolve, reject)=>{
+        const s = document.createElement('script'); s.src = chrome.runtime.getURL(path); s.onload = ()=>resolve(); s.onerror = ()=>reject(new Error('load failed: '+path)); document.documentElement.appendChild(s);
+      });
+      try{ await tryLoad('vendor/pdf-lib.min.js'); }catch{}
+      if (window.PDFLib || (typeof globalThis!== 'undefined' && globalThis.PDFLib)) return (window.PDFLib||globalThis.PDFLib);
+      try{ await tryLoad('vendor/pdf-lib.js'); }catch{}
+      return (window.PDFLib|| (typeof globalThis!== 'undefined' ? globalThis.PDFLib : undefined));
+    }
+
+    // Bind Export PDF using pdf-lib (no print dialog)
+    try{
+      const exportBtn = sh.getElementById('sx-reader-export');
+      if (exportBtn){
+        exportBtn.addEventListener('click', async ()=>{
+          try{
+            if (summarizing) return;
+            exportBtn.disabled = true; exportBtn.classList.add('busy');
+            // Ensure pdf-lib is loaded
+            const PDFLibNS = await ensurePdfLibLoaded();
+            const { PDFDocument, rgb } = (PDFLibNS && (PDFLibNS.PDFDocument ? PDFLibNS : (PDFLibNS.default || {}))) || PDFLibNS || {};
+            if (!PDFDocument) throw new Error('pdf-lib not available');
+
+            // Render current reader DOM to image via SVG foreignObject → canvas
+            const mdEl = sh.getElementById('sx-reader-md'); if (!mdEl) throw new Error('no content');
+            const clone = mdEl.cloneNode(true);
+            // Try to inline images to avoid cross-origin taint when rasterizing
+            async function inlineImages(root){
+              const imgs = Array.from(root.querySelectorAll('img'));
+              await Promise.all(imgs.map(async (img)=>{
+                try{
+                  let src = img.getAttribute('src')||''; if (!src) return;
+                  if (/^data:/i.test(src)) return; // already inline
+                  // absolutize
+                  try{ src = new URL(src, location.href).href; }catch{}
+                  const resp = await fetch(src, { mode:'cors' });
+                  if (!resp.ok) return;
+                  const blob = await resp.blob();
+                  const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
+                  img.setAttribute('src', String(dataUrl||''));
+                }catch{}
+              }));
+            }
+            try{ await inlineImages(clone); }catch{}
+            const wrap = document.createElement('div'); wrap.style.position='fixed'; wrap.style.left='-99999px'; wrap.style.top='0'; wrap.style.pointerEvents='none'; wrap.style.background='#fff';
+            wrap.appendChild(clone); document.body.appendChild(wrap);
+            // Try simplified rendering approach - direct canvas rendering without SVG
+            const rect = clone.getBoundingClientRect();
+            // Use A4 width; final height decided after measurement pass
+            const cw = 794; // A4 width at 96 DPI (210mm * 96/25.4)
+            let ch = 1; // temporary, will resize after we measure
+            
+            // Create canvas and render HTML content directly
+            const canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            
+            // Set white background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cw, ch);
+            
+            // Enhanced text rendering with proper styling and structure
+            // Use canvas pixel space pagination to avoid later scaling causing overlap
+            // If shouldDraw=false, only measure total height/pages
+            const renderStructuredContent = (element, ctx, x, y, maxWidth, pageHeightPx, topMarginPx, bottomMarginPx, shouldDraw=true) => {
+              let currentY = y; // y within the current page in canvas pixels
+              let pageIndex = 0;
+              const getPageBottomLimit = ()=> (pageIndex + 1) * pageHeightPx - bottomMarginPx;
+              
+              const processNode = (node, isTitle = false, isHeading = false, isBold = false, isItalic = false) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const text = node.textContent.trim();
+                  if (!text) return currentY;
+                  
+                  // Set font based on context - using larger sizes for Letter paper
+                  let fontSize = 20; // Reasonable base font size
+                  let fontWeight = 'normal';
+                  let fontStyle = 'normal';
+                  
+                  if (isTitle) {
+                    fontSize = 28; // Large title
+                    fontWeight = 'bold';
+                  } else if (isHeading) {
+                    fontSize = 24; // Large headings
+                    fontWeight = 'bold';
+                  } else if (isBold) {
+                    fontWeight = 'bold';
+                  }
+                  
+                  if (isItalic) {
+                    fontStyle = 'italic';
+                  }
+                  
+                  ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px Arial, "PingFang SC", "Microsoft YaHei", sans-serif`;
+                  
+                  // Handle text wrapping — enforce CJK wrapping and fallback to word wrapping
+                  const lineHeight = fontSize * 1.6; // Increased line height for better readability
+                  const textStr = String(text || '');
+                  const hasCJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(textStr);
+
+                  const flushLine = () => {
+                    if (!line) return;
+                    if (currentY + lineHeight > getPageBottomLimit()){
+                      pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx;
+                    }
+                    if (shouldDraw) ctx.fillText(line, x, currentY);
+                    currentY += lineHeight;
+                    line = '';
+                    cjkCountInLine = 0;
+                  };
+
+                  let line = '';
+                  let cjkCountInLine = 0;
+
+                  if (hasCJK) {
+                    const chars = Array.from(textStr);
+                    // Conservative width to reduce overflow risk
+                    const effectiveMax = Math.floor(maxWidth * 0.90);
+                    for (const ch of chars){
+                      if (ch === '\n'){ flushLine(); continue; }
+                      // collapse spaces at line start
+                      if (/^\s$/.test(ch) && !line) continue;
+                      const isCjkChar = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(ch);
+                      const testLine = line + ch;
+                      const w = ctx.measureText(testLine).width;
+                      // Force break if width exceeds or reached 35 CJK chars on the line
+                      if ((isCjkChar && cjkCountInLine >= 40) || (w > effectiveMax && line)){
+                        flushLine();
+                      }
+                      line += ch;
+                      if (isCjkChar) cjkCountInLine += 1;
+                    }
+                    flushLine();
+                  } else {
+                    // English and others: word-based wrapping
+                    const words = textStr.split(/\s+/);
+                    for (const word of words) {
+                      const testLine = line + (line ? ' ' : '') + word;
+                      const w = ctx.measureText(testLine).width;
+                      if (w > maxWidth && line) {
+                        flushLine();
+                        line = word; // start new line with current word
+                      } else {
+                        line = testLine;
+                      }
+                    }
+                    if (line.trim()) flushLine();
+                  }
+                  
+                  // Add extra spacing after different elements
+                  if (isTitle || isHeading) {
+                    currentY += lineHeight * 0.8; // More space after titles/headings
+                  } else {
+                    currentY += lineHeight * 0.3; // Some space after paragraphs
+                  }
+                  
+                  return currentY;
+                }
+                
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                  const tagName = node.tagName.toLowerCase();
+                  
+                  // Handle different HTML elements
+                  switch (tagName) {
+                    case 'h1':
+                      if (currentY + 40 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 30; // Extra spacing before title
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, true, false, false, false);
+                      }
+                      currentY += 20; // Extra spacing after title
+                      break;
+                    case 'h2':
+                    case 'h3':
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                      if (currentY + 30 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 25; // Extra spacing before heading
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, true, false, false);
+                      }
+                      currentY += 15; // Extra spacing after heading
+                      break;
+                    case 'p':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      currentY += 20; // More paragraph spacing
+                      break;
+                    case 'strong':
+                    case 'b':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, true, false);
+                      }
+                      break;
+                    case 'em':
+                    case 'i':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, true);
+                      }
+                      break;
+                    case 'li':
+                      // Add bullet point
+                      if (currentY + 24 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      ctx.font = 'normal normal 20px Arial, sans-serif';
+                      if (shouldDraw) ctx.fillText('• ', x, currentY);
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      currentY += 15; // More spacing between list items
+                      break;
+                    case 'ul':
+                    case 'ol':
+                      if (currentY + 20 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 15; // Spacing before list
+                      for (const child of node.childNodes) {
+                        if (child.nodeType === Node.ELEMENT_NODE) {
+                          currentY = processNode(child, false, false, false, false);
+                        }
+                      }
+                      currentY += 15; // Spacing after list
+                      break;
+                    case 'blockquote':
+                      if (currentY + 40 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 20; // More spacing before quote
+                      // Draw quote bar
+                      ctx.fillStyle = '#3b82f6';
+                      ctx.fillRect(x - 10, currentY - 15, 4, 30);
+                      ctx.fillStyle = '#000000';
+                      
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, true);
+                      }
+                      currentY += 20; // More spacing after quote
+                      break;
+                    case 'br':
+                      if (currentY + 30 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 30; // More spacing for line breaks
+                      break;
+                    default:
+                      // Process child nodes for other elements
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      break;
+                  }
+                }
+                
+                return currentY;
+              };
+              
+              processNode(element);
+              return { pagesUsed: pageIndex + 1, lastY: currentY };
+            };
+            
+            // Start rendering from top with proper margins in canvas pixel space
+            ctx.fillStyle = '#000000';
+            const CANVAS_A4_W_PT = 595.28, CANVAS_A4_H_PT = 841.89; const marginsPt = 36; // keep sync with PDF settings
+            const usableWPt = CANVAS_A4_W_PT - marginsPt*2; const usableHPt = CANVAS_A4_H_PT - marginsPt*2;
+            const scaleForPdf = usableWPt / cw;
+            const pageHeightPx = Math.max(1, Math.floor(usableHPt / scaleForPdf));
+            const marginCanvasPx = Math.round((marginsPt / 72) * 96); // ~48px at 96dpi
+            const startX = marginCanvasPx; const startY = marginCanvasPx;
+            const maxWidth = cw - marginCanvasPx*2;
+            // First measure to compute total canvas height
+            const measureCanvas = document.createElement('canvas'); measureCanvas.width = cw; measureCanvas.height = 1; const measureCtx = measureCanvas.getContext('2d');
+            const measurement = renderStructuredContent(clone, measureCtx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/false);
+            ch = Math.max(pageHeightPx * measurement.pagesUsed, pageHeightPx);
+            // Resize real canvas and paint background, then draw
+            canvas.height = ch; ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cw,ch); ctx.fillStyle = '#000000';
+            renderStructuredContent(clone, ctx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/true);
+            
+            const pngDataUrl = canvas.toDataURL('image/png');
+            try{ document.body.removeChild(wrap); }catch{}
+            
+            if (!pngDataUrl || pngDataUrl === 'data:,') {
+              throw new Error('Canvas rendering failed');
+            }
+
+            // Build PDF (A4 size), proper scaling for readable text
+            const pdfDoc = await PDFDocument.create();
+            const A4_W = 595.28, A4_H = 841.89; // A4 size in points (210 x 297 mm)
+            const margins = 36; // 0.5 inch margins (about 12.7mm)
+            const usableW = A4_W - (margins * 2);
+            const usableH = A4_H - (margins * 2);
+            
+            // Calculate scaling to fit canvas width to PDF page width
+            const scale = usableW / cw;
+            const scaledHeight = ch * scale;
+            
+            // Slice the large canvas into page-sized tiles to avoid stretching
+            const tileSrcHeight = Math.max(1, Math.floor(usableH / scale)); // in source canvas pixels
+            const pageCount = Math.max(1, Math.ceil(ch / tileSrcHeight));
+
+            // Reusable page canvas for slicing
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = cw; // full width of source canvas
+            const pageCtx = pageCanvas.getContext('2d');
+            pageCtx.imageSmoothingEnabled = true;
+
+            for (let i = 0; i < pageCount; i++) {
+              const srcY = i * tileSrcHeight;
+              const srcH = Math.min(tileSrcHeight, ch - srcY);
+              if (srcH <= 0) break;
+
+              // Resize pageCanvas height to current tile height
+              if (pageCanvas.height !== srcH) { pageCanvas.height = srcH; }
+              // Clear and draw the slice from the big canvas
+              pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+              pageCtx.drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
+
+              // Encode this tile to PNG bytes
+              const tileDataUrl = pageCanvas.toDataURL('image/png');
+              const tileBytes = await fetch(tileDataUrl).then(r=>r.arrayBuffer());
+              const tilePng = await pdfDoc.embedPng(tileBytes);
+
+              // Compute destination height in PDF points after scaling by width
+              const destH = srcH * scale; // keep aspect ratio
+              const page = pdfDoc.addPage([A4_W, A4_H]);
+              page.drawImage(tilePng, {
+                x: margins,
+                y: A4_H - margins - destH,
+                width: usableW,
+                height: destH
+              });
+            }
+            const bytes = await pdfDoc.save();
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = (title || document.title || 'document') + '.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 2000);
+          }catch(e){
+            console.warn('export pdf failed', e);
+            const msg = (e && e.message) ? e.message : (e && e.type) ? `render error (${e.type})` : String(e||'');
+            alert((currentLangCache==='en'?'Export failed: ':'导出失败：') + msg);
+          }
+          finally{ exportBtn.disabled = false; exportBtn.classList.remove('busy'); }
+        });
+      }
+    }catch{}
 
     // Build initial content as block wrappers for progressive translation
     try{

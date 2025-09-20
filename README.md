@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v1.9.1 (main branch)
-Current beta: v2.3.0 (dev/next branch)
+Current beta: v2.3.2 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -28,6 +28,7 @@ Current beta: v2.3.0 (dev/next branch)
   - Select specific pages for summarization (e.g., "1-3,5" or "10-15")
   - Real-time validation with clear error messages
   - Integrated PDF.js for robust rendering and text extraction
+  - Export Reader Mode to crisp A4 PDFs with robust CJK line wrapping (Chinese 40 chars/line, 90% width guard)
 - 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click  
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
@@ -129,7 +130,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 ## 中文简介
 
 当前稳定版：v1.9.1 (main分支)
-当前测试版：v2.3.0 (dev/next分支)
+当前测试版：v2.3.2 (dev/next分支)
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 
@@ -143,6 +144,7 @@ All processing happens locally or via your configured AI API key. No data is sen
   - 选择特定页面进行摘要（例如："1-3,5" 或 "10-15"）
   - 实时验证，提供清晰的错误提示
   - 集成 PDF.js 实现稳定的渲染和文本提取
+  - 阅读模式可导出为 A4 PDF，中文强制换行（每行 40 字、90% 宽度守卫），多页切片清晰无拉伸
 - 🤖 AI 驱动的摘要与翻译：一键生成简洁摘要或翻译  
 - ⚙️ 个性化设置：自定义提示词、模式、快捷键和界面偏好  
 - 📑 浮动面板：无需跳转页面即可查看摘要  

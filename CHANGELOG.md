@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.3.2 - 2025-01-XX
+
+### English
+- **PDF Export (Reader Mode)**: Robust CJK line wrapping
+  - Force-break Chinese at 40 characters per line with a 90% width guard
+  - Canvas-space pagination to prevent overlap/stretching
+  - Multi-page slicing for crisp A4 PDFs without distortion
+- Minor: Better stability when exporting long articles with images
+
+### 中文
+- **PDF 导出（阅读模式）**：增强中文换行
+  - 中文每行最多 40 个汉字，且在 90% 宽度处保守换行
+  - 在画布像素空间分页，避免重叠与拉伸
+  - A4 多页切片导出，页面比例准确、清晰
+- 其它：长文与图片导出稳定性优化
+
 ## v2.3.1 - 2025-01-XX
 
 ### English
