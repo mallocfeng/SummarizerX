@@ -2809,14 +2809,18 @@
                 }catch{ last = el; }
               }
             }catch{}
-            // Preload images after dedupe
+            // Preload images after dedupe (only safe sources to avoid canvas taint)
             try{
               imgMap = new WeakMap();
               const nodes = Array.from(clone.querySelectorAll('img'));
               await Promise.all(nodes.map(el=> new Promise((res)=>{
                 try{
                   const src = el.getAttribute('src')||''; if(!src){ res(); return; }
+                  // Only draw images that are guaranteed safe for canvas export
+                  const safe = /^data:/i.test(src) || /^blob:/i.test(src) || /^chrome-extension:/i.test(src);
+                  if (!safe){ res(); return; }
                   const im = new Image();
+                  try{ im.crossOrigin = 'anonymous'; }catch{}
                   im.onload = ()=>{ try{ imgMap.set(el, im); }catch{} res(); };
                   im.onerror = ()=> res();
                   im.src = src;
