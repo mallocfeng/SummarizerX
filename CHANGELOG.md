@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.3.3 - 2025-09-21
+
+### English
+- PDF Export (Reader Mode): Strip hyperlinks and normalize whitespace before rendering to prevent linked words (e.g., "rate cut") from being isolated on their own lines in the exported PDF.
+- Text layout: Removed per-text-node extra spacing that could cause unintended breaks around previously linked words.
+- Reliability: Keeps images inlined and preserves crisp A4 pagination.
+
+### 中文
+- PDF 导出（阅读模式）：在渲染前移除超链接并规范空白，避免带链接的词语（如 “rate cut”）在导出 PDF 时两端出现不必要的回行，单独占一行。
+- 文本排版：移除逐文本节点的额外间距，减少因链接去除而出现的意外换行。
+- 稳定性：继续内联图片，保持清晰的 A4 分页。
+
 ## v2.3.2 - 2025-01-XX
 
 ### English

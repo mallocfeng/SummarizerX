@@ -2688,6 +2688,87 @@
             // Render current reader DOM to image via SVG foreignObject → canvas
             const mdEl = sh.getElementById('sx-reader-md'); if (!mdEl) throw new Error('no content');
             const clone = mdEl.cloneNode(true);
+            // Strip hyperlinks and normalize whitespace to avoid isolated lines around linked words
+            try{
+              const stripHyperlinks = (root)=>{
+                try{
+                  const anchors = Array.from(root.querySelectorAll('a[href]'));
+                  for (const a of anchors){
+                    try{
+                      // Mark parent <p> that only contains this link so we can inline it later
+                      try{
+                        const p = a.parentElement;
+                        if (p && p.tagName && p.tagName.toLowerCase()==='p'){
+                          const onlyLinkChild = (p.children.length === 1 && p.children[0] === a);
+                          if (onlyLinkChild) { p.setAttribute('data-sx-link-only','1'); }
+                        }
+                      }catch{}
+
+                      const textRaw = a.textContent || '';
+                      const textNorm = String(textRaw).replace(/\s+/g,' ');
+                      const children = Array.from(a.childNodes);
+                      if (children.length === 1 && children[0].nodeType === Node.TEXT_NODE){
+                        a.replaceWith(document.createTextNode(textNorm));
+                      } else {
+                        // Unwrap preserving content, but ensure normalized text nodes
+                        const frag = document.createDocumentFragment();
+                        const tmp = document.createTextNode(textNorm);
+                        frag.appendChild(tmp);
+                        a.replaceWith(frag);
+                      }
+                    }catch{}
+                  }
+                }catch{}
+              };
+              const inlineLinkOnlyParagraphs = (root)=>{
+                try{
+                  const ps = Array.from(root.querySelectorAll('p[data-sx-link-only="1"]'));
+                  for (const p of ps){
+                    try{
+                      const t = (p.textContent||'').replace(/\s+/g,' ').trim();
+                      const txt = document.createTextNode((t ? (' '+t+' ') : ''));
+                      p.replaceWith(txt);
+                    }catch{}
+                  }
+                }catch{}
+              };
+              const mergeAndNormalizeTextNodes = (el)=>{
+                try{
+                  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                  const nodes = [];
+                  let n; while ((n = walker.nextNode())) { nodes.push(n); }
+                  for (const node of nodes){
+                    try{ node.nodeValue = String(node.nodeValue||'').replace(/[\t\n\r]+/g,' ').replace(/\s{2,}/g,' '); }catch{}
+                  }
+                  // Merge adjacent text nodes within each element
+                  const mergeIn = (root)=>{
+                    try{
+                      for (const child of Array.from(root.childNodes)){
+                        if (child.nodeType === Node.ELEMENT_NODE) mergeIn(child);
+                        // Merge sequential text nodes
+                        if (child.nodeType === Node.TEXT_NODE){
+                          let next = child.nextSibling;
+                          while (next && next.nodeType === Node.TEXT_NODE){
+                            try{
+                              const a = child.nodeValue || '';
+                              const b = next.nodeValue || '';
+                              // Ensure a single space at the boundary
+                              const join = (a && /\S$/.test(a) && b && /^\S/.test(b)) ? (a+' '+b) : (a+b);
+                              child.nodeValue = join.replace(/\s{2,}/g,' ');
+                              const toRemove = next; next = next.nextSibling; toRemove.remove();
+                            }catch{ break; }
+                          }
+                        }
+                      }
+                    }catch{}
+                  };
+                  mergeIn(el);
+                }catch{}
+              };
+              stripHyperlinks(clone);
+              inlineLinkOnlyParagraphs(clone);
+              mergeAndNormalizeTextNodes(clone);
+            }catch{}
             // Try to inline images to avoid cross-origin taint when rasterizing
             async function inlineImages(root){
               const imgs = Array.from(root.querySelectorAll('img'));
