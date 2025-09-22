@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.4 - 2025-09-22
+
+### English
+- Fix: Disable "Extract & Summarize" while the PDF card is open until a PDF is fully loaded and the page/range selection is valid. Prevents accidental runs that led to inconsistent states.
+- Behavior: Button re-enables automatically after PDF loads and inputs validate; closes or hides the PDF card restores normal behavior.
+
+### 中文
+- 修复：当 PDF 卡片打开时，禁用“提取并摘要”按钮，直到 PDF 成功加载且页码/范围有效为止，避免误触导致状态异常。
+- 行为：PDF 加载完成且输入校验通过后自动恢复；关闭/隐藏 PDF 卡片后恢复正常。
+
 ## v2.3.3 - 2025-09-21
 
 ### English

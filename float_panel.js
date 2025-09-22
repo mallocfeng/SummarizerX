@@ -3943,6 +3943,7 @@
       // build once
       if (!card.__built){ buildPdfPanel(card); card.__built = true; }
       card.style.display = '';
+      try{ updateRunButtonState(shadow); }catch{}
 
       // If sidepanel is folded, expand it similarly to summarize flow
       const wrapEl = shadow.getElementById('sx-wrap');
@@ -4208,6 +4209,9 @@
       pagesInput?.addEventListener('input', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } updateRunButtonState(shadow); }catch{} });
       pagesInput?.addEventListener('change', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } const arr = parsePageRanges(pagesInput.value); if (Array.isArray(arr) && arr.length) gotoPage(arr[0]); updateRunButtonState(shadow); }catch{} });
       updatePageInputState();
+
+      // Disable Run while PDF is loading (before a document is set)
+      try{ updateRunButtonState(shadow); }catch{}
 
       const handleFiles = async (file)=>{
         clearErr();
@@ -4485,15 +4489,16 @@
       const btn = shadow.getElementById('sx-run'); if (!btn) return;
       // Default: enabled unless current tab is a PDF URL and PDF card not ready/invalid
       let disable = false;
+      const card = shadow.getElementById('sx-pdf');
+      const pdfCardOpen = !!card && card.style.display !== 'none';
       const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
-      if (isPdfUrl){
-        // In PDF tab, default to disabled until we positively validate conditions
+
+      // Rule: When the PDF card is open, disable Run until the PDF is properly loaded and inputs are valid.
+      // This applies regardless of whether the current tab URL is a PDF URL.
+      if (pdfCardOpen){
         disable = true;
-        const card = shadow.getElementById('sx-pdf');
-        const open = !!card && card.style.display !== 'none';
         const loaded = !!card?.__pdfDoc;
-        if (open && loaded){
-          // Validate inputs: if range present, must parse to non-empty list; else page must be valid
+        if (loaded){
           const pagesInput = card.__pdfElems?.pagesInput;
           const pageInput = card.__pdfElems?.pageInput;
           const parse = card.__pdfElems?.parsePageRanges;
@@ -4502,25 +4507,16 @@
           if (hasRange){
             try{
               const arr = parse ? parse(pagesInput.value) : [];
-              if (Array.isArray(arr) && arr.length>0) {
-                disable = false;
-              } else {
-                // Fallback: if user entered something that looks like pages/ranges (contains digits), allow click
-                // Parsing might fail temporarily while typing; run-time will re-parse before extraction.
-                const looksLikeRange = /\d/.test(String(pagesInput.value||''));
-                disable = !looksLikeRange;
-              }
-            }catch{ 
-              const looksLikeRange = /\d/.test(String(pagesInput.value||''));
-              disable = !looksLikeRange; 
-            }
+              if (Array.isArray(arr) && arr.length>0) disable = false; else disable = !/\d/.test(String(pagesInput.value||''));
+            }catch{ disable = !/\d/.test(String(pagesInput.value||'')); }
           } else {
             const n = parseInt(pageInput?.value, 10);
             disable = !(Number.isFinite(n) && n>=1 && n<=total);
           }
-        } else {
-          disable = true;
         }
+      } else if (isPdfUrl){
+        // If on a PDF viewer tab but card is not open, keep disabled by default
+        disable = true;
       }
       // Also keep disabled during summarizing state
       btn.disabled = !!(disable || summarizing);
