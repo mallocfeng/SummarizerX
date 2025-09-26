@@ -16,6 +16,7 @@ const SYSTEM_PRESETS = {
 // ---- 会话状态（按 tabId）
 const S = chrome.storage.session;
 const STATE_KEY = (tabId) => `panel_state_v3:${tabId}`;
+const QA_UI_KEY = (tabId) => `qa_ui_v1:${tabId}`;
 
 async function getState(tabId) {
   const d = await S.get([STATE_KEY(tabId)]);
@@ -27,6 +28,15 @@ async function setState(tabId, state) {
   chrome.runtime.sendMessage({ type: "PANEL_STATE_UPDATED", tabId }).catch(()=>{});
 }
 
+async function getQAUI(tabId) {
+  const d = await S.get([QA_UI_KEY(tabId)]);
+  return d[QA_UI_KEY(tabId)] || {};
+}
+async function setQAUI(tabId, ui) {
+  const prev = await getQAUI(tabId);
+  await S.set({ [QA_UI_KEY(tabId)]: { ...prev, ...ui, ts: Date.now() } });
+}
+
 /* ------------------------------------------------------------------ */
 // 兜底注入：大多数页面已通过 manifest.content_scripts 常驻注入
 // 但为防在个别时序/站点下收不到消息，这里保留一次动态注入兜底（仅注入本地文件，合规）。
@@ -35,6 +45,8 @@ async function injectIfNeeded(tabId) {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "PING_EXTRACTOR" });
     if (ping?.ok) return;
   } catch {}
+  // Inject Readability (offline content extraction) first, then our extractor helpers and bridge
+  try { await chrome.scripting.executeScript({ target: { tabId }, files: ["vendor/Readability.js"] }); } catch {}
   try { await chrome.scripting.executeScript({ target: { tabId }, files: ["utils_extract.js"] }); } catch {}
   try { await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }); } catch {}
 }
@@ -140,12 +152,20 @@ async function runForTab(tabId) {
 
   await setState(tabId, { status: "running" });
 
-  const { title, text, url, pageLang } = await getPageRawByTabId(tabId);
+  const { title, text, url, pageLang, markdown: pageMarkdown } = await getPageRawByTabId(tabId);
   const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text);
 
-  const quickMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim())
-    ? cfg.markdown
-    : textToMarkdown(typeof text === "string" ? text : "");
+  const rawTextMd = textToMarkdown(typeof text === "string" ? text : "");
+  const baseMarkdown = (() => {
+    if (typeof pageMarkdown === "string" && pageMarkdown.trim()) {
+      return pageMarkdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    if (typeof cfg?.markdown === "string" && cfg.markdown.trim()) {
+      return cfg.markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    return rawTextMd;
+  })();
+  const quickMd = baseMarkdown;
   const sysForSummary = buildSystemPrompt({
     custom: cfg.system_prompt_custom,
     preset: cfg.system_prompt_preset,
@@ -170,10 +190,36 @@ async function runForTab(tabId) {
     temperature: 0.1
   });
 
+  // Generate 3 likely user questions for quick ask (in finalLang), plain text one per line
+  let quickQuestions = [];
+  try {
+    const qsPrompt = enforceUserLang(
+      `From the content below, generate 3 likely questions a reader may ask.\n`+
+      `Rules: return EXACTLY 3 lines, one question per line, no numbering, no quotes.\n\n`+
+      `Content:\n${quickMd.slice(0, 12000)}`,
+      finalLang,
+      false
+    );
+    const qsOut = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey: cfg.apiKey || 'trial',
+      model: cfg.model_summarize,
+      system: sysForSummary,
+      prompt: qsPrompt,
+      temperature: 0.6
+    });
+    quickQuestions = String(qsOut || '')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^[-*\d\.\)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  } catch {}
+
   await setState(tabId, {
     status: "partial",
     summary: summaryFast,
     cleaned: "",
+    quickQuestions,
     meta: {
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
@@ -187,22 +233,24 @@ async function runForTab(tabId) {
   // 正文
   let cleanedMarkdown = "";
   if (cfg.extract_mode === "fast") {
-    const preferMd = (typeof cfg?.markdown === "string" && cfg.markdown.trim().length > 0)
-      ? cfg.markdown
-      : textToMarkdown(typeof text === "string" ? text : "");
     const NOTICE_ZH = "当前“正文提取方式”为**本地快速模式**，以下正文为**原文**显示。若希望按目标语言显示正文，请在设置中将“正文提取方式”切换为 **AI 清洗模式**。";
     const NOTICE_EN = "Extract mode is **Local Fast**. The readable body below is shown **in the original language**. If you want the body to follow the target language, switch “Extract Mode” to **AI Clean** in Settings.";
     const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
     const BODY_LIMIT = 50000;
-    const body = (preferMd ? String(preferMd) : "").slice(0, BODY_LIMIT);
-    cleanedMarkdown = (noticeBlock + "\n" + body).replace(/\n{3,}/g, "\n\n").trim();
+    const body = (baseMarkdown ? String(baseMarkdown) : "").slice(0, BODY_LIMIT);
+    // Prepend title as H1 when body doesn't already start with a heading
+    const hasHeadingAtTop = /^\s*#{1,6}\s+/.test(body);
+    const titleLine = (title && !hasHeadingAtTop) ? `# ${title.trim()}\n\n` : '';
+    cleanedMarkdown = (noticeBlock + "\n" + titleLine + body).replace(/\n{3,}/g, "\n\n").trim();
   } else {
-    const clipped = (text || "").slice(0, 20000);
+    // Use baseMarkdown (from Readability/DOM) so images and basic formatting are present for cleaning
+    const clipped = (baseMarkdown || "").slice(0, 20000);
     const sysClean = [
       "You are an article cleaner.",
       "Your job: remove navigation, ads, cookie banners, boilerplate, and duplicate fragments.",
       "PRESERVE the ORIGINAL sentences and wording. DO NOT paraphrase or summarize.",
-      "Keep headings, lists, blockquotes, code fences, links, and tables.",
+      "Keep headings, lists, blockquotes, code fences, links, images, and tables.",
+      "For images: include them as Markdown ![alt](url) using the original alt text when available.",
       "Output clean Markdown of the main body only.",
       langLineEn(finalLang, true),
       langLineNative(finalLang)
@@ -222,6 +270,7 @@ async function runForTab(tabId) {
     status: "done",
     summary: summaryFast,
     cleaned: cleanedMarkdown,
+    quickQuestions,
     meta: {
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
@@ -229,6 +278,152 @@ async function runForTab(tabId) {
       output_lang: finalLang,
       extract_mode: cfg.extract_mode,
       task_mode: cfg.task_mode
+    }
+  });
+}
+
+// Run pipeline for provided raw text/markdown (e.g., from PDF)
+async function runForText(tabId, { title = '', text = '', url = '', pageLang = '', markdown = null, pagesLabel = undefined } = {}) {
+  const cfg = await getSettings();
+  const isTrial = (cfg.aiProvider === "trial");
+  if (!cfg.apiKey && !isTrial) throw new Error("请先到设置页填写并保存 API Key");
+  if (isTrial) {
+    try {
+      const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+      if (!trial_consent) {
+        try { await chrome.storage.sync.set({ need_trial_consent_focus: true }); } catch {}
+        try { await chrome.runtime.openOptionsPage(); } catch {}
+        throw new Error("试用模式需先同意通过代理传输页面内容。请在设置页勾选同意，或切换到其他平台。");
+      }
+    } catch {}
+  }
+
+  await setState(tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
+
+  const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text || "");
+  const rawTextMd = textToMarkdown(typeof text === "string" ? text : "");
+  const baseMarkdown = (() => {
+    if (typeof markdown === "string" && markdown.trim()) {
+      return markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    if (typeof cfg?.markdown === "string" && cfg.markdown.trim()) {
+      return cfg.markdown.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    return rawTextMd;
+  })();
+
+  const quickMd = baseMarkdown;
+  const sysForSummary = buildSystemPrompt({
+    custom: cfg.system_prompt_custom,
+    preset: cfg.system_prompt_preset,
+    finalLang,
+    task: cfg.task_mode
+  });
+  let summaryPrompt =
+    `Based on the content below, produce:\n` +
+    `1) 3–5 key bullet points\n` +
+    `2) One-sentence conclusion or recommendation\n` +
+    `3) 3–6 keywords\n\n` +
+    `Content:\n${quickMd.slice(0, 18000)}`;
+  summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
+  const summaryFast = await chatCompletion({
+    baseURL: cfg.baseURL,
+    apiKey: cfg.apiKey || "trial",
+    model: cfg.model_summarize,
+    system: sysForSummary,
+    prompt: summaryPrompt,
+    temperature: 0.1
+  });
+
+  let quickQuestions = [];
+  try {
+    const qsPrompt = enforceUserLang(
+      `From the content below, generate 3 likely questions a reader may ask.\n`+
+      `Rules: return EXACTLY 3 lines, one question per line, no numbering, no quotes.\n\n`+
+      `Content:\n${quickMd.slice(0, 12000)}`,
+      finalLang,
+      false
+    );
+    const qsOut = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey: cfg.apiKey || 'trial',
+      model: cfg.model_summarize,
+      system: sysForSummary,
+      prompt: qsPrompt,
+      temperature: 0.6
+    });
+    quickQuestions = String(qsOut || '')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^[-*\d\.\)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  } catch {}
+
+  await setState(tabId, {
+    status: "partial",
+    summary: summaryFast,
+    cleaned: "",
+    quickQuestions,
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode,
+      source: 'pdf',
+      pagesLabel
+    }
+  });
+
+  // Cleaned body
+  let cleanedMarkdown = "";
+  if (cfg.extract_mode === "fast") {
+    const NOTICE_ZH = "当前“正文提取方式”为**本地快速模式**，以下正文为**原文**显示。若希望按目标语言显示正文，请在设置中将“正文提取方式”切换为 **AI 清洗模式**。";
+    const NOTICE_EN = "Extract mode is **Local Fast**. The readable body below is shown **in the original language**. If you want the body to follow the target language, switch “Extract Mode” to **AI Clean** in Settings.";
+    const noticeBlock = `:::notice\n${finalLang === "zh" ? NOTICE_ZH : NOTICE_EN}\n:::\n`;
+    const BODY_LIMIT = 50000;
+    const body = (baseMarkdown ? String(baseMarkdown) : "").slice(0, BODY_LIMIT);
+    const hasHeadingAtTop = /^\s*#{1,6}\s+/.test(body);
+    const titleLine = (title && !hasHeadingAtTop) ? `# ${title.trim()}\n\n` : '';
+    cleanedMarkdown = (noticeBlock + "\n" + titleLine + body).replace(/\n{3,}/g, "\n\n").trim();
+  } else {
+    const clipped = (baseMarkdown || "").slice(0, 20000);
+    const sysClean = [
+      "You are an article cleaner.",
+      "Your job: remove navigation, ads, cookie banners, boilerplate, and duplicate fragments.",
+      "PRESERVE the ORIGINAL sentences and wording. DO NOT paraphrase or summarize.",
+      "Keep headings, lists, blockquotes, code fences, links, images, and tables.",
+      "For images: include them as Markdown ![alt](url) using the original alt text when available.",
+      "Output clean Markdown of the main body only.",
+      langLineEn(finalLang, true),
+      langLineNative(finalLang)
+    ].join("\n");
+    const promptClean = `Title: ${title || "(none)"}\nURL: ${url || "pdf://local"}\n\nRaw content (possibly noisy):\n${clipped}\n\nReturn ONLY the cleaned main body as Markdown.`;
+    cleanedMarkdown = await chatCompletion({
+      baseURL: cfg.baseURL,
+      apiKey:  cfg.apiKey || "trial",
+      model:   cfg.model_extract,
+      system:  sysClean,
+      prompt:  promptClean,
+      temperature: 0.0
+    });
+  }
+
+  await setState(tabId, {
+    status: "done",
+    summary: summaryFast,
+    cleaned: cleanedMarkdown,
+    quickQuestions,
+    meta: {
+      baseURL: cfg.baseURL,
+      model_extract: cfg.model_extract,
+      model_summarize: cfg.model_summarize,
+      output_lang: finalLang,
+      extract_mode: cfg.extract_mode,
+      task_mode: cfg.task_mode,
+      source: 'pdf',
+      pagesLabel
     }
   });
 }
@@ -426,6 +621,58 @@ async function setupVideoAdDNRRules() {
   } catch (e) { console.warn('DNR optional IMA rule update failed:', e); }
 }
 
+// Enable/disable the video ad DNR rules as a group based on adblock_enabled
+async function setVideoAdDNRRulesEnabled(enabled){
+  const ids = [2001,2002,2003,2004,2101,2102,2201,2202];
+  try{
+    if (!enabled){
+      // remove our managed dynamic rules
+      const existing = await chrome.declarativeNetRequest.getDynamicRules();
+      const toRemove = existing.filter(r => ids.includes(r.id)).map(r => r.id);
+      if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+      return;
+    }
+    // enabled: (re)install base rules and optional IMA depending on per-site toggle
+    await setupVideoAdDNRRules();
+  }catch(e){ console.warn('setVideoAdDNRRulesEnabled failed:', e); }
+}
+
+/* ====================== Mixed content: upgrade insecure requests ====================== */
+// Some HTTPS pages (e.g., 163.com articles) still reference HTTP assets from 126.net CDNs,
+// which browsers block as mixed content. Add a safe DNR rule to upgrade scheme to HTTPS.
+async function ensureHttpsUpgradeDynamicRules(){
+  const rules = [
+    {
+      id: 2601,
+      priority: 1,
+      action: { type: 'upgradeScheme' },
+      condition: {
+        regexFilter: '^http://static\\.ws\\.126\\.net/',
+        resourceTypes: ['image','stylesheet','font','media']
+      }
+    },
+    {
+      id: 2602,
+      priority: 1,
+      action: { type: 'upgradeScheme' },
+      condition: {
+        // broader 126.net CDN umbrella (images, css, fonts, media only)
+        regexFilter: '^http://([a-z0-9.-]*\\.)?126\\.net/',
+        resourceTypes: ['image','stylesheet','font','media']
+      }
+    }
+  ];
+  try {
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const targetIds = rules.map(r => r.id);
+    const toRemove = existing.filter(r => targetIds.includes(r.id)).map(r => r.id);
+    if (toRemove.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove, addRules: [] });
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules, removeRuleIds: [] });
+  } catch (e) {
+    console.warn('ensureHttpsUpgradeDynamicRules failed:', e);
+  }
+}
+
 /* ====================== SpankBang session rules (site pack) ====================== */
 const SPANKBANG_DOMAINS = ['spankbang.com','www.spankbang.com'];
 
@@ -478,6 +725,13 @@ async function buildSpankbangRules() {
 }
 
 async function refreshSpankbangSessionRules(){
+  try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); if (!adblock_enabled){
+    // remove managed rules and exit
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managedIds = existing.filter(r => r.id === 2301 || r.id === 2302 || r.id === 2303).map(r => r.id);
+    if (managedIds.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managedIds, addRules: [] });
+    return;
+  } }catch{}
   let tabs = [];
   try { tabs = await chrome.tabs.query({}); } catch {}
   let hasSB = false;
@@ -564,10 +818,26 @@ async function buildAdultRules(){
   addBlock('^https?://([a-z0-9.-]*\\.)?adtelligent\\.com/');
   addBlock('^https?://([a-z0-9.-]*\\.)?mgid\\.com/');
 
+  // MissAV-specific: block Stripchat Spot widget (bottom-right white bubble)
+  // This script mounts a floating chat-like widget with text like
+  // "just send a message and ask for ...". Blocking it prevents the popup entirely.
+  addBlock('^https?://creative\\.myavlive\\.com/widgets/Spot/');
+  // Also block their generic creative loader domain often used for inpage widgets
+  // (safe for initiators in this adult set; does not affect core playback)
+  addBlock('^https?://creative\\.myavlive\\.com/.+');
+  // Occasionally seen auxiliary ad loader
+  addBlock('^https?://([a-z0-9.-]*\\.)?sunnycloudstone\\.com/');
+
   return rules;
 }
 
 async function refreshAdultSiteSessionRules(){
+  try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); if (!adblock_enabled){
+    const existing = await chrome.declarativeNetRequest.getSessionRules();
+    const managed = existing.filter(r => r.id >= 2401 && r.id <= 2499).map(r => r.id);
+    if (managed.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: managed, addRules: [] });
+    return;
+  } }catch{}
   // Check if any tab is one of our adult initiators
   let tabs = [];
   try { tabs = await chrome.tabs.query({}); } catch {}
@@ -603,8 +873,14 @@ async function refreshAdultSiteSessionRules(){
     chrome.tabs.onActivated.addListener(() => { refreshSpankbangSessionRules(); refreshAdultSiteSessionRules(); });
   } catch {}
 
-  chrome.runtime.onInstalled.addListener(() => { setupVideoAdDNRRules(); });
-  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { setupVideoAdDNRRules(); });
+  chrome.runtime.onInstalled.addListener(async () => {
+    try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+    try{ await ensureHttpsUpgradeDynamicRules(); }catch{}
+  });
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(async () => {
+    try{ const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false }); await setVideoAdDNRRulesEnabled(!!adblock_enabled); }catch{}
+    try{ await ensureHttpsUpgradeDynamicRules(); }catch{}
+  });
 
 // ---- 与浮动面板通信
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -622,9 +898,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg?.type === "PANEL_RUN_FOR_TAB" && typeof msg.tabId === "number") {
     (async () => {
-      await setState(msg.tabId, { status: "running" });
+      await setState(msg.tabId, { status: "running", meta: { source: 'page' } });
       safeReply({ ok: true });
       runForTab(msg.tabId).catch(async (e) => {
+        await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
+      });
+    })();
+    return true;
+  }
+
+  if (msg?.type === "PANEL_RUN_FOR_TEXT" && typeof msg.tabId === "number" && msg.payload && typeof msg.payload === 'object') {
+    (async () => {
+      // Allow optional pages label to appear on the summary card title
+      const pagesLabel = (typeof msg.payload.pagesLabel === 'string') ? msg.payload.pagesLabel : undefined;
+      await setState(msg.tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
+      safeReply({ ok: true });
+      runForText(msg.tabId, msg.payload).catch(async (e) => {
         await setState(msg.tabId, { status: "error", error: e?.message || String(e) });
       });
     })();
@@ -647,6 +936,57 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try { await chrome.runtime.openOptionsPage(); } catch {}
       safeReply({ ok: true });
+    })();
+    return true;
+  }
+
+  if (msg?.type === 'QA_UI_GET') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        const data = await getQAUI(tabId);
+        safeReply({ ok:true, data });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+  if (msg?.type === 'QA_UI_CLEAR') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        await chrome.storage.session.remove(QA_UI_KEY(tabId));
+        safeReply({ ok:true });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+  if (msg?.type === 'QA_UI_SET') {
+    (async () => {
+      try {
+        let tabId = (typeof msg.tabId === 'number') ? msg.tabId : (sender?.tab?.id);
+        if (typeof tabId !== 'number') { safeReply({ ok:false, error:'No tabId' }); return; }
+        const ui = msg.ui && typeof msg.ui === 'object' ? msg.ui : {};
+        await setQAUI(tabId, ui);
+        safeReply({ ok:true });
+      } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+
+  if (msg?.type === "REQUEST_READABLE") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tab?.id;
+        if (!tabId) return safeReply({ ok:false, error:'No active tab' });
+        await injectIfNeeded(tabId);
+        const data = await getPageRawByTabId(tabId);
+        safeReply({ ok:true, data });
+      } catch (e) {
+        safeReply({ ok:false, error: String(e) });
+      }
     })();
     return true;
   }
@@ -682,12 +1022,33 @@ async function downloadAdblockRules(selectedIds = []) {
     await chrome.storage.local.set({ adblock_rules: {}, adblock_last_update: Date.now(), adblock_error: null });
     return;
   }
+  // 基础内置规则
   const map = listMap();
+  // 合并自定义（仅含 URL 的自定义规则参与下载；纯文本自定义无需下载）
+  try {
+    const { adblock_custom_lists = [] } = await chrome.storage.sync.get({ adblock_custom_lists: [] });
+    for (const it of (Array.isArray(adblock_custom_lists) ? adblock_custom_lists : [])) {
+      if (it && it.id && it.url) {
+        map.set(it.id, { id: it.id, url: it.url, name: it.name || it.id });
+      }
+    }
+  } catch {}
+
   const results = {};
   const errors = [];
+  // 先保留纯文本自定义（无 URL）的现有内容
+  try {
+    const loc = await chrome.storage.local.get({ adblock_rules: {} });
+    const existing = loc.adblock_rules || {};
+    for (const id of idSet) {
+      if (!map.has(id) && existing[id]?.content) {
+        results[id] = existing[id];
+      }
+    }
+  } catch {}
   for (const id of idSet) {
     const item = map.get(id);
-    if (!item) continue;
+    if (!item) continue; // 纯文本自定义或未知 id：跳过
     try {
       const txt = await downloadText(item.url);
       results[id] = { id, url: item.url, name: item.name, size: txt.length, updatedAt: Date.now(), content: txt };
@@ -711,10 +1072,16 @@ function scheduleAdblockUpdate(reason) {
   }, 500); // 简单防抖
 }
 
-// 存储变化时触发下载
+// 存储变化时触发下载 / 启停网络规则
 try {
-  chrome.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== 'sync') return;
+    if (changes.adblock_enabled) {
+      const enabled = !!changes.adblock_enabled.newValue;
+      try { await setVideoAdDNRRulesEnabled(enabled); } catch {}
+      try { await refreshSpankbangSessionRules(); } catch {}
+      try { await refreshAdultSiteSessionRules(); } catch {}
+    }
     if (changes.adblock_enabled || changes.adblock_selected) {
       scheduleAdblockUpdate('storage_changed');
     }
@@ -768,8 +1135,23 @@ async function injectFloatPanel(tabId) {
 
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
+  // Prefer reusing existing panel in the page (if script already present)
+  try {
+    const ping = await chrome.tabs.sendMessage(tab.id, { type: 'SX_PING_PANEL' });
+    if (ping?.ok) {
+      if (!ping.present) {
+        await injectFloatPanel(tab.id);
+        return;
+      }
+      if (!ping.visible) {
+        try { await chrome.tabs.sendMessage(tab.id, { type: 'SX_SHOW_PANEL' }); } catch {}
+      }
+      return;
+    }
+  } catch {}
+  // Fallback: inject fresh panel
   try { await injectFloatPanel(tab.id); }
-  catch (e) { console.warn("injectFloatPanel failed:", e); }
+  catch (e) { console.warn('injectFloatPanel failed:', e); }
 });
 
 async function closeAllFloatPanels() {
@@ -785,19 +1167,27 @@ async function closeAllFloatPanels() {
   } catch {}
 }
 
+async function closeFloatPanel(tabId){
+  try { if (typeof tabId === 'number') await chrome.tabs.sendMessage(tabId, { type: 'SX_CLOSE_FLOAT_PANEL' }); } catch {}
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  // 只要开始加载或 URL 变化，就清掉该 tab 的缓存状态
-  if (changeInfo.status === "loading" || changeInfo.url) {
+  // URL 变化：切到新页面，清除该 tab 的 Q&A UI 状态并关闭旧页面浮窗
+  if (changeInfo.url) {
     chrome.storage.session.remove(STATE_KEY(tabId));
-    // 重置“全文翻译内联”状态，避免新页面沿用旧状态
+    chrome.storage.session.remove(QA_UI_KEY(tabId));
     try { inlineStateByTab.set(tabId, false); } catch {}
+  } else if (changeInfo.status === "loading") {
+    // 同 URL 刷新/恢复：仅清摘要运行态
+    chrome.storage.session.remove(STATE_KEY(tabId));
   }
 
   if (!changeInfo.url && changeInfo.status !== "loading") return;
-  closeAllFloatPanels();
+  // 仅关闭当前发生加载/跳转的 tab 的浮窗；其他 tab 的浮窗保持原样
+  closeFloatPanel(tabId);
 });
 
-chrome.tabs.onActivated.addListener(() => { closeAllFloatPanels(); });
+// 不再在 tab 切换时关闭所有页面浮窗；让各 tab 的面板保留形态
 
 // 标签页关闭时清理状态
 try {
@@ -817,6 +1207,28 @@ const MENU_ID_TRANSLATE = 'sx_translate_selection';
 const MENU_ID_TRANSLATE_FULL = 'sx_translate_full';
 // 记录各 tab 是否已处于“全文对照翻译插入”状态
 const inlineStateByTab = new Map(); // tabId -> boolean
+
+// 根据当前 tab 的状态，更新“全文翻译/显示原文”菜单标题（用于跨 Tab 时保持独立状态）
+async function updateFullMenuTitleForTab(tabId){
+  try{
+    if (typeof tabId !== 'number') return;
+    const inline = inlineStateByTab.get(tabId) === true;
+    const { ui_language = 'zh' } = await chrome.storage.sync.get({ ui_language: 'zh' });
+    const targetLang = await getTargetLang();
+    let title = '';
+    if (inline) {
+      title = (ui_language === 'en')
+        ? 'SummarizerX: Restore original (remove inline translations)'
+        : 'SummarizerX：显示原文（移除对照翻译）';
+    } else {
+      title = (ui_language === 'en')
+        ? (targetLang === 'en' ? 'SummarizerX: Translate full page (inline → English)' : 'SummarizerX: Translate full page (inline → Chinese)')
+        : (targetLang === 'en' ? 'SummarizerX：全文翻译（段落对照 → 英文）' : 'SummarizerX：全文翻译（段落对照 → 中文）');
+    }
+    chrome.contextMenus.update(MENU_ID_TRANSLATE_FULL, { title });
+    chrome.contextMenus.refresh?.();
+  }catch{}
+}
 
 // 根据设置返回目标语言 'zh' | 'en'（默认 zh）
 async function getTargetLang() {
@@ -903,6 +1315,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+// 在激活标签、窗口焦点变化、或页面加载完成时，同步菜单标题为激活 tab 的状态
+try {
+  chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+    await updateFullMenuTitleForTab(tabId);
+  });
+} catch {}
+try {
+  chrome.windows?.onFocusChanged?.addListener(async () => {
+    try {
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (active?.id != null) await updateFullMenuTitleForTab(active.id);
+    } catch {}
+  });
+} catch {}
+try {
+  chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+    if (info.status === 'complete') { updateFullMenuTitleForTab(tabId); }
+  });
+} catch {}
+
 // 右键点击：让内容脚本执行翻译动作
 // chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 //   if (info.menuItemId !== MENU_ID_TRANSLATE || !tab?.id) return;
@@ -955,6 +1387,133 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     })();
     return true; // 异步
+  }
+  if (msg?.type === 'SX_QA_ASK') {
+    (async () => {
+      try {
+        // Resolve tabId from sender; fallback to active tab
+        let tabId = sender?.tab?.id;
+        if (typeof tabId !== 'number') {
+          const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+          tabId = active?.id;
+        }
+        if (typeof tabId !== 'number') throw new Error('No tab context');
+
+        // Read settings and credentials
+        const cfg = await getSettings();
+        const isTrial = (cfg.aiProvider === 'trial');
+        if (!cfg.apiKey && !isTrial) throw new Error('请先到设置页填写并保存 API Key');
+        if (isTrial) {
+          try {
+            const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+            if (!trial_consent) throw new Error('试用模式需先同意通过代理传输页面内容');
+          } catch {}
+        }
+
+        // Determine source: prefer explicit PDF payload from panel if provided
+        const pdf = (msg && typeof msg.pdf === 'object') ? msg.pdf : null;
+        const usePdf = !!(pdf && typeof pdf.text === 'string' && pdf.text.trim());
+        const raw = usePdf
+          ? { title: pdf.title || '(PDF)', url: pdf.url || 'pdf://local', text: pdf.text || '', pageLang: pdf.pageLang || '', markdown: pdf.markdown || null }
+          : await getPageRawByTabId(tabId);
+        const finalLang = resolveFinalLang(cfg.output_lang || 'auto', raw.pageLang, raw.text || '');
+        const pageMd = (typeof raw.markdown === 'string' && raw.markdown.trim()) ? raw.markdown : textToMarkdown(String(raw.text || ''));
+        const clipped = pageMd.slice(0, 20000);
+
+        // Build prompts
+        const sys = [
+          'You are a helpful assistant that must answer STRICTLY using ONLY the provided page content.',
+          'Do NOT use external knowledge. If the content lacks enough information, say so briefly in natural language (no special tokens).',
+          'When the user question is ambiguous or uses deictic words like "this/that/it" (e.g., "如何评价这件事情" / "How to evaluate this"), interpret them as referring to the MAIN SUBJECT of this page (based on title and leading content).',
+          'Synthesize concise answers strictly from the page (facts, viewpoints, pros/cons, outcomes). Keep formatting tidy and readable.',
+          langLineEn(finalLang, false),
+          langLineNative(finalLang)
+        ].join('\n');
+        const q = String(msg.question || '').slice(0, 2000);
+        const h = Array.isArray(msg.history) ? msg.history.slice(-8) : [];
+        const hist = h.map(it => {
+          const role = (it && it.role==="assistant") ? "Assistant" : "User";
+          const content = String(it?.content||'').slice(0, 2000);
+          return `${role}: ${content}`;
+        }).join('\n');
+        const prompt = `Title: ${raw.title || '(untitled)'}\nURL: ${raw.url || ''}\n\nPAGE CONTENT (Markdown):\n${clipped}\n\nCHAT SO FAR (if any):\n${hist || '(none)'}\n\nQUESTION:\n${q}\n\nInstructions: Answer ONLY using the ${usePdf ? 'PDF' : 'page'} content above.`;
+
+        // Mark QA busy to reflect in-flight state across tab switches
+        try { await setQAUI(tabId, { qaBusy: true }); } catch {}
+
+        const answer = await chatCompletion({
+          baseURL: cfg.baseURL,
+          apiKey: cfg.apiKey || 'trial',
+          model: cfg.model_summarize,
+          system: sys,
+          prompt,
+          temperature: 0.1
+        });
+
+        const txt = String(answer || '').trim();
+        // Persist history robustly (session + local-by-URL)
+        try {
+          const ui = await getQAUI(tabId);
+          const prev = Array.isArray(ui?.hist) ? ui.hist.slice(0) : [];
+          prev.push({ role: 'user', content: q });
+          prev.push({ role: 'assistant', content: txt });
+          await setQAUI(tabId, { hist: prev, qaBusy: false });
+        const urlKey = 'sx_qa_hist_v1:' + String(raw.url || '').split('#')[0];
+          try { await chrome.storage.local.set({ [urlKey]: { hist: prev, updatedAt: Date.now() } }); } catch {}
+        } catch {}
+
+        sendResponse({ ok: true, answer: txt, url: raw.url || '', finalLang });
+      } catch (e) {
+        try {
+          const tabId = sender?.tab?.id;
+          if (typeof tabId === 'number') await setQAUI(tabId, { qaBusy: false });
+        } catch {}
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true; // async
+  }
+  if (msg?.type === 'SX_READER_TRANSLATE_BLOCK') {
+    (async () => {
+      try {
+        const rawText = String(msg.text || '');
+        const target = (msg.target === 'en') ? 'en' : 'zh';
+        const cfg = await getSettings();
+        const isTrial = (cfg.aiProvider === 'trial');
+        if (!cfg.apiKey && !isTrial) throw new Error('请先到设置页填写并保存 API Key');
+        if (isTrial) {
+          try {
+            const { trial_consent = false } = await chrome.storage.sync.get({ trial_consent: false });
+            if (!trial_consent) throw new Error('试用模式需先同意通过代理传输页面内容');
+          } catch {}
+        }
+
+        const targetName = (target === 'en') ? 'English' : 'Chinese (Simplified)';
+        const sys = [
+          'You are a professional translator. Translate faithfully.',
+          'Preserve Markdown structure (headings, lists, blockquotes, code fences, links, images).',
+          'Do not add commentary. Output ONLY translated Markdown for THIS BLOCK — no HTML and no extra notes.',
+          'Keep code fences unchanged.'
+        ].join('\n');
+        const prompt = `Translate the following Markdown block into ${targetName}. Return ONLY the translated Markdown for this block.\n\n<<<BLOCK>>>\n${rawText}\n<<<END>>>`;
+        const txt0 = await chatCompletion({
+          baseURL: cfg.baseURL,
+          apiKey: cfg.apiKey || 'trial',
+          model: cfg.model_summarize,
+          system: sys,
+          prompt,
+          temperature: 0
+        });
+        let txt = String(txt0 || '').trim();
+        txt = txt.replace(/^\s*<article>\s*/i,'').replace(/\s*<\/article>\s*$/i,'');
+        txt = txt.replace(/^\s*```(?:markdown)?\s*/i,'').replace(/\s*```\s*$/i,'');
+        txt = txt.replace(/^\s*<<<BLOCK>>>\s*/i,'').replace(/\s*<<<END>>>\s*$/i,'');
+        sendResponse({ ok: true, text: txt });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+    return true; // async
   }
   if (msg?.type === 'SX_INLINE_TRANSLATED_CHANGED') {
     try {

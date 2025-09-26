@@ -200,12 +200,27 @@
           </div>
         </div>
 
+        <!-- NYTimes 专项：屏蔽家庭订阅浮窗 -->
+        <div class="field">
+          <label class="label" id="nyt-popup-label">纽约时报浮窗</label>
+          <div class="row" style="display:flex; align-items:center; gap:12px;">
+            <label class="switch">
+              <input id="nyt_block_family_popup" type="checkbox" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="hint" id="nyt-popup-hint">屏蔽 NYTimes “Family subscriptions / All Access Family” 浮动弹窗</span>
+          </div>
+        </div>
+
         <div class="field">
           <label class="label" id="adblock-strength-label">过滤强度</label>
-          <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
-            <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
-            <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
-            <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+          <div class="row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div class="seg" id="adblock-strength-seg" role="tablist" aria-label="过滤强度">
+              <button class="seg-btn" data-strength="low" aria-selected="false">低</button>
+              <button class="seg-btn" data-strength="medium" aria-selected="true">中</button>
+              <button class="seg-btn" data-strength="high" aria-selected="false">高</button>
+            </div>
+            <div class="hint" id="adblock-strength-custom-hint" style="margin:0;">提示：如使用自定义规则，建议选择“中”。</div>
           </div>
         </div>
       </div>
@@ -244,6 +259,64 @@
           <span id="adblock_cookie_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
         </label>
         <div id="adblock_cookie_lists" class="checklist"></div>
+      </div>
+
+      <!-- 自定义规则区域 -->
+      <div class="field" style="margin-top:12px;" id="adblock-custom-area">
+        <label class="label">
+          <span id="adblock-custom-lists-text">自定义广告过滤规则</span>
+          <button id="sync_all_custom" class="sync-all-btn" type="button" title="全部更新" aria-label="全部更新" data-tip="全部更新">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/>
+            </svg>
+          </button>
+          <span id="adblock_custom_summary_inline" class="adbl-summary-inline" aria-live="polite"></span>
+        </label>
+
+        <!-- 方式一：从 URL 导入 txt -->
+        <div class="custom-import">
+          <div class="row" style="display:flex; gap:8px; align-items:center;">
+            <input id="custom_url" class="ctrl" placeholder="自定义 txt 规则 URL（以 .txt 结尾）" />
+            <button id="btn_custom_url_fetch" class="btn" type="button">下载并校验</button>
+          </div>
+          <div id="custom_url_step2" class="row" style="display:none; margin-top:8px; gap:8px; align-items:center;">
+            <input id="custom_url_name" class="ctrl" placeholder="规则名称（例如：我的自定义规则）" style="flex:1;" />
+            <button id="btn_custom_url_add" class="btn primary" type="button">确认添加</button>
+          </div>
+          <div id="custom_url_status" class="hint" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- 方式二：完全自定义文本 -->
+        <div class="custom-text" style="margin-top:12px;">
+          <label class="label" style="margin-bottom:6px;" id="custom-text-label">完全自定义（大文本框）</label>
+          <textarea id="custom_text" class="ctrl mono" rows="6" placeholder="在此粘贴/输入规则，每行一条；支持 ##/###/#@# 语法，见下方说明"></textarea>
+          <div class="row" style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+            <input id="custom_text_name" class="ctrl" placeholder="规则名称（必填）" style="flex: 0 0 280px;" />
+            <button id="btn_custom_text_add" class="btn" type="button">保存为自定义规则</button>
+          </div>
+          <div id="custom_text_status" class="hint" style="margin-top:6px;"></div>
+
+          <!-- 语法说明 -->
+          <div class="help" style="margin-top:8px;">
+            <div><strong id="custom-syntax-title">输入规则语法（仅支持外观隐藏子集）：</strong></div>
+            <div id="custom-syntax-comment">• 注释行以 <code>!</code>、<code>[Adblock</code>、<code>[uBlock</code> 开头</div>
+            <div id="custom-syntax-global">• 全局隐藏：<code>##selector</code></div>
+            <div id="custom-syntax-domain">• 仅作用于域名：<code>example.com##selector</code>（可用逗号分隔多个域；<code>~example.com</code>表示排除域）</div>
+            <div id="custom-syntax-id">• ID 快捷：<code>###id</code> 等同于 <code>## #id</code></div>
+            <div id="custom-syntax-exception">• 例外（取消隐藏）：<code>example.com#@#selector</code></div>
+            <div id="custom-syntax-unsupported">• 不支持：网络规则（如 <code>||</code>、<code>@@</code>、<code>$</code> 选项）、脚本注入（<code>##+js(...)</code>）等</div>
+          </div>
+        </div>
+
+        <!-- 自定义规则列表展示 -->
+        <div id="adblock_custom_lists" class="checklist" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- 用户元素隐藏（按域名） -->
+      <div class="field" style="margin-top:12px;">
+        <label class="label" id="adblock-user-rules-label">自定义隐藏（按域名，一行一条）</label>
+        <textarea id="adblock_user_rules_text" class="ctrl mono" rows="4" placeholder="例如：example.com##.ad-banner"></textarea>
+        <div class="hint" id="adblock-user-rules-hint">说明：每行一条 ABP 元素隐藏规则，仅建议使用域名限定的 ##/### 规则；不支持网络/脚本规则。</div>
       </div>
 
       <p class="hint" id="adblock-tip">提示：选择后将在后台自动下载并保存在本地，仅用于本扩展的广告过滤功能。</p>

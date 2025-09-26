@@ -1,5 +1,250 @@
 # Changelog
 
+## v2.3.4 - 2025-09-22
+
+### English
+- Fix: Disable "Extract & Summarize" while the PDF card is open until a PDF is fully loaded and the page/range selection is valid. Prevents accidental runs that led to inconsistent states.
+- Behavior: Button re-enables automatically after PDF loads and inputs validate; closes or hides the PDF card restores normal behavior.
+
+### 中文
+- 修复：当 PDF 卡片打开时，禁用“提取并摘要”按钮，直到 PDF 成功加载且页码/范围有效为止，避免误触导致状态异常。
+- 行为：PDF 加载完成且输入校验通过后自动恢复；关闭/隐藏 PDF 卡片后恢复正常。
+
+## v2.3.3 - 2025-09-21
+
+### English
+- PDF Export (Reader Mode): Strip hyperlinks and normalize whitespace before rendering to prevent linked words (e.g., "rate cut") from being isolated on their own lines in the exported PDF.
+- Text layout: Removed per-text-node extra spacing that could cause unintended breaks around previously linked words.
+- Reliability: Keeps images inlined and preserves crisp A4 pagination.
+
+### 中文
+- PDF 导出（阅读模式）：在渲染前移除超链接并规范空白，避免带链接的词语（如 “rate cut”）在导出 PDF 时两端出现不必要的回行，单独占一行。
+- 文本排版：移除逐文本节点的额外间距，减少因链接去除而出现的意外换行。
+- 稳定性：继续内联图片，保持清晰的 A4 分页。
+
+## v2.3.2 - 2025-01-XX
+
+### English
+- **PDF Export (Reader Mode)**: Robust CJK line wrapping
+  - Force-break Chinese at 40 characters per line with a 90% width guard
+  - Canvas-space pagination to prevent overlap/stretching
+  - Multi-page slicing for crisp A4 PDFs without distortion
+- Minor: Better stability when exporting long articles with images
+
+### 中文
+- **PDF 导出（阅读模式）**：增强中文换行
+  - 中文每行最多 40 个汉字，且在 90% 宽度处保守换行
+  - 在画布像素空间分页，避免重叠与拉伸
+  - A4 多页切片导出，页面比例准确、清晰
+- 其它：长文与图片导出稳定性优化
+
+## v2.3.1 - 2025-01-XX
+
+### English
+- **Bug Fix**: Fixed Q&A chat context switching between PDF and web page content
+  - Q&A now correctly follows the last summarization source (PDF or web page)
+  - Chat context automatically switches when changing between PDF and web page summarization
+  - Prevents confusion when PDF panel is hidden but PDF content should still be used for Q&A
+  - Improved chat history management when switching content sources
+
+### 中文
+- **错误修复**: 修复了PDF和网页内容之间的问答聊天上下文切换问题
+  - 问答现在正确跟随最后一次摘要的来源（PDF或网页）
+  - 在PDF和网页摘要之间切换时，聊天上下文自动切换
+  - 防止PDF面板隐藏时仍应使用PDF内容进行问答的混淆
+  - 改进了切换内容源时的聊天历史管理
+
+## v2.3.0 - 2025-01-XX
+
+### English
+- **PDF AI Summarization**: Major new feature supporting both local PDF files and online PDF URLs
+  - Import PDFs via drag-and-drop or file picker in the floating side panel
+  - Preview PDF pages with navigation controls (previous/next page, direct page input)
+  - Select specific page ranges for AI summarization (e.g., "1-3,5" or "10-15")
+  - Real-time page range validation with clear error messages
+  - PDF text extraction and AI processing with the same providers (OpenAI, DeepSeek, Trial, Custom)
+  - Integrated PDF.js for robust PDF rendering and text extraction
+- **PDF Panel UI**: Dedicated PDF preview card with modern interface
+  - Collapsible PDF panel with smooth animations
+  - Page navigation toolbar with current page indicator
+  - Range input with placeholder examples and validation
+  - Error handling with user-friendly messages in both languages
+  - Theme-aware styling (light/dark mode support)
+- **Error Handling**: Improved PDF range validation and error clearing
+  - Clear previous error messages when correcting page ranges
+  - Automatic error clearing when starting new summarization runs
+  - Bilingual error messages for better user guidance
+- **Performance**: Optimized PDF processing with local PDF.js integration
+  - No external dependencies for PDF handling
+  - Efficient text extraction from PDF pages
+  - Memory management for large PDF files
+
+### 中文
+- **PDF AI 摘要**：重大新功能，支持本地 PDF 文件和在线 PDF 链接
+  - 在浮动侧边栏中通过拖拽或文件选择器导入 PDF
+  - 预览 PDF 页面，支持导航控制（上一页/下一页、直接输入页码）
+  - 选择特定页面范围进行 AI 摘要（例如："1-3,5" 或 "10-15"）
+  - 实时页面范围验证，提供清晰的错误提示
+  - PDF 文本提取和 AI 处理，支持所有现有提供商（OpenAI、DeepSeek、试用、自定义）
+  - 集成 PDF.js 实现稳定的 PDF 渲染和文本提取
+- **PDF 面板界面**：专用的 PDF 预览卡片，采用现代化界面
+  - 可折叠的 PDF 面板，带有流畅动画
+  - 页面导航工具栏，显示当前页码指示器
+  - 范围输入框，带有示例占位符和验证
+  - 错误处理，提供中英双语用户友好提示
+  - 主题感知样式（支持明暗模式）
+- **错误处理**：改进的 PDF 范围验证和错误清除
+  - 修正页面范围时清除之前的错误消息
+  - 开始新的摘要运行时自动清除错误
+  - 双语错误消息，提供更好的用户指导
+- **性能**：通过本地 PDF.js 集成优化 PDF 处理
+  - PDF 处理无外部依赖
+  - 高效的 PDF 页面文本提取
+  - 大文件的内存管理
+
+## v2.2.5-beta - 2025-09-18
+
+### English
+- New: Reader Mode — open via the book icon in the side panel; centered overlay with a frosted header, isolated scrolling that never scrolls the page, expanded side padding, and live theme sync (Auto/Light/Dark).
+- Reader Mode overlay: Title bar stays frosted and always visible; the vertical scrollbar is now confined to the content area and never overlaps the Close button.
+- Scroll containment: Continued wheel/middle‑click/trackpad scroll inside the overlay no longer scrolls the underlying page; touch scrolling is also contained. Mask layer absorbs scroll events.
+- Padding: Increased inner horizontal padding for more comfortable reading, with responsive behavior preserved.
+- Theme sync: Overlay now follows the panel theme (Auto/Light/Dark) in real time when toggled from the side panel.
+- Icon polish: Replaced the book glyph with a clearer open‑book silhouette and switched to a distinct reader accent color that stands out on both light/dark themes; added a tooltip for the reader icon.
+ - Ad Filtering indicator: OFF state is now a red shield with a white slash; ON remains a green shield with a check. Colors adapt to light/dark themes. Tooltip remains fast and prominent.
+ - Fix: Force Dark Mode — masthead wordmarks now stay readable on nytimes.com and washingtonpost.com. The header logos are selectively lightened (invert/brightness) and black SVG fills are mapped to light text in both the Dark Reader path and our local fallback. Scope is limited to header/logo selectors to avoid over‑inversion of inline icons.
+
+### 中文
+- 新增：阅读模式（从侧栏标题行的小书图标进入）；居中浮窗，带磨砂标题栏；滚动事件被容器吸收不影响背景；两侧留白更宽；与外观（自动/浅色/深色）实时联动。
+- 阅读模式浮窗：标题栏保持磨砂半透明并始终可见；垂直滚动条仅出现在正文区域，不再遮挡关闭按钮。
+- 滚动隔离：在浮窗内继续滚动（鼠标滚轮/中键/触控板）不会再带动页面滚动；触摸滚动同样被容器捕获；遮罩层也会吞掉滚动事件。
+- 边距：增大正文左右内边距，阅读更舒适（保留自适应）。
+- 主题联动：从侧边栏切换外观（自动/浅色/深色）时，阅读浮窗的配色即时同步。
+- 图标优化：更换更易识别的“打开的书”图标，并用更醒目的阅读强调色，在明暗主题下都有良好对比；为图标新增悬浮提示。
+ - 广告过滤指示：关闭态改为红色盾牌 + 白色斜杠，开启态保持绿色带对勾；两种主题下对比清晰，提示气泡依旧醒目。
+ - 修复：强制深色模式下，nytimes.com 与 washingtonpost.com 页首字标（The New York Times / The Washington Post）在暗底上自动反白，显著提升可读性。该修复同时覆盖 Dark Reader 动态引擎与本地回退样式，选择器仅作用于页首 logo，避免误伤站内其他图标。
+
+## v2.2.3-beta - 2025-09-17
+
+### English
+- Ad Filtering toggle in panel: Redesigned the status icon (shield with check/slash), with a fast, prominent tooltip; fully accessible (role=switch) and keyboard‑toggleable; z-index fixes ensure the tooltip appears above the body.
+- Quick toggle sync: Toggling ad filtering from the panel now writes to storage and the Options page live-syncs its UI without requiring a full reload (enabled switch, strength, selected lists, popup blocker, custom rules text).
+- Network rules control: `adblock_enabled` now also enables/disables DNR (dynamic and session) site packs — rules are installed/removed immediately when toggled off/on, so closing the switch actually stops network-level blocking too.
+- CSP compliance: Removed inline script injections. Replaced with extension-hosted stubs (`stubs/allow_popups.js`, `stubs/nyt-noads-shim.js`) to satisfy strict page CSPs.
+- Options toasts: Removed Petite‑Vue usage in options app to avoid `unsafe-eval` under MV3 CSP; replaced with a lightweight vanilla implementation while keeping the same events and ARIA live region.
+- Panel reliability: Action click prefers reusing an existing panel instance (ping/show) before re-injecting; fixed a duplicate `clampFloatWithinContainer` redeclaration edge case when reloading the panel.
+
+### 中文
+- 面板广告过滤开关：状态图标改为“盾牌 + 勾/斜杠”，提示气泡更大更快；支持键盘切换；修复层级，提示不会被主体遮挡。
+- 快捷开关同步：从面板切换广告过滤后，设置页（若已打开）会即时联动（开关、强度、勾选列表、弹窗拦截、自定义规则文本），无需刷新。
+- 网络规则联动：`adblock_enabled` 现在同时启用/移除 DNR（动态 + 会话）规则，关闭后立即停止网络级拦截。
+- CSP 兼容：去除内联脚本注入，改为使用扩展资源脚本（`stubs/allow_popups.js`、`stubs/nyt-noads-shim.js`），避免严格 CSP 报错。
+- 设置页提示：移除 Petite‑Vue 以消除 MV3 `unsafe-eval` 报错，改为原生轻量实现，保留原有事件与 ARIA。
+- 面板稳定性：点击图标优先唤醒已存在的面板（ping/show），避免重复注入；修复二次注入下 `clampFloatWithinContainer` 重复声明的问题。
+
+## v2.2.1-beta - 2025-09-16
+
+### English
+- Extraction: prefer the DOM-provided Markdown when available, normalize newlines, and fall back to saved custom Markdown or auto-converted text.
+- Fast mode body reuses the sanitized Markdown so the summary and readable body stay consistent.
+- Cleaner heuristics skip navigation/aside sections via tag and ARIA role detection, treat block containers recursively, and honor `<br>` for better spacing.
+- Version: bumped to 2.2.1-beta.
+
+### 中文
+- 正文提取：优先使用内容脚本返回的 Markdown，并标准化换行；若无则回退到自定义 Markdown 或自动转换文本。
+- 快速模式正文复用同一份清洗后的 Markdown，让摘要与正文内容保持一致。
+- 清理规则：通过标签和 ARIA role 识别导航/侧边栏，递归处理块级容器、保留 `<br>`，减少多余空行。
+- 版本：升级至 2.2.1-beta。
+
+## v2.2.0-beta - 2025-09-15
+
+### English
+- Q&A Chat Mode: Bottom bar now supports page-scoped Q&A with continuous bubbles (user right, AI left). Typing indicator (three bouncing dots), clean Markdown rendering, and smart scroll (align top for long answers, scroll to bottom for short ones).
+- Inline Translate Zoom: Per-paragraph +/- for long quotes; controls pinned top-right; hover lift; non-overlapping text.
+- UX Polish: Reduced paragraph spacing inside chat bubbles; increased bubble padding; removed first-replace flicker; cleaned extra breaks only within chat bubbles.
+- Panel Behavior: Q&A send auto-expands the panel (same as summarize) with progress bar; summary/cleaned cards hide during ask; clicking Summarize fades chat away and restores the two cards.
+- Adblock Safety: Do not hide ChatGPT/OpenAI sticky UI when collapsing floating overlays.
+
+### 中文
+- 你问我答（气泡模式）：底部输入支持基于当前网页的连续对话，用户气泡在右、AI 气泡在左；新增三点打字指示；Markdown 排版整洁；智能滚动（长答顶部对齐，短答自动滚底）。
+- 全文对照放大：对较长段落的引用块提供 +/- 放缩；按钮固定在右上角并带轻微悬停上浮；文本不与按钮重叠。
+- 交互优化：气泡内段落间距更紧凑；气泡内边距更舒适；首次替换不闪烁；仅在聊天域清理多余换行，不影响摘要/正文。
+- 面板行为：发送后自动展开浮窗并显示顶部进度条；对话期间隐藏“摘要/正文”；点击“提取并摘要”淡出对话并恢复两卡模式。
+- 广告过滤安全：避免在 ChatGPT/OpenAI 站点上误隐藏粘附式界面元素。
+
+## v2.1.1 - 2025-09-14
+
+### English
+- Inline translate: Added per-paragraph zoom controls (+ / −) for long translated quotes; zoom only affects the current quote.
+- UX: Reserve right padding to avoid text overlapping controls; center glyphs in buttons for better alignment.
+- UI: Pin the +/- controls to the top-right of each quote so they don’t shift while zooming; add a subtle hover lift for feedback.
+- Version: Bumped to 2.1.1.
+
+### 中文
+- 全文对照：为较长段落的内联译文块新增 +/- 放大缩小按钮；仅作用于当前段落。
+- 交互：自动为右侧按钮预留内边距，避免与文字遮挡；优化按钮图标的居中显示。
+- 体验：将 +/- 固定在段落右上角，缩放时按钮不再随文字漂移；悬停有轻微上浮反馈。
+- 版本：升级至 2.1.1。
+
+## v2.1.0 - 2025-09-14
+
+### English
+- Fix: Prevented the floating overlay cleaner from hiding ChatGPT’s bottom‑left avatar/settings panel on `chatgpt.com`.
+- Safety: Added a domain safeguard in `collapseFloatingOverlays()` to skip ChatGPT/OpenAI properties.
+- Version: Bumped extension version to 2.1.0 in `manifest.json`.
+
+### 中文
+- 修复：广告浮层清理会误伤 ChatGPT 左下角头像/设置区的问题（`chatgpt.com`）。
+- 安全：为 ChatGPT/OpenAI 域名加入白名单保护，跳过浮动层清理逻辑。
+- 版本：`manifest.json` 升级为 2.1.0。
+
+## v2.0.9-beta
+
+### English
+- Float panel: Added a coordinated “Hide element” control (icon + label) next to Force Dark.
+- Picker UX: Clicking Confirm now exits picking mode immediately; clicking Cancel returns to picking; Esc exits.
+- Reliability: Confirmation dialog no longer blocked by global capture; works consistently.
+- Generalized selectors: Prefer stable IDs and simple, stable class tokens; fall back to heading tags (h1–h3) if necessary. Improves reusability across the same site.
+- Batch hide on confirm: Immediately hides all elements matching the generated selector for instant feedback; the rule is saved under user hides (per-domain cosmetic) and applied by the engine.
+- Settings: Inline hint to recommend Medium strength when using custom/user rules; i18n for all new strings.
+
+### 中文
+- 浮窗面板：在“强制深色”旁新增“隐藏元素”控件（图标 + 文字），风格统一。
+- 选择器交互：点击“确认添加”后立即退出隐藏模式；点击“取消”则继续框选；按 Esc 退出。
+- 稳定性：确认对话框不再被全局捕获阻挡，按钮可正常点击。
+- 通用选择器：优先稳定 ID 和简单稳定类名；必要时回退到标题标签（h1–h3），提升同站点复用性。
+- 批量隐藏：确认后立即隐藏当前页所有匹配的元素，并保存到“用户隐藏（按域名）”规则，由引擎统一应用。
+- 设置：在“过滤强度”右侧加入提示——使用自定义/用户规则时，推荐选择“中”；相关文案均已双语化。
+
+## v2.0.8-beta
+
+### English
+- Ad Filtering → Custom rules: Added a bottom section to import custom lists from URL (txt) with strict validation and to save fully manual rules via a large textarea. Both appear as selectable items with per-item sync (URL lists) and a section-level “Update All”.
+- Validation: Reject unsupported network/scriptlet rules (e.g., `||`, `@@`, `$`, `##+js(...)`); allow only cosmetic subset (##, ###, #@#) with domain scoping and negations.
+- i18n: All new labels, placeholders, buttons, and the syntax guide localized (中文/English). Integrated with the existing language switcher.
+
+### 中文
+- 广告过滤 → 自定义规则：在底部新增“自定义规则”区域，支持两种方式：
+  1) 通过 URL 导入 txt（下载后严格校验，合格才允许添加）；
+  2) 完全自定义（大文本框输入）。
+  导入/保存后会显示在“自定义规则”列表，可勾选启用；带 URL 的条目支持逐条/全部更新。
+- 校验：拒绝不支持的网络/脚本规则（如 `||`、`@@`、`$`、`##+js(...)`），仅允许外观隐藏子集（##、###、#@#），支持域名与否定域名。
+- 多语言：新增标题、按钮、占位符与语法说明的中英双语，并与现有语言切换联动。
+
+## v2.0.7-beta
+
+### English
+- Ad Filtering UI: The first four controls (Enable ad filtering / Popup blocking / NYTimes upsell / Strength) are now stacked vertically with a small right indent for cleaner layout.
+- NYTimes upsell control: Added a dedicated toggle to hide the “Family subscriptions / All Access Family” floating upsell popup; fully localized (中文/English).
+- Fresh install defaults: Ad filtering, popup blocking, and NYTimes upsell hiding are OFF by default.
+- Housekeeping: Removed obsolete `RELEASE_NOTES_v1.9.0.md`.
+
+### 中文
+- 广告过滤 UI：顶部四项（启用广告过滤 / 弹窗拦截 / 纽约时报浮窗 / 过滤强度）改为竖向排列，并整体右侧缩进，版面更整洁。
+- 纽约时报浮窗：新增独立开关，屏蔽 “Family subscriptions / All Access Family” 浮动弹窗；支持中英双语。
+- 初装默认：广告过滤开关、弹窗拦截、纽约时报浮窗屏蔽均为关闭状态。
+- 清理：移除 `RELEASE_NOTES_v1.9.0.md` 旧文件。
+
 ## v2.0.6
 
 ### English
@@ -399,3 +644,45 @@ This makes SummarizerX more convenient for bilingual reading and quick translati
 - 🧼 设置页底部对齐与 meta 文本显示宽度优化。
 - 🧭 翻译模式严格输出纯文本：不含 Markdown/额外说明，保持原段落换行。
 - 🐛 修复：右键菜单标题与内联翻译实际状态保持同步（导航重置、标签页关闭清理、状态变更即时更新）。
+# Changelog
+
+## v2.2.2-beta - 2025-09-16
+
+### English
+- Q&A window bounds: Never auto-resize or auto-reposition the Q&A bubble when the side panel width changes. Enforce a 10px safe margin on both left and right. If shrinking the side panel would push the Q&A window within 10px of either edge, shrinking is blocked instead of squeezing the bubble. When near the right edge, the bubble no longer auto-moves inward.
+- Resize reliability: Fixed an issue where the Q&A bubble could continue resizing after mouse release. Added robust pointer capture + global listeners and immediate stop on buttons==0.
+- Summarize lockout: While Extract & Summarize is running (running/partial), the Q&A input and Send button are disabled and visually dimmed; they restore on done/error.
+- Safety polish: Hide horizontal overflow in the container and unify boundary margins to 10px during drag/resize.
+- Version: Bumped to 2.2.2-beta in manifest and docs.
+
+### 中文
+- 你问我答边界：不再因 sidepanel 宽度变化而“弹性”改变浮窗尺寸或位置；左右各保留 10px 安全边距。当收窄 sidepanel 会导致浮窗距任一侧低于 10px 时，改为阻止继续收窄；右侧接近边缘时，浮窗不再向内自动移动。
+- 缩放稳定性：修复“松开鼠标后仍继续改变大小”的问题；加入更稳健的指针捕获与全局监听，并在鼠标按钮抬起时立刻结束缩放。
+- 运行期禁用：执行“提取并摘要”期间（running/partial），禁用问答输入与发送按钮并灰显；处理完成或出错后自动恢复。
+- 安全细化：容器横向溢出隐藏；卡片拖动/缩放边界统一为 10px。
+- 版本：升级至 2.2.2-beta（manifest 与文档）。
+# Changelog
+
+## v2.2.4-beta - 2025-09-17
+
+### English
+- Force Dark Mode: integrated Dark Reader (MIT) dynamic theme by default with a safe local fallback. The floating sidepanel is now excluded from darkening to preserve its own theme. Dark Reader files are bundled locally (no remote fetch) and the upstream LICENSE is included.
+- Readable Body (Local Fast): integrated Mozilla Readability (Apache‑2.0) for offline extraction, with our previous heuristic as fallback; keeps headings/lists/quotes and reduces boilerplate. Upstream LICENSE is bundled.
+- Q&A chat polish: increased bubble spacing for readability; input bar styling aligned with the chat card; in light theme the textarea uses white background for clarity.
+- Scroll behavior: prevented scroll chaining from the floating Q&A window into the sidepanel (overscroll-behavior: contain); fine‑tuned top/bottom paddings when scrolling.
+- UX: when the Q&A window floats above, background cards (Summary/Readable) no longer lift on hover; restored after closing the chat float.
+
+### 中文
+- 强制深色模式：默认集成 Dark Reader（MIT）动态主题，并提供本地轻量回退。浮窗面板本身不会被“变黑”，其明/暗外观保持不变。Dark Reader 以本地文件打包（不走远程），并附带上游 LICENSE。
+- 可读正文（本地快速）：集成 Mozilla Readability（Apache‑2.0）进行离线提取，保留原启发式作为回退；更好地保留标题/列表/引用并减少噪声。已打包上游 LICENSE。
+- 你问我答细节：增大气泡间距；提问输入区配色与卡片统一；亮色模式下输入框采用白色底，易于辨认。
+- 滚动体验：阻止你问我答浮窗的滚动链路传导到侧边面板（overscroll-behavior: contain）；滚动到顶/底时的上下留白更合适。
+- 交互：当你问我答浮窗在前台时，背后“摘要/可读正文”卡片不再触发悬浮上浮；关闭浮窗后恢复。
+## 2.2.6 — Reader Translate Improvements
+
+- Reader Mode: Added Translate Original button with per-paragraph progressive translation. Each block replaces in place as soon as it’s done, so users don’t wait for the whole article.
+- Provider selector: choose between Free service (Cloudflare Worker + Gemini 2.5‑flash) and the AI provider configured in Settings. The option reflects your current provider (ChatGPT/OpenAI, DeepSeek, Trial, or Custom) and persists across pages.
+- Caching: Re-entering Reader Mode on the same page reuses completed translations; only untranslated blocks are requested again. A one‑click toggle switches between Show Original and Show Translation without new requests.
+- Concurrency + timeout: Parallelize translation (3 concurrent blocks) and raise per-block timeout to 3 minutes to improve reliability on long articles.
+- Integrated progress: The translate button now shows an in‑button progress bar with stronger contrast for better visibility in both light/dark themes.
+- Robustness: Better error surfacing from the free worker path; trims accidental wrappers like <article>…</article> and code fences in responses. Fixed an async usage issue in content scripts.

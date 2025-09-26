@@ -1,25 +1,39 @@
-// options.app.js — petite-vue app shell for non-intrusive toasts
-if (window.PetiteVue && typeof window.PetiteVue.createApp === 'function') {
+// options.app.js — CSP-safe toasts (no Petite-Vue, no eval)
+(function(){
   const root = document.getElementById('sx-toast-root');
-  if (root) {
-    const App = Object.assign(window.SXUI || {}, {
-      toasts: [],
-      focus: (window.SXUI && window.SXUI.focus) || { aiProvider:false, apiKey:false, baseURL:false, model_extract:false, model_summarize:false, output_lang:false, extract_mode:false },
-      addToast(msg, type = 'info', ms = 1800) {
-        const id = Date.now() + Math.random();
-        this.toasts.push({ id, msg, type });
-        setTimeout(() => this.removeToast(id), ms);
-      },
-      removeToast(id){ this.toasts = this.toasts.filter(t => t.id !== id); }
-    });
-    window.PetiteVue.createApp(App).mount(root);
+  if (!root) return;
+  // Remove template bindings to avoid showing raw mustache/attributes
+  try{ root.innerHTML = ''; }catch{}
 
-    // Wire events from options.js
-    try{
-      window.addEventListener('SX_OPT_SAVE_END', () => App.addToast('已保存设置', 'success'));
-      window.addEventListener('SX_OPT_TEST_END', () => App.addToast('测试已完成', 'info'));
-    }catch{}
+  function renderToast(t){
+    const el = document.createElement('div');
+    el.className = 'sx-toast ' + (t.type||'info');
+    el.textContent = t.msg||'';
+    el.setAttribute('role','status');
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', ()=> removeToast(t.id, el));
+    root.appendChild(el);
+    return el;
   }
-}
+  function removeToast(id, el){
+    try{ if (el && el.parentNode) el.parentNode.removeChild(el); }catch{}
+    queue = queue.filter(x => x.id !== id);
+  }
+  function addToast(msg, type='info', ms=1800){
+    const t = { id: Date.now() + Math.random(), msg, type };
+    queue.push(t);
+    const el = renderToast(t);
+    if (ms>0) setTimeout(()=> removeToast(t.id, el), ms);
+  }
+  let queue = [];
 
+  // Expose for other modules
+  window.SXToast = { add: addToast, remove: removeToast };
+
+  // Wire events from options.js
+  try{
+    window.addEventListener('SX_OPT_SAVE_END', () => addToast('已保存设置', 'success'));
+    window.addEventListener('SX_OPT_TEST_END', () => addToast('测试已完成', 'info'));
+  }catch{}
+})();
 

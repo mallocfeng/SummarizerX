@@ -369,6 +369,7 @@ html[data-theme="light"] .language-switcher .lang-btn.active{ background: var(--
   padding:10px 14px; border-radius: 10px; cursor:pointer; font-weight:700; border:1px solid #d1d5db; background:#fff; color:#111827; transition: background .15s, border-color .15s, transform .05s;
   white-space: nowrap; min-width:0; flex-shrink:1; max-width:160px; overflow:hidden; text-overflow:ellipsis;
 }
+.btn#btn_custom_text_add{ max-width: none; flex: 0 0 auto; overflow: visible; text-overflow: initial; }
 .btn:hover{ background:#f3f4f6; border-color:#cbd5e1; }
 .btn:active{ transform: translateY(1px); }
 .btn.primary{ background: var(--primary); border-color: var(--primary); color:#fff; }
@@ -521,6 +522,7 @@ html[data-theme="dark"] .buy-help-inline{ color:#cbd5e1; }
   .dock-left{ min-width:auto; max-width:none; }
   .dock-right{ justify-content:flex-end; gap:8px; flex-wrap: wrap; }
   .btn{ padding: 8px 12px; font-size:12px; max-width: 120px; }
+  .btn#btn_custom_text_add{ max-width: none; }
   .save-dock .meta{ white-space:normal; font-size:10px; padding:4px 6px; }
 }
 .save-dock{ padding: 12px 0; }
@@ -815,8 +817,15 @@ html[data-theme="dark"] #adblock-strength-seg .seg-btn[aria-selected="true"],
 html[data-theme="dark"] #adblock-strength-seg .seg-btn.active{ background: var(--primary-600); color:#fff; }
 
 /* ---- Adblock first row layout (three controls in one line) ---- */
-.adblock-row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
-.adblock-row .field{ margin: 0; min-width: 220px; }
+.adblock-row{
+  display:flex;
+  flex-direction: column;      /* stack vertically */
+  align-items: flex-start;      /* left align */
+  gap:12px;                     /* vertical spacing between items */
+  margin-bottom:14px;
+  padding-left: 12px;           /* slight right indent */
+}
+.adblock-row .field{ margin: 0; width: 100%; min-width: 0; }
 .adblock-row .field .label{ margin-bottom: 6px; }
 .adblock-row .switch{ transform: none; }
 

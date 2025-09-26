@@ -10,7 +10,7 @@
 
   // Conditionally inject page-world script to patch window.open and block nuisance popups
   try {
-    const { adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_block_popups: true });
+    const { adblock_block_popups = false } = await chrome.storage.sync.get({ adblock_block_popups: false });
     if (adblock_block_popups) {
       const s = document.createElement('script');
       s.src = chrome.runtime.getURL('block_pop.js');
@@ -31,12 +31,16 @@
   // Observe changes regardless of initial state so toggling on/off works without reload
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === 'sync') {
-      if (changes.adblock_enabled || changes.adblock_strength || changes.adblock_selected) {
+      if (changes.adblock_enabled || changes.adblock_strength || changes.adblock_selected || changes.adblock_user_rules_text) {
         // If user turned off, clear cache for this host to avoid early hide next reload
         if (changes.adblock_enabled && changes.adblock_enabled.newValue === false) {
           try { clearSessionCacheForHost(); } catch {}
         }
         await reapply();
+      }
+      if (changes.nyt_block_family_popup) {
+        // re-scan overlays on toggle change
+        try { schedulePlaceholderSweep(); } catch {}
       }
       if (changes.adblock_block_popups) {
         const on = !!changes.adblock_block_popups.newValue;
@@ -48,12 +52,12 @@
             (document.documentElement || document.head || document.body).appendChild(s);
           } catch {}
         } else {
-          // disable patched window.open by setting page flag
+          // disable patched window.open by setting page flag via extension resource (CSP-safe)
           try {
             const s = document.createElement('script');
-            s.textContent = 'try{window.__sx_allow_popups=true;}catch{}';
+            s.src = chrome.runtime.getURL('stubs/allow_popups.js');
+            s.defer = false; s.async = false; s.type = 'text/javascript';
             (document.documentElement || document.head || document.body).appendChild(s);
-            s.remove();
           } catch {}
         }
       }
@@ -66,7 +70,9 @@
 
   async function reapply(){
     try {
-      const { adblock_enabled = false, adblock_strength = 'medium', adblock_selected = [] } = await chrome.storage.sync.get({ adblock_enabled:false, adblock_strength:'medium', adblock_selected: [] });
+      const { adblock_enabled = false, adblock_strength = 'medium', adblock_selected = [], nyt_block_family_popup = false } = await chrome.storage.sync.get({ adblock_enabled:false, adblock_strength:'medium', adblock_selected: [], nyt_block_family_popup: false });
+      // snapshot NYT toggle for subsequent sweeps
+      try { window.__sx_nyt_block_family_popup = !!nyt_block_family_popup; } catch {}
       const style = document.getElementById('sx-adblock-style');
       // Safeguard: avoid cosmetic filtering on YouTube by default (prevents UI regressions)
       const host = location.hostname || '';
@@ -74,11 +80,13 @@
       if (isYouTube) { if (style) style.remove(); disconnectRemover(); return; }
       if (!adblock_enabled) { if (style) style.remove(); return; }
       const { adblock_rules = {} } = await chrome.storage.local.get({ adblock_rules: {} });
+      const { adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_user_rules_text: '' });
       const collected = [];
       for (const id of adblock_selected || []) {
         const rec = adblock_rules[id];
         if (rec?.content) collected.push(rec.content);
       }
+      if (adblock_user_rules_text && adblock_user_rules_text.trim()) collected.push(adblock_user_rules_text);
       if (!collected.length) { if (style) style.remove(); return; }
       const struct = mergeStructs(collected.map(parseCosmetic));
       const selectors = compileForHost(struct, location.hostname || '', adblock_strength);
@@ -163,6 +171,7 @@ function schedulePlaceholderSweep(){
       // Tightened heuristic: skip placeholder collapsing on low strength
       if (__adblStrength !== 'low') collapseAdPlaceholders();
       collapseNYTPlaceholders();
+      collapseNYTFamilyUpsell();
       collapseFloatingOverlays();
       // Site specific inline ad containers
       try { if (/\bmissav\./i.test(host)) collapseMissavInlineAds(); } catch {}
@@ -287,6 +296,54 @@ function collapseNYTPlaceholders(){
   try { neutralizeNYTBetamaxAds(); } catch {}
 }
 
+// Hide NYTimes "Family subscriptions / All Access Family" upsell floating dialog/banner
+function collapseNYTFamilyUpsell(){
+  try {
+    const host = location.hostname || '';
+    if (!/nytimes\.com$/.test(host)) return;
+    // Respect user toggle (default true)
+    const on = (function(){ try { return window.__sx_nyt_block_family_popup !== false; } catch { return true; } })();
+    if (!on) return;
+
+    // Text patterns observed on NYT upsell
+    const txtRe = /(family\s+subscriptions?\s+are\s+here|all\s*access\s*family|家庭(订阅|方案)|家庭版)/i;
+
+    // Collect likely overlays: fixed/sticky or role=dialog banners
+    const nodes = [];
+    try { nodes.push(...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')); } catch {}
+    try { nodes.push(...document.querySelectorAll('[style*="position:fixed" i], [style*="position: sticky" i]')); } catch {}
+    try { nodes.push(...document.querySelectorAll('div,section,aside')); } catch {}
+
+    const seen = new WeakSet();
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    const EDGE = 140; // banner near edges
+
+    for (const el of nodes) {
+      try {
+        if (!el || !el.isConnected || seen.has(el)) continue;
+        seen.add(el);
+        const text = (el.textContent || '').trim();
+        if (!text || !txtRe.test(text)) continue; // must match upsell text
+
+        // Only target overlays/banners to avoid accidental content hiding
+        const cs = getComputedStyle(el);
+        const pos = (cs.position || '').toLowerCase();
+        const rect = el.getBoundingClientRect();
+        const z = parseInt(cs.zIndex || '0', 10);
+        const overlayish = (pos === 'fixed' || pos === 'sticky' || (isNaN(z) ? false : z >= 5));
+        const nearEdge = rect && (vh - rect.bottom <= EDGE || rect.top <= EDGE || vw - rect.right <= EDGE || rect.left <= EDGE);
+
+        if (overlayish || nearEdge) {
+          hardHide(el);
+          const p = el.parentElement;
+          if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+        }
+      } catch {}
+    }
+  } catch {}
+}
+
 // NYTimes ad neutralization (non-destructive):
 // - Page-world shim to force adClientUtils to report ads disabled
 // - Avoid removing player components that could break playback
@@ -303,26 +360,7 @@ function earlyInjectNYTNoAdsShim(){
     const s = document.createElement('script');
     s.id = 'sx-nyt-noads-shim';
     s.type = 'text/javascript';
-    s.textContent = `
-      (function(){
-        try{
-          // Patch adClientUtils so site believes ads are disabled
-          var u = window.adClientUtils = window.adClientUtils || {};
-          var origHas = u.hasActiveToggle;
-          u.hasActiveToggle = function(name){
-            try{
-              var n = String(name||'');
-              if (/(^|_)dfp|geoedge|medianet|amazon|als_toggle|als|adslot|ads?/i.test(n)) return false;
-            }catch{}
-            return origHas ? origHas.apply(this, arguments) : false;
-          };
-          var origGet = u.getAdsPurrDirective;
-          u.getAdsPurrDirective = function(){ return 'no-ads'; };
-          // Optional: mark as opted-out flag consumed by some layers
-          try{ document.documentElement.dataset.optedOutOfAds = 'true'; }catch{}
-        }catch(e){}
-      })();
-    `;
+    s.src = chrome.runtime.getURL('stubs/nyt-noads-shim.js');
     (document.documentElement || document.head || document.body).appendChild(s);
   } catch {}
 }
@@ -330,6 +368,12 @@ function earlyInjectNYTNoAdsShim(){
 // ----- Generic floating overlay (bottom-right ads) remover -----
 function collapseFloatingOverlays(){
   try {
+    // Safety: avoid hiding legitimate sticky UI on ChatGPT/OpenAI properties
+    try {
+      const h = (location.hostname || '').toLowerCase();
+      if (/(^|\.)chatgpt\.com$/.test(h) || /(^|\.)openai\.com$/.test(h)) return;
+    } catch {}
+
     // Site-specific: MISSAV corner floating ads are persistent; apply stronger sweep.
     try { if (/\bmissav\./i.test(location.hostname || '')) collapseMissavCornerAds(); } catch {}
 

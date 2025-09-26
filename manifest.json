@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SummarizerX AI Reader",
-  "version": "2.0.6",
+  "version": "2.3.4",
+  "version_name": "2.3.4",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": [
     "activeTab",
@@ -39,10 +40,19 @@
       "resources": [
         "i18n.js",
         "vendor/petite-vue.iife.js",
+        "vendor/darkreader.min.js",
+        "vendor/sx-dark-bridge.js",
+        "vendor/pdf-lib.min.js",
+        "vendor/pdf-lib.esm.js",
+        "vendor/pdfjs/pdf.mjs",
+        "vendor/pdfjs/pdf.worker.mjs",
+        "vendor/pdfjs/pdf.sandbox.mjs",
         "adblock_engine.js",
         "block_pop.js",
         "stubs/nyt-betamax-ads-stub.js",
-        "stubs/ima3-empty.js"
+        "stubs/ima3-empty.js",
+        "stubs/allow_popups.js",
+        "stubs/nyt-noads-shim.js"
       ],
       "matches": ["<all_urls>"]
     }

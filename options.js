@@ -210,8 +210,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyDocumentTheme(v);
   }).catch(()=>{});
 
-  // 初始化国际化
-  await initI18n();
+  // 初始化国际化（兜底保护）
+  try { await initI18n(); } catch (e) { console.warn('initI18n failed:', e); }
 
   // 初始化 Tab 切换（AI 摘要 / 广告过滤）
   try { initTopTabs(); } catch(e) { console.warn('initTopTabs failed:', e); }
@@ -333,7 +333,7 @@ function applyPresetToTextarea(force = false) {
 async function loadSettings() {
   const d = await getSettings(); // ← 统一读取（含 trial 默认）
   const { trial_consent = false, need_trial_consent_focus = false } = await chrome.storage.sync.get({ trial_consent: false, need_trial_consent_focus: false });
-  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = true } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: true });
+  const { adblock_enabled = false, adblock_strength = FILTER_DEFAULT_STRENGTH, adblock_selected = [], adblock_block_popups = false, nyt_block_family_popup = false, adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_enabled: false, adblock_strength: FILTER_DEFAULT_STRENGTH, adblock_selected: [], adblock_block_popups: false, nyt_block_family_popup: false, adblock_user_rules_text: '' });
 
   // 平台（默认 trial）
   const aiProvider = d.aiProvider || DEFAULTS.aiProvider;
@@ -391,6 +391,10 @@ async function loadSettings() {
     updateAdblockSectionEnabledState();
     const popCb = document.getElementById('adblock_block_popups');
     if (popCb) popCb.checked = !!adblock_block_popups;
+    const nytCb = document.getElementById('nyt_block_family_popup');
+    if (nytCb) nytCb.checked = !!nyt_block_family_popup;
+    const userTxt = document.getElementById('adblock_user_rules_text');
+    if (userTxt) userTxt.value = adblock_user_rules_text || '';
   } catch {}
 }
 
@@ -411,6 +415,17 @@ async function saveSettings() {
     $("extract_mode").value = "fast";
   }
 
+  const $userTxt = document.getElementById('adblock_user_rules_text');
+  // 校验自定义隐藏规则（若存在）
+  if ($userTxt && $userTxt.value.trim()) {
+    const v = validateCustomRules($userTxt.value);
+    if (!v.ok) {
+      const msg = await t('adblock.userRulesInvalid').catch(()=> '自定义隐藏规则校验失败：');
+      await setStatus(`${msg}${v.msg}`);
+      throw new Error('user rules invalid');
+    }
+  }
+
   const payload = {
     aiProvider,
     apiKey: $("apiKey").value.trim(),
@@ -428,8 +443,10 @@ async function saveSettings() {
     adblock_selected: (function(){
       return Array.from(getAdblockSelectedSet());
     })(),
-    adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked)
+    adblock_block_popups: !!(document.getElementById('adblock_block_popups')?.checked),
+    nyt_block_family_popup: !!(document.getElementById('nyt_block_family_popup')?.checked)
   };
+  if ($userTxt) payload.adblock_user_rules_text = $userTxt.value.trim();
 
   // 同步保存平台专用 key（便于切换回填）
   const providerKeyName = PROVIDER_PRESETS[aiProvider]?.apiKeyKey;
@@ -793,6 +810,9 @@ async function updateUIText() {
   updateElementText('adblock-enable-hint', await t('adblock.enableHint'));
   updateElementText('adblock-block-popups-label', await t('adblock.blockPopups'));
   updateElementText('adblock-block-popups-hint', await t('adblock.blockPopupsHint'));
+  // NYTimes popup switch
+  updateElementText('nyt-popup-label', await t('adblock.nytPopupLabel'));
+  updateElementText('nyt-popup-hint', await t('adblock.nytPopupHint'));
   updateElementText('adblock-strength-label', await t('adblock.strength'));
   // 强度按钮文字
   try {
@@ -807,16 +827,26 @@ async function updateUIText() {
       seg.setAttribute('aria-label', await t('adblock.strength'));
     }
   } catch {}
+  // 强度提示（自定义规则时建议选择“中”）
+  updateElementText('adblock-strength-custom-hint', await t('adblock.strengthCustomHint'));
   updateElementText('adblock-global-lists-text', await t('adblock.globalLists'));
   updateElementText('adblock-regional-lists-text', await t('adblock.regionalLists'));
   updateElementText('adblock-cookie-lists-text', await t('adblock.cookieLists'));
+  // 自定义规则标题
+  updateElementText('adblock-custom-lists-text', await t('adblock.customTitle'));
+  // 用户自定义隐藏（文本）
+  updateElementText('adblock-user-rules-label', await t('adblock.userRulesTitle'));
+  const uTxt = document.getElementById('adblock_user_rules_text');
+  if (uTxt) uTxt.placeholder = await t('adblock.userRulesPlaceholder');
+  updateElementText('adblock-user-rules-hint', await t('adblock.userRulesHint'));
   updateElementText('adblock-tip', await t('adblock.tip'));
   // 同步按钮提示
   const syncAllText = await t('adblock.syncAll');
   const syncAllBtns = [
     document.getElementById('sync_all_global'),
     document.getElementById('sync_all_regional'),
-    document.getElementById('sync_all_cookie')
+    document.getElementById('sync_all_cookie'),
+    document.getElementById('sync_all_custom')
   ];
   for (const b of syncAllBtns) {
     if (!b) continue;
@@ -824,6 +854,36 @@ async function updateUIText() {
     b.setAttribute('aria-label', syncAllText);
     b.dataset.tip = syncAllText;
   }
+
+  // 自定义导入区：占位与按钮文案
+  try {
+    const elUrl = document.getElementById('custom_url');
+    if (elUrl) elUrl.placeholder = await t('adblock.customUrlPlaceholder');
+    const bFetch = document.getElementById('btn_custom_url_fetch');
+    if (bFetch) bFetch.textContent = await t('adblock.customUrlFetch');
+    const elName1 = document.getElementById('custom_url_name');
+    if (elName1) elName1.placeholder = await t('adblock.customUrlNamePlaceholder');
+    const bAdd1 = document.getElementById('btn_custom_url_add');
+    if (bAdd1) bAdd1.textContent = await t('adblock.customUrlConfirm');
+
+    const lblText = document.getElementById('custom-text-label');
+    if (lblText) lblText.textContent = await t('adblock.customTextLabel');
+    const elText = document.getElementById('custom_text');
+    if (elText) elText.placeholder = await t('adblock.customTextPlaceholder');
+    const elName2 = document.getElementById('custom_text_name');
+    if (elName2) elName2.placeholder = await t('adblock.customTextNamePlaceholder');
+    const bAdd2 = document.getElementById('btn_custom_text_add');
+    if (bAdd2) bAdd2.textContent = await t('adblock.customTextSave');
+
+    // 语法说明
+    updateElementText('custom-syntax-title', await t('adblock.syntaxTitle'));
+    updateElementText('custom-syntax-comment', await t('adblock.syntaxComment'));
+    updateElementText('custom-syntax-global', await t('adblock.syntaxGlobal'));
+    updateElementText('custom-syntax-domain', await t('adblock.syntaxDomain'));
+    updateElementText('custom-syntax-id', await t('adblock.syntaxId'));
+    updateElementText('custom-syntax-exception', await t('adblock.syntaxException'));
+    updateElementText('custom-syntax-unsupported', await t('adblock.syntaxUnsupported'));
+  } catch {}
 
   // 状态行多语言同步（已存在的“同步成功/失败/同步中…”）
   try {
@@ -852,7 +912,7 @@ async function updateUIText() {
     const okLabel = await t('adblock.resultOkLabel');
     const failLabel = await t('adblock.resultFailLabel');
     const noTasks = await t('adblock.noTasks');
-    const ids = ['adblock_global_summary_inline','adblock_regional_summary_inline','adblock_cookie_summary_inline'];
+    const ids = ['adblock_global_summary_inline','adblock_regional_summary_inline','adblock_cookie_summary_inline','adblock_custom_summary_inline'];
     for (const id of ids) {
       const el = document.getElementById(id);
       if (!el) continue;
@@ -904,8 +964,11 @@ async function switchLanguage(lang) {
     // 等待淡出完成（或超时兜底）
     await new Promise(res=> setTimeout(res, window.matchMedia('(prefers-reduced-motion: reduce)').matches? 0: 180));
 
-    // 保存语言设置 + 更新文案
-    await chrome.storage.sync.set({ ui_language: lang });
+    // 保存语言设置（同时写 sync 与 local，容错）
+    await Promise.allSettled([
+      chrome.storage.sync.set({ ui_language: lang }),
+      chrome.storage.local.set({ ui_language_cache: lang })
+    ]);
     await updatePageLanguage();
     updateLanguageSwitcher(lang);
     await updateUIText();
@@ -957,6 +1020,28 @@ document.addEventListener('DOMContentLoaded', () => {
   try{
     chrome.storage.onChanged.addListener(async (changes, area) => {
       if (area !== 'sync') return;
+      // Keep Ad Filtering UI in sync when toggled from the floating panel
+      try{
+        if (changes.adblock_enabled){
+          const enabledEl = document.getElementById('adblock_enabled');
+          if (enabledEl) enabledEl.checked = !!changes.adblock_enabled.newValue;
+          try { updateAdblockSectionEnabledState(); } catch {}
+        }
+        if (changes.adblock_strength){
+          try { setSelectedStrength(String(changes.adblock_strength.newValue)); } catch {}
+        }
+        if (changes.adblock_selected){
+          try { applyAdblockSelections(new Set((changes.adblock_selected.newValue || []).filter(Boolean))); } catch {}
+        }
+        if (changes.adblock_block_popups){
+          const popCb = document.getElementById('adblock_block_popups');
+          if (popCb) popCb.checked = !!changes.adblock_block_popups.newValue;
+        }
+        if (changes.adblock_user_rules_text){
+          const userTxt = document.getElementById('adblock_user_rules_text');
+          if (userTxt) userTxt.value = String(changes.adblock_user_rules_text.newValue || '');
+        }
+      }catch{}
       if (changes.need_trial_consent_focus && changes.need_trial_consent_focus.newValue) {
         try {
           const sel = document.getElementById('aiProvider');
@@ -1051,14 +1136,14 @@ function renderAdblockLists() {
 
 function getAdblockSelectedSet() {
   const sel = new Set();
-  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"], #adblock_custom_lists input[type="checkbox"]').forEach(cb => {
     if (cb.checked) sel.add(cb.dataset.listId);
   });
   return sel;
 }
 
 function applyAdblockSelections(set) {
-  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#adblock_global_lists input[type="checkbox"], #adblock_regional_lists input[type="checkbox"], #adblock_cookie_lists input[type="checkbox"], #adblock_custom_lists input[type="checkbox"]').forEach(cb => {
     const id = cb.dataset.listId;
     cb.checked = set.has(id);
   });
@@ -1090,18 +1175,23 @@ function updateAdblockSectionEnabledState(){
     document.getElementById('adblock_global_lists'),
     document.getElementById('adblock_regional_lists'),
     document.getElementById('adblock_cookie_lists'),
-    document.getElementById('adblock_block_popups')
+    document.getElementById('adblock_custom_lists'),
+    document.getElementById('adblock_block_popups'),
+    document.getElementById('nyt_block_family_popup')
   ];
   controls.forEach(el => { if (el) el.closest('.field')?.classList.toggle('disabled', !enabled); });
-  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input, #adblock_cookie_lists input').forEach(el => { el.disabled = !enabled; });
+  document.querySelectorAll('#adblock_global_lists input, #adblock_regional_lists input, #adblock_cookie_lists input, #adblock_custom_lists input').forEach(el => { el.disabled = !enabled; });
   document.querySelectorAll('#adblock-strength-seg .seg-btn').forEach(el => { el.disabled = !enabled; });
   document.querySelectorAll('.sync-btn').forEach(el => { el.disabled = !enabled; });
   const popCb = document.getElementById('adblock_block_popups');
   if (popCb) popCb.disabled = !enabled;
+  const nytCb = document.getElementById('nyt_block_family_popup');
+  if (nytCb) nytCb.disabled = !enabled;
 }
 
 function initAdblockUI(){
   renderAdblockLists();
+  renderCustomAdblockListsFromSync();
   // 回填由 loadSettings() 完成，这里只绑定事件
   const enabledEl = document.getElementById('adblock_enabled');
   if (enabledEl) enabledEl.addEventListener('change', updateAdblockSectionEnabledState);
@@ -1114,7 +1204,7 @@ function initAdblockUI(){
     });
   }
   // 规则的“同步”点击（事件委托）
-  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists'), document.getElementById('adblock_cookie_lists')];
+  const listWraps = [document.getElementById('adblock_global_lists'), document.getElementById('adblock_regional_lists'), document.getElementById('adblock_cookie_lists'), document.getElementById('adblock_custom_lists')];
   listWraps.forEach(wrap => {
     if (!wrap) return;
     wrap.addEventListener('click', async (e) => {
@@ -1175,9 +1265,14 @@ function initAdblockUI(){
   const syncAllGlobal = document.getElementById('sync_all_global');
   const syncAllRegional = document.getElementById('sync_all_regional');
   const syncAllCookie = document.getElementById('sync_all_cookie');
+  const syncAllCustom = document.getElementById('sync_all_custom');
   if (syncAllGlobal) syncAllGlobal.addEventListener('click', () => syncAllInSection('global'));
   if (syncAllRegional) syncAllRegional.addEventListener('click', () => syncAllInSection('regional'));
   if (syncAllCookie) syncAllCookie.addEventListener('click', () => syncAllInSection('cookie'));
+  if (syncAllCustom) syncAllCustom.addEventListener('click', () => syncAllCustomLists());
+
+  // 绑定自定义导入区
+  try { bindCustomImportHandlers(); } catch (e) { console.warn('bindCustomImportHandlers failed:', e); }
 }
 
 async function syncOneList(btn, id, name, url){
@@ -1253,6 +1348,234 @@ async function syncAllInSection(section){
   } finally {
     try { btnAll.dataset.loading = '0'; btnAll.disabled = false; } catch {}
   }
+}
+
+async function syncAllCustomLists(){
+  const enabled = !!document.getElementById('adblock_enabled')?.checked;
+  if (!enabled) return;
+  const btnAll = document.getElementById('sync_all_custom');
+  const wrap = document.getElementById('adblock_custom_lists');
+  if (!wrap || !btnAll) return;
+  try {
+    btnAll.dataset.loading = '1';
+    btnAll.disabled = true;
+    const rows = Array.from(wrap.querySelectorAll('label'));
+    const selectedIds = new Set(Array.from(wrap.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked).map(cb => cb.dataset.listId));
+    const tasks = [];
+    rows.forEach(row => {
+      const btn = row.querySelector('.sync-btn');
+      const id = btn?.dataset.listId;
+      const url = btn?.dataset.url || '';
+      if (!btn || !id || !url) return; // 仅更新有 URL 的自定义规则
+      if (selectedIds.size > 0 && !selectedIds.has(id)) return;
+      const name = btn.dataset.name || id;
+      tasks.push({ btn, id, name, url });
+    });
+    let ok = 0, fail = 0;
+    for (const t of tasks) {
+      const res = await syncOneList(t.btn, t.id, t.name, t.url);
+      if (res) ok++; else fail++;
+      await new Promise(r => setTimeout(r, 80));
+    }
+    const summary = document.getElementById('adblock_custom_summary_inline');
+    if (summary) {
+      if (tasks.length === 0) summary.textContent = await t('adblock.noTasks');
+      else summary.textContent = `${await t('adblock.resultOkLabel')} ${ok} · ${await t('adblock.resultFailLabel')} ${fail}`;
+    }
+  } finally {
+    try { btnAll.dataset.loading = '0'; btnAll.disabled = false; } catch {}
+  }
+}
+
+// ===== 自定义规则：渲染 / 校验 / 导入保存 =====
+async function renderCustomAdblockListsFromSync(){
+  try {
+    const wrap = document.getElementById('adblock_custom_lists');
+    if (!wrap) return;
+    const { adblock_custom_lists = [] } = await chrome.storage.sync.get({ adblock_custom_lists: [] });
+    wrap.innerHTML = '';
+    const items = Array.isArray(adblock_custom_lists) ? adblock_custom_lists : [];
+    items.forEach(item => {
+      const id = String(item.id || '').trim();
+      if (!id) return;
+      const row = document.createElement('label');
+      row.className = 'adbl-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.listId = id;
+      const span = document.createElement('span');
+      span.textContent = item.name || id;
+      span.className = 'adbl-name';
+      // sync button: 仅当有 URL 时显示
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sync-btn';
+      btn.setAttribute('aria-label', '同步此规则');
+      btn.dataset.listId = id;
+      btn.dataset.name = item.name || id;
+      if (item.url) btn.dataset.url = item.url;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 22v-6h6"/><path d="M21 8a9 9 0 0 0-15.5-6.36L3 6"/><path d="M3 16a9 9 0 0 0 15.5 6.36L21 18"/></svg>';
+      if (!item.url) btn.style.display = 'none';
+      const status = document.createElement('span');
+      status.className = 'adbl-status';
+      status.id = `adbl_status_${id}`;
+      row.appendChild(cb);
+      row.appendChild(span);
+      row.appendChild(btn);
+      row.appendChild(status);
+      wrap.appendChild(row);
+    });
+  } catch (e) { console.warn('renderCustomAdblockListsFromSync failed:', e); }
+}
+
+function simpleHash32(s){
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return (h >>> 0).toString(36);
+}
+
+function validateCustomRules(text){
+  const lines = String(text || '').split(/\r?\n/);
+  let n = 0;
+  for (const raw of lines) {
+    const line = (raw || '').trim();
+    if (!line) continue;
+    if (/^(\!|\[Adblock|\[uBlock)/i.test(line)) continue; // comment/header
+    // reject network/scriptlet rules quickly
+    if (/(^\|\||@@|\$|##\+js\(|#\$#|\$\$)/.test(line)) return { ok:false, msg: '包含不支持的网络/脚本规则（如 ||、@@、$、##+js）。' };
+    // must be one of: ###id | (domain,~domain)##selector | (domain,~domain)#@#selector | ##selector
+    if (line.includes('###')) {
+      const idx = line.indexOf('###');
+      const id = line.slice(idx + 3).trim();
+      if (!id || /[^a-zA-Z0-9_-]/.test(id)) return { ok:false, msg: `无效的ID：${id}` };
+      n++; continue;
+    }
+    if (line.includes('#@#')) {
+      const idx = line.indexOf('#@#');
+      const left = line.slice(0, idx).trim();
+      const sel = line.slice(idx + 3).trim();
+      if (!sel) return { ok:false, msg: '缺少选择器（#@# 后为空）。' };
+      // domains optional
+      if (left) {
+        const doms = left.split(',').map(s=>s.trim()).filter(Boolean);
+        if (doms.some(d => !/^~?[a-z0-9.-]+$/i.test(d))) return { ok:false, msg: '域名列表格式不正确。' };
+      }
+      n++; continue;
+    }
+    if (line.includes('##')) {
+      const idx = line.indexOf('##');
+      const left = line.slice(0, idx).trim();
+      const sel = line.slice(idx + 2).trim();
+      if (!sel) return { ok:false, msg: '缺少选择器（## 后为空）。' };
+      if (left) {
+        const doms = left.split(',').map(s=>s.trim()).filter(Boolean);
+        if (doms.some(d => !/^~?[a-z0-9.-]+$/i.test(d))) return { ok:false, msg: '域名列表格式不正确。' };
+      }
+      n++; continue;
+    }
+    return { ok:false, msg: `不支持的语法：${line.slice(0,80)}...` };
+  }
+  if (n === 0) return { ok:false, msg: '未检测到有效规则。' };
+  return { ok:true, count:n };
+}
+
+function bindCustomImportHandlers(){
+  const $url = document.getElementById('custom_url');
+  const $fetch = document.getElementById('btn_custom_url_fetch');
+  const $step2 = document.getElementById('custom_url_step2');
+  const $name = document.getElementById('custom_url_name');
+  const $add = document.getElementById('btn_custom_url_add');
+  const $status = document.getElementById('custom_url_status');
+  const $txt = document.getElementById('custom_text');
+  const $txtName = document.getElementById('custom_text_name');
+  const $txtAdd = document.getElementById('btn_custom_text_add');
+  const setStatus = (el, msg, ok) => { if (!el) return; el.textContent = msg || ''; el.style.color = ok ? '#059669' : '#b91c1c'; };
+
+  if ($fetch) $fetch.addEventListener('click', async () => {
+    const url = ($url?.value || '').trim();
+    setStatus($status, '', true);
+    $step2.style.display = 'none';
+    if (!url || !/^https?:\/\//i.test(url)) { setStatus($status, '请输入合法的 http(s) URL。', false); return; }
+    try {
+      const res = await fetch(url, { redirect:'follow', cache: 'no-cache', credentials:'omit' });
+      const txt = await res.text();
+      if (!res.ok) { setStatus($status, `下载失败：HTTP ${res.status}`, false); return; }
+      const val = validateCustomRules(txt);
+      if (!val.ok) { setStatus($status, `校验失败：${val.msg}`, false); return; }
+      // 建议规则名
+      try {
+        const u = new URL(url);
+        const base = (u.pathname.split('/').pop() || '').replace(/\.[a-z0-9]+$/i,'') || u.hostname;
+        if ($name && !$name.value) $name.value = decodeURIComponent(base);
+      } catch {}
+      // 暂存到按钮 dataset 以便“确认添加”复用
+      $add.dataset.fetchedUrl = url;
+      $add.dataset.fetchedText = txt;
+      setStatus($status, `校验通过，共 ${val.count} 条规则。请填写名称后确认添加。`, true);
+      $step2.style.display = '';
+    } catch (e) {
+      setStatus($status, `下载异常：${e?.message || String(e)}`, false);
+    }
+  });
+
+  if ($add) $add.addEventListener('click', async () => {
+    const name = ($name?.value || '').trim();
+    const url = $add.dataset.fetchedUrl || '';
+    const txt = $add.dataset.fetchedText || '';
+    if (!url || !txt) { setStatus($status, '请先下载并通过校验。', false); return; }
+    if (!name) { setStatus($status, '请填写规则名称。', false); return; }
+    const id = `custom_${simpleHash32(url)}`;
+    try {
+      const now = Date.now();
+      // 更新 sync: 自定义条目
+      const all = await chrome.storage.sync.get({ adblock_custom_lists: [] });
+      const list = Array.isArray(all.adblock_custom_lists) ? all.adblock_custom_lists : [];
+      if (list.some(x => x.id === id || (x.url && x.url === url))) { setStatus($status, '此 URL 已添加。', false); return; }
+      list.push({ id, name, url });
+      await chrome.storage.sync.set({ adblock_custom_lists: list });
+      // 写入 local: 规则内容
+      const loc = await chrome.storage.local.get({ adblock_rules: {} });
+      const rules = loc.adblock_rules || {};
+      rules[id] = { id, url, name, size: txt.length, updatedAt: now, content: txt };
+      await chrome.storage.local.set({ adblock_rules: rules, adblock_last_update: now });
+      // 刷新列表
+      await renderCustomAdblockListsFromSync();
+      setStatus($status, '已添加，记得勾选以启用。', true);
+      $step2.style.display = 'none';
+      $add.dataset.fetchedUrl=''; $add.dataset.fetchedText='';
+      $name.value=''; $url.value='';
+    } catch (e) {
+      setStatus($status, `保存失败：${e?.message || String(e)}`, false);
+    }
+  });
+
+  if ($txtAdd) $txtAdd.addEventListener('click', async () => {
+    const name = ($txtName?.value || '').trim();
+    const text = ($txt?.value || '').trim();
+    const $stat = document.getElementById('custom_text_status');
+    const ok = name && text;
+    if (!ok) { setStatus($stat, '名称与文本均不能为空。', false); return; }
+    const val = validateCustomRules(text);
+    if (!val.ok) { setStatus($stat, `校验失败：${val.msg}`, false); return; }
+    const id = `custom_text_${simpleHash32(name)}`;
+    try {
+      const now = Date.now();
+      const all = await chrome.storage.sync.get({ adblock_custom_lists: [] });
+      const list = Array.isArray(all.adblock_custom_lists) ? all.adblock_custom_lists : [];
+      if (list.some(x => x.id === id)) { setStatus($stat, '同名规则已存在，请更换名称。', false); return; }
+      list.push({ id, name });
+      await chrome.storage.sync.set({ adblock_custom_lists: list });
+      const loc = await chrome.storage.local.get({ adblock_rules: {} });
+      const rules = loc.adblock_rules || {};
+      rules[id] = { id, name, size: text.length, updatedAt: now, content: text };
+      await chrome.storage.local.set({ adblock_rules: rules, adblock_last_update: now });
+      await renderCustomAdblockListsFromSync();
+      setStatus($stat, `已添加（${val.count} 条）。记得勾选以启用。`, true);
+      $txt.value=''; $txtName.value='';
+    } catch (e) {
+      setStatus($stat, `保存失败：${e?.message || String(e)}`, false);
+    }
+  });
 }
 
 

@@ -71,10 +71,13 @@ const I18N = {
       enableHint: "打开后自动下载所选规则",
       blockPopups: "弹窗拦截",
       blockPopupsHint: "阻止“/pop?url=…”等骚扰弹窗",
+      nytPopupLabel: "纽约时报浮窗",
+      nytPopupHint: "屏蔽 NYTimes ‘Family subscriptions / All Access Family’ 浮动弹窗",
       strength: "过滤强度",
       low: "低",
       medium: "中",
       high: "高",
+      strengthCustomHint: "提示：如使用自定义规则，建议选择“中”。",
       globalLists: "全球性广告过滤列表",
       regionalLists: "区域性广告过滤列表",
       cookieLists: "Cookie 提示隐藏",
@@ -87,6 +90,26 @@ const I18N = {
       syncOk: "同步成功",
       syncFail: "同步失败",
       cannotSelect: "无法获取规则，已禁用此项；成功同步后可再勾选。"
+      ,customTitle: "自定义广告过滤规则"
+      ,customUrlPlaceholder: "自定义 txt 规则 URL（以 .txt 结尾）"
+      ,customUrlFetch: "下载并校验"
+      ,customUrlNamePlaceholder: "规则名称（例如：我的自定义规则）"
+      ,customUrlConfirm: "确认添加"
+      ,customTextLabel: "完全自定义（大文本框）"
+      ,customTextPlaceholder: "在此粘贴/输入规则，每行一条；支持 ##/###/#@# 语法，见下方说明"
+      ,customTextNamePlaceholder: "规则名称（必填）"
+      ,customTextSave: "保存为自定义规则"
+      ,syntaxTitle: "输入规则语法（仅支持外观隐藏子集）："
+      ,syntaxComment: "• 注释行以 !、[Adblock、[uBlock 开头"
+      ,syntaxGlobal: "• 全局隐藏：##selector"
+      ,syntaxDomain: "• 仅作用于域名：example.com##selector（可用逗号分隔多个域；~example.com表示排除域）"
+      ,syntaxId: "• ID 快捷：###id 等同于 ## #id"
+      ,syntaxException: "• 例外（取消隐藏）：example.com#@#selector"
+      ,syntaxUnsupported: "• 不支持：网络规则（如 ||、@@、$ 选项）、脚本注入（##+js(...)）等"
+      ,userRulesTitle: "自定义隐藏（按域名，一行一条）"
+      ,userRulesPlaceholder: "例如：example.com##.ad-banner"
+      ,userRulesHint: "说明：每行一条 ABP 元素隐藏规则；建议使用域名限定的 ##/### 规则；不支持网络/脚本规则。"
+      ,userRulesInvalid: "自定义隐藏规则校验失败："
     },
     // 浮窗面板
     floatPanel: {
@@ -188,10 +211,13 @@ const I18N = {
       enableHint: "Automatically download selected lists when enabled",
       blockPopups: "Popup blocking",
       blockPopupsHint: "Block annoying popups like '/pop?url=…'",
+      nytPopupLabel: "NYTimes upsell popup",
+      nytPopupHint: "Hide NYTimes ‘Family subscriptions / All Access Family’ floating popup",
       strength: "Filter strength",
       low: "Low",
       medium: "Medium",
       high: "High",
+      strengthCustomHint: "Hint: when using custom rules, Medium is recommended.",
       globalLists: "Global Ad Filter Lists",
       regionalLists: "Regional Ad Filter Lists",
       cookieLists: "Cookie Notice Hiding",
@@ -204,6 +230,26 @@ const I18N = {
       syncOk: "Synced",
       syncFail: "Sync failed",
       cannotSelect: "Cannot fetch rules; disabled. Re-enable after a successful sync."
+      ,customTitle: "Custom Adblock Rules"
+      ,customUrlPlaceholder: "Custom rules txt URL (.txt)"
+      ,customUrlFetch: "Download & Validate"
+      ,customUrlNamePlaceholder: "Rule name (e.g., My rules)"
+      ,customUrlConfirm: "Confirm Add"
+      ,customTextLabel: "Fully Custom (textarea)"
+      ,customTextPlaceholder: "Paste/type rules here, one per line; supports ##/###/#@# syntax; see guide below"
+      ,customTextNamePlaceholder: "Rule name (required)"
+      ,customTextSave: "Save as Custom Rule"
+      ,syntaxTitle: "Rule Syntax (cosmetic subset only):"
+      ,syntaxComment: "• Comment lines start with !, [Adblock, or [uBlock"
+      ,syntaxGlobal: "• Global hide: ##selector"
+      ,syntaxDomain: "• Domain-scoped: example.com##selector (comma-separated; ~example.com to exclude)"
+      ,syntaxId: "• ID shortcut: ###id equals ## #id"
+      ,syntaxException: "• Exception (unhide): example.com#@#selector"
+      ,syntaxUnsupported: "• Unsupported: network rules (||, @@, $ options), scriptlets (##+js(...)), etc"
+      ,userRulesTitle: "Custom hides (by domain, one per line)"
+      ,userRulesPlaceholder: "Example: example.com##.ad-banner"
+      ,userRulesHint: "Tip: one ABP cosmetic rule per line; prefer domain-scoped ##/### rules; network/scriptlet rules are not supported."
+      ,userRulesInvalid: "Custom hide rules validation failed: "
     },
     // Float panel
     floatPanel: {
@@ -236,13 +282,29 @@ const I18N = {
   }
 };
 
-// 获取当前语言设置
+// 获取当前语言设置（优先 sync，失败则回退 local 缓存）
 async function getCurrentLanguage() {
+  const normalize = (v) => {
+    const s = String(v || '').trim().toLowerCase();
+    if (s === 'en' || s === 'english' || s === 'en-us') return 'en';
+    if (s === 'zh' || s === 'zh-cn' || s === 'chinese' || s === '中文') return 'zh';
+    return s || 'zh';
+  };
   try {
-    const result = await chrome.storage.sync.get(['ui_language']);
-    return result.ui_language || 'zh'; // 默认中文
-  } catch {
+    const [syncRes, localRes] = await Promise.allSettled([
+      chrome.storage.sync.get(['ui_language']),
+      chrome.storage.local.get(['ui_language_cache'])
+    ]);
+    const syncLang = (syncRes.status === 'fulfilled') ? syncRes.value.ui_language : undefined;
+    const localLang = (localRes.status === 'fulfilled') ? localRes.value.ui_language_cache : undefined;
+    if (syncLang) return normalize(syncLang);
+    if (localLang) return normalize(localLang);
     return 'zh';
+  } catch {
+    try {
+      const localOnly = await chrome.storage.local.get(['ui_language_cache']);
+      return localOnly.ui_language_cache ? normalize(localOnly.ui_language_cache) : 'zh';
+    } catch { return 'zh'; }
   }
 }
 

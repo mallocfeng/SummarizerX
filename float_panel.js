@@ -44,6 +44,7 @@
                .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
                .replace(/\*(.+?)\*/g,'<em>$1</em>')
                .replace(/`([^`]+?)`/g,'<code>$1</code>')
+               .replace(/\^([^^]+)\^/g,'<sup>$1</sup>')
                .replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm,(block)=>{
                   const items = block.split(/\n/).map(l=>l.replace(/^(?:- |\* )/,'').trim()).filter(Boolean);
                   return `<ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
@@ -78,6 +79,18 @@
       .replace(/^##\s?(.*)$/gm,'<h2>$1</h2>')
       .replace(/^#\s?(.*)$/gm,'<h1>$1</h1>');
 
+    // Images: convert Markdown ![alt](src) to HTML <img>
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, src) => {
+      try{
+        const s = String(src||'').trim();
+        // Allow protocol-relative (//), generic data:, and common schemes
+        const safe = /^(https?:|data:|blob:|\/\/|\/|\.|#)/i.test(s) ? s : '';
+        const a = (alt||'').trim();
+        if (!safe) return '';
+        return `<img src="${safe}" alt="${a}" loading="lazy">`;
+      }catch{ return ''; }
+    });
+
     html = html.replace(/^(?:- |\* )(.*)(?:\n(?:- |\* ).*)*/gm,(block)=>{
       const items = block.split('\n').map(l=>l.replace(/^(?:- |\* )/,'').trim()).filter(Boolean);
       return `<ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
@@ -91,7 +104,9 @@
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/\*(.+?)\*/g,'<em>$1</em>')
       .replace(/`([^`]+?)`/g,'<code>$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Superscript: convert caret markers like ^6^ to <sup>6</sup>
+      .replace(/\^(\d{1,3})\^/g,'<sup>$1</sup>');
 
     html = html.replace(/\n{2,}/g,'<br><br>');
     html = html.replace(/(?:<br\s*\/?>\s*){3,}/gi,'<br><br>');
@@ -785,6 +800,12 @@
     if(host) return host;
     host=document.createElement('div');
     host.id=PANEL_ID;
+    // Prevent Dark Reader from instrumenting our Shadow DOM.
+    // Dark Reader skips shadow hosts with class "surfingkeys_hints_host".
+    // See iterateShadowHosts() in darkreader.js.
+    try{ host.classList.add('surfingkeys_hints_host'); }catch{}
+    // Also set a hint attribute (harmless if unsupported by DR).
+    try{ host.setAttribute('data-darkreader-ignore',''); }catch{}
     host.style.position='fixed';
     host.style.top='0';
     host.style.right='0';
@@ -818,6 +839,7 @@
         --card-radius: 14px;
 
         --primary: #3b82f6;       /* indigo/azure */
+        --reader-accent: #f59e0b; /* reader icon accent (amber) */
         --primary-600: #2563eb;   /* darker */
         --accent: #22c55e;        /* success */
         --danger: #ef4444;        /* danger */
@@ -870,14 +892,14 @@
       @media (prefers-reduced-motion: reduce){
         .wrap.fx-enter, .wrap.fx-enter .appbar, .wrap.fx-enter .footer{ animation: none; }
       }
-      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; z-index:10; }
+      .dragbar{ position:absolute; top:0; left:0; height:100%; width:10px; cursor:col-resize; z-index:10; touch-action: none; }
       .dragbar::after{ content:""; position:absolute; top:0; bottom:0; right:-1px; width:2px; background:linear-gradient(180deg, rgba(102,112,133,.20), rgba(102,112,133,.02)); opacity:0; transition: opacity .15s ease; }
       .dragbar:hover::after, .wrap.dragging .dragbar::after{ opacity:.9; }
       .wrap.dragging{ cursor:col-resize; }
 
       /* ===== Top bar ===== */
       .appbar{
-        flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
+        flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; gap:14px;
         /* raised glass bar */
         background:
           linear-gradient(90deg, var(--candy-vi) 0%, var(--candy-az) 55%, rgba(255,255,255,0) 100%),
@@ -887,9 +909,124 @@
         border-bottom:1px solid var(--border);
         /* raised glass: subtle outer drop shadow */
         box-shadow: 0 1px 6px rgba(16,24,40,.06);
+        position: relative; z-index: 20; /* keep tooltips above the body container */
         border-top-left-radius: var(--chrome-radius); border-top-right-radius: var(--chrome-radius);
       }
       .brand{ display:flex; align-items:center; gap:10px; }
+      /* Reader mode icon (book, clearer silhouette) */
+      .reader-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color: var(--reader-accent); opacity:1; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .reader-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
+        /* heroicons 24/solid book-open path (silhouette) */
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.25a.75.75 0 0 0 1 .707A8.237 8.237 0 0 1 6 18.75c1.995 0 3.823.707 5.25 1.886V4.533ZM12.75 20.636A8.214 8.214 0 0 1 18 18.75c.966 0 1.89.166 2.75.47a.75.75 0 0 0 1-.708V4.262a.75.75 0 0 0-.5-.707A9.735 9.735 0 0 0 18 3a9.707 9.707 0 0 0-5.25 1.533v16.103Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.25a.75.75 0 0 0 1 .707A8.237 8.237 0 0 1 6 18.75c1.995 0 3.823.707 5.25 1.886V4.533ZM12.75 20.636A8.214 8.214 0 0 1 18 18.75c.966 0 1.89.166 2.75.47a.75.75 0 0 0 1-.708V4.262a.75.75 0 0 0-.5-.707A9.735 9.735 0 0 0 18 3a9.707 9.707 0 0 0-5.25 1.533v16.103Z"/></svg>') center/contain no-repeat;
+      }
+      .reader-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .reader-ind:active{ transform: translateY(0); }
+      .reader-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+      :host([data-theme="dark"]) .reader-ind{ color: var(--reader-accent); }
+
+      /* PDF import icon (document) */
+      .pdf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#ef4444; opacity:1; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .pdf-ind::before{ content:""; position:absolute; inset:0; background: currentColor;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 7.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5L19 7.5Z"/><path d="M13 3v4a1 1 0 0 0 1 1h4"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 7.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5L19 7.5Z"/><path d="M13 3v4a1 1 0 0 0 1 1h4"/></svg>') center/contain no-repeat;
+      }
+      .pdf-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .pdf-ind:active{ transform: translateY(0); }
+      .pdf-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
+      :host([data-theme="dark"]) .pdf-ind{ color:#f97316; }
+      /* Ad filtering status indicator (shield + check/slash); clickable toggle */
+      .adf-ind{ position:relative; width:18px; height:18px; flex:0 0 auto; color:#94a3b8; opacity:.95; cursor:pointer; border-radius:4px; outline:none; display:inline-block; }
+      .adf-ind::before{ content:""; position:absolute; inset:0; background: currentColor; 
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>') center/contain no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>') center/contain no-repeat;
+      }
+      /* On: add a check mark overlay */
+      .adf-ind.on{ color:#22c55e; }
+      .adf-ind.on::after{ content:""; position:absolute; inset:0; background: currentColor; opacity:.95;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/70% no-repeat;
+      }
+      /* Off: add a slash overlay (white over red shield) */
+      .adf-ind:not(.on)::after{ content:""; position:absolute; inset:0; background: #ffffff; opacity:.95;
+        -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
+        mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke-width="3" stroke="%23000" fill="none" stroke-linecap="round"/></svg>') center/70% no-repeat;
+      }
+      .adf-ind:hover{ transform: translateY(-1px); opacity:1; }
+      .adf-ind:active{ transform: translateY(0); }
+      .adf-ind:focus-visible{ box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+      :host([data-theme="dark"]) .adf-ind{ color:#7d8fb0; }
+      :host([data-theme="dark"]) .adf-ind.on{ color:#22c55e; }
+      /* Off state: red shield (light/dark) */
+      .adf-ind:not(.on){ color: var(--danger); }
+      :host([data-theme="dark"]) .adf-ind:not(.on){ color: var(--danger); }
+
+      /* Ad filtering tooltip (fast, prominent) */
+      .adf-ind .adf-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .adf-ind .adf-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      :host([data-theme="dark"]) .adf-ind .adf-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .adf-ind .adf-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+      .adf-ind .adf-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+
+      /* Reader tooltip */
+      .reader-ind .reader-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .reader-ind .reader-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      .reader-ind .reader-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+      :host([data-theme="dark"]) .reader-ind .reader-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .reader-ind .reader-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+
+      /* PDF tooltip (re-use same style class name for simplicity) */
+      .pdf-ind .reader-tip{ position:absolute; top: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px) scale(.98); opacity:0; pointer-events:none;
+        padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--surface); color: var(--text);
+        font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; box-shadow: 0 8px 24px rgba(16,24,40,.12);
+        transition: opacity .12s ease, transform .12s ease; z-index: 1000;
+      }
+      .pdf-ind .reader-tip::after{ content:""; position:absolute; top:-6px; left:50%; width:10px; height:10px; transform: translateX(-50%) rotate(45deg); background: var(--surface);
+        border-left:1px solid var(--border); border-top:1px solid var(--border);
+      }
+      .pdf-ind .reader-tip.on{ opacity:1; transform: translate(-50%, 0) scale(1); }
+      :host([data-theme="dark"]) .pdf-ind .reader-tip{ background:#0f172a; color:#e2ebf8; border-color:#27344b; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      :host([data-theme="dark"]) .pdf-ind .reader-tip::after{ background:#0f172a; border-left-color:#27344b; border-top-color:#27344b; }
+
+      /* PDF icon halo pulse to draw attention (yellow) */
+      .pdf-ind.halo-pulse{ animation: pdfHalo 1.05s ease-in-out 3; }
+      @keyframes pdfHalo{
+        0%,100%{ box-shadow: 0 0 0 0 rgba(234,179,8,0); transform: translateY(0) scale(1); }
+        50%{ box-shadow: 0 0 0 10px rgba(234,179,8,.24); transform: translateY(-1px) scale(1.06); }
+      }
+
+      /* PDF panel */
+      .pdf-panel{ display:flex; flex-direction:column; gap:12px; }
+      /* When collapsed, hide only the rendered canvas area; keep dropzone + toolbar visible */
+      #sx-pdf.pdf-collapsed #sx-pdf-view{ display:none !important; }
+      .pdf-dropzone{ border:2px dashed var(--border); border-radius:10px; padding:18px; text-align:center; color: var(--muted); cursor:pointer; background: var(--surface-2); }
+      .pdf-dropzone:hover{ border-color:#93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.18) inset; }
+      .pdf-dropzone.drag{ border-color:#60a5fa; background: rgba(59,130,246,.05); color:#1e3a8a; }
+      .pdf-drop-hint{ font-size:13px; font-weight:700; }
+      .pdf-dropzone.dnd-off{ cursor: default; opacity:.96; }
+      .pdf-toolbar{ display:flex; align-items:center; gap:6px; flex-wrap: wrap; }
+      .pdf-toolbar .sep{ width:1px; height:16px; background: var(--border); margin: 0 2px; }
+      .pdf-toolbar .pdf-nav-btn{ min-width:auto; width:26px; height:26px; padding:0; display:grid; place-items:center; border-radius:8px; }
+      .pdf-toolbar .pdf-nav-btn svg{ width:14px; height:14px; display:block; stroke: currentColor; fill: none; stroke-width: 2; }
+      .pdf-toolbar input[type="number"]{ width:56px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background: var(--surface); color: var(--text); font-weight:700; }
+      .pdf-toolbar input[type="number"]:focus{ outline:none; box-shadow: 0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
+      .pdf-toolbar input[type="text"]{ width:120px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background: var(--surface); color: var(--text); font-weight:700; }
+      .pdf-toolbar input[type="text"]:focus{ outline:none; box-shadow: 0 0 0 3px rgba(59,130,246,.25); border-color:#93c5fd; }
+      .pdf-toolbar input:disabled{ opacity:.55; cursor:not-allowed; background: var(--surface-2); }
+      .pdf-view{ display:block; overflow:auto; }
+      .pdf-error{ color: var(--danger); font-weight: 700; padding: 8px 10px; background: rgba(244,63,94,.08); border:1px solid rgba(244,63,94,.32); border-radius:8px; }
       .logo{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow:0 0 0 6px rgba(59,130,246,.12); }
       .title{ font-size:14px; font-weight:800; letter-spacing:.2px; color:var(--text); }
 
@@ -925,12 +1062,13 @@
       .progress.hidden{ display:none; }
 
       /* ===== Body ===== */
-      .container{ flex:1 1 auto; padding:7px 12px 8px; overflow:auto; transition: height .6s cubic-bezier(.2,.7,.3,1); }
+      .container{ flex:1 1 auto; padding:0 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; overscroll-behavior: contain; }
       .container .section:last-child{ margin-bottom:8px; }
-      .container .section:first-child{ margin-top:4px; }
+      .container .section:first-child{ margin-top:0; }
       /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
       .wrap.is-empty #sx-summary,
-      .wrap.is-empty #sx-cleaned{ display:none !important; }
+      .wrap.is-empty #sx-cleaned,
+      .wrap.is-empty #sx-pdf{ display:none !important; }
       .wrap.is-empty .container{ flex:0 0 auto; height:66px; overflow:hidden; padding-top:0; padding-bottom:0; }
       .wrap.is-empty .section{ margin:0 !important; }
       /* While expanding, allow the middle to grow smoothly */
@@ -1019,6 +1157,9 @@
         transform-origin: top center;
       }
       .card:hover{ transform: translateY(-2px); box-shadow: 0 2px 3px rgba(16,24,40,.06), 0 12px 28px rgba(16,24,40,.12); }
+      /* When floating Q&A is in front, suppress hover pop on background summary/cleaned cards */
+      .wrap.qa-hover-off #sx-summary:hover,
+      .wrap.qa-hover-off #sx-cleaned:hover{ transform: translateY(0) !important; box-shadow: 0 1px 1px rgba(16,24,40,.05), 0 8px 22px rgba(16,24,40,.08) !important; }
 
       /* Light theme: add a gentle color tint so cards aren't pure white */
       :host([data-theme="light"]) .card{
@@ -1099,7 +1240,7 @@
       .md table{ width:100%; border-collapse:collapse; display:block; overflow:auto; margin:10px 0; border-radius:10px; }
       .md thead th{ background:#f0f5ff; color:var(--text); font-weight:800; }
       .md th, .md td{ border:1px solid #e5e7eb; padding:8px 10px; text-align:left; vertical-align:top; }
-      .md img{ display:block; margin:8px 0; border-radius:8px; }
+      .md img{ display:block; margin:8px 0; border-radius:8px; max-width:100%; height:auto; }
       .md hr{ border:0; border-top:1px solid #e6e8f0; margin:12px 0; }
 
       /* content progressive reveal */
@@ -1148,6 +1289,13 @@
         color:#334155; border-bottom-left-radius: var(--chrome-radius); border-bottom-right-radius: var(--chrome-radius); }
       .footer-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap; }
       .footer-controls{ display:flex; align-items:center; gap:16px; flex-shrink:0; }
+      /* Note tip (compact icon-only) */
+      .note-tip{ position:relative; display:inline-flex; align-items:center; gap:6px; padding:0 8px; height:28px; border-radius:8px; background: rgba(250,204,21,.18); border:1px solid rgba(217,119,6,.35); color:#92400e; font-weight:700; cursor:default; user-select:none; }
+      .note-tip .dot{ width:10px; height:10px; border-radius:999px; background:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.18); }
+      .note-tip .chev{ width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid currentColor; opacity:.7; }
+      .note-tip .note-tooltip{ position:absolute; left:0; bottom: calc(100% + 8px); min-width:260px; max-width:520px; padding:10px 12px; border-radius:10px; border:1px solid #f3e9c5; background:#fff9e6; color:#92400e; font-weight:600; line-height:1.6; box-shadow: 0 8px 24px rgba(0,0,0,.12); opacity:0; transform: translateY(6px); pointer-events:none; transition: opacity .16s ease, transform .16s ease; z-index: 20; }
+      .note-tip:hover .note-tooltip, .note-tip:focus .note-tooltip, .note-tip:focus-within .note-tooltip{ opacity:1; transform: translateY(0); pointer-events:auto; }
+      .note-tip .note-tooltip::after{ content:""; position:absolute; top:100%; left:14px; width:10px; height:10px; background:#fff9e6; border-left:1px solid #f3e9c5; border-bottom:1px solid #f3e9c5; transform: rotate(45deg); }
       .force-dark-toggle{ display:flex; align-items:center; gap:8px; }
       .force-dark-toggle .label{ color:#334155; white-space:nowrap; font-weight:700; font-size:12px; letter-spacing:.03em; }
       .toggle-btn{ 
@@ -1204,6 +1352,7 @@
         --text:#e8eef9;
         --muted:#c2cde3;
         --primary:#8ea2ff;
+        --reader-accent:#fbbf24; /* brighter amber for dark */
         --primary-600:#7b8cff;
         --candy-az: rgba(142,162,255,.14);
         --candy-vi: rgba(123,140,255,.12);
@@ -1259,6 +1408,11 @@
         color:#d8e0ee; border-top-color: var(--border);
         box-shadow: 0 -1px 8px rgba(0,0,0,.28);
       }
+      /* Dark theme for note tip */
+      :host([data-theme="dark"]) .note-tip{ background: rgba(250,204,21,.10); border-color: rgba(250,204,21,.35); color:#f2e9c0; }
+      :host([data-theme="dark"]) .note-tip .dot{ background:#fbbf24; box-shadow:0 0 0 4px rgba(250,204,21,.15); }
+      :host([data-theme="dark"]) .note-tip .note-tooltip{ background: rgba(45,33,10,.95); border-color: rgba(250,204,21,.30); color:#f7f0ca; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+      :host([data-theme="dark"]) .note-tip .note-tooltip::after{ background: rgba(45,33,10,.95); border-left-color: rgba(250,204,21,.30); border-bottom-color: rgba(250,204,21,.30); }
       :host([data-theme="dark"]) .empty .illus{ 
         background: linear-gradient(135deg, rgba(142,162,255,.08) 0%, rgba(142,162,255,.04) 100%);
         border-color: rgba(142,162,255,.15);
@@ -1287,6 +1441,17 @@
         color:#e8eef8; 
         border-color: #2a3d5f;
         box-shadow: 0 2px 8px rgba(142,162,255,0.3);
+      }
+      /* Stronger contrast for Force-Dark active state in dark theme */
+      :host([data-theme="dark"]) #sx-force-dark-btn.active{
+        background: var(--primary-600);
+        border-color: var(--primary-600);
+        color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(142,162,255,0.28), 0 4px 12px rgba(0,0,0,0.55);
+      }
+      :host([data-theme="dark"]) #sx-force-dark-btn.active:hover{
+        background: var(--primary);
+        border-color: var(--primary);
       }
       :host([data-theme="dark"]) .theme-toggle .label{ color:#d9e2f2; }
       :host([data-theme="dark"]) .theme-toggle .seg{ background:#18233a; border-color:#2a3d5f; }
@@ -1321,6 +1486,201 @@
       :host([data-theme="dark"]) .tbtn-share:hover{ background:#23365e; border-color:#3a5588; box-shadow: 0 2px 12px rgba(142,162,255,.22); }
       :host([data-theme="dark"]) .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(142,162,255,.35); }
 
+      /* ===== Chat Bubbles ===== */
+      .chat-list{ display:flex; flex-direction:column; gap:16px; padding:0 2px 0; }
+      /* Provide a small visual breathing space at the very top when at scrollTop=0,
+         but no persistent top padding while scrolling (the spacer scrolls away). */
+      /* No extra spacer; keep tight to header and control via card padding */
+      .chat-list::before{ content:""; display:block; height:0; flex:0 0 0; }
+      .chat-bubble{ max-width:92%; padding:12px 16px; border-radius:14px; box-shadow: var(--shadow-1); white-space:pre-wrap; word-break:break-word; line-height:1.55; }
+      /* Warm sticky-note palette for chat bubbles */
+      .chat-bubble.user{ align-self:flex-end; background:#FFE9A6; color:#3b2a05; border:1px solid #FDE68A; }
+      .chat-bubble.ai{ align-self:flex-start; background:#FFF9E6; color:#3b2f0b; border:1px solid #FDE68A; }
+      :host([data-theme="dark"]) .chat-bubble.user{ background: rgba(250,204,21,.12); color:#f8f5e3; border:1px solid rgba(250,204,21,.34); }
+      :host([data-theme="dark"]) .chat-bubble.ai{ background: rgba(250,204,21,.08); color:#efe9d2; border:1px solid rgba(250,204,21,.26); }
+      .chat-bubble .skl{ height:12px; margin:8px 0; border-radius:8px; background: linear-gradient(90deg, rgba(148,163,184,.18), rgba(148,163,184,.28), rgba(148,163,184,.18)); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
+      @keyframes shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      /* typing indicator: three bouncing dots */
+      .typing{ display:inline-flex; gap:6px; align-items:center; padding:2px 0; }
+      .typing .dot{ width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.55; animation: bounce 1.1s ease-in-out infinite; }
+      .typing .dot:nth-child(1){ animation-delay: 0s; }
+      .typing .dot:nth-child(2){ animation-delay: .15s; }
+      .typing .dot:nth-child(3){ animation-delay: .3s; }
+      @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity:.45 } 40% { transform: translateY(-4px); opacity:.9 } }
+      /* Tighter paragraph spacing inside chat bubbles only */
+      .chat-bubble .md p{ margin:6px 0; }
+      .chat-bubble .md ul, .chat-bubble .md ol{ margin:6px 0 6px 18px; }
+      .chat-bubble .md blockquote{ margin:8px 0; }
+      .chat-bubble .md pre{ margin:8px 0; }
+      .chat-hide{ animation: fadeUp .28s ease forwards; }
+      @keyframes fadeUp { from{ opacity:1; transform: translateY(0);} to{ opacity:0; transform: translateY(-10px);} }
+
+      /* ===== Floating QA Overlay ===== */
+      /* Chat card: header 44px + persistent 2px breathing; bottom 10px */
+      #sx-chat.card.card-head{ padding-top:46px; padding-bottom:10px; }
+      #sx-chat.qa-float{ position:absolute; right:16px; z-index:60;
+        /* leave room for QA bar at bottom; JS sets --qa-bottom */
+        bottom: calc(var(--qa-bottom, 72px));
+        /* default larger size */
+        --qa-w: min(640px, 70%);
+        --qa-h: min(123vh, 1140px);
+        width: var(--qa-w);
+        height: var(--qa-h);
+        /* Fix width by default; do not elastically depend on container width */
+        min-width: 200px;
+        min-height: 280px;
+        max-width: none;
+        box-sizing: border-box;
+        overflow:hidden;
+        box-shadow: 0 8px 26px rgba(16,24,40,.16), 0 2px 10px rgba(16,24,40,.10);
+        border:1px solid var(--border);
+      }
+      /* Match chat-list height to card height minus top/bottom paddings (46 + 10) */
+      #sx-chat.qa-float .chat-list{ height: calc(var(--qa-h) - 56px); overflow:auto; overscroll-behavior: contain; }
+      /* when repositioned by user */
+      #sx-chat.qa-float.qa-custom-pos{ right:auto; bottom:auto; }
+      /* show move cursor on header */
+      #sx-chat.qa-float.card.card-head::before{ cursor: move; }
+      /* resize handle */
+      #sx-chat.qa-float .qa-resize-handle{ position:absolute; right:8px; bottom:8px; width:12px; height:12px; cursor: nwse-resize; opacity:.65; z-index:3; }
+      #sx-chat.qa-float .qa-resize-handle::before{
+        content:""; position:absolute; inset:0; background:
+          linear-gradient(135deg, transparent 50%, rgba(234,179,8,.55) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(234,179,8,.70) calc(50% - 3px));
+        background-size: 100% 100%, 8px 8px; background-repeat:no-repeat; background-position: center center;
+        border-radius:2px;
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .qa-resize-handle::before{
+        background:
+          linear-gradient(135deg, transparent 50%, rgba(234,179,8,.65) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(234,179,8,.80) calc(50% - 3px));
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .qa-resize-handle::before{
+        background:
+          linear-gradient(135deg, transparent 50%, rgba(250,204,21,.60) 50%),
+          linear-gradient(135deg, transparent calc(50% - 3px), rgba(250,204,21,.75) calc(50% - 3px));
+      }
+      /* Make floating chat stand out more than background cards */
+      :host([data-theme="light"]) #sx-chat.qa-float{
+        /* Sticky-note like warm paper in light theme (slightly translucent) */
+        background:
+          radial-gradient(220px 160px at 28px -28px, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 78%),
+          linear-gradient(180deg, rgba(255,247,214,.94) 0%, rgba(255,240,184,.90) 100%);
+        border-color: rgba(234,179,8,.35); /* amber-500 */
+        box-shadow: 0 10px 28px rgba(125,90,8,.16), 0 8px 18px rgba(234,179,8,.18);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float.card.card-head::before{
+        background:
+          linear-gradient(90deg, rgba(234,179,8,.20) 0%, rgba(253,224,71,.18) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, rgba(255,250,230,.92) 0%, rgba(255,243,191,.90) 100%);
+        border-bottom-color: rgba(234,179,8,.28);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float{
+        /* Warm-tinted dark paper (slightly translucent) */
+        background:
+          radial-gradient(260px 180px at 28px -28px, rgba(255,220,120,.10) 0%, rgba(255,220,120,0) 82%),
+          linear-gradient(180deg, rgba(32,40,60,.84) 0%, rgba(26,34,52,.80) 100%);
+        border-color: rgba(250,204,21,.30); /* amber-400 */
+        /* warm glow so shadow is visible on dark surfaces */
+        box-shadow: 0 12px 34px rgba(250,204,21,.16), 0 6px 18px rgba(12,18,28,.30);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float.card.card-head::before{
+        background:
+          linear-gradient(90deg, rgba(250,204,21,.20) 0%, rgba(251,191,36,.18) 60%, rgba(255,255,255,0) 100%),
+          linear-gradient(180deg, rgba(42,50,72,.70) 0%, rgba(34,42,64,.60) 100%);
+        border-bottom-color: rgba(250,204,21,.26);
+      }
+      .chat-list{ position: relative; }
+      #sx-chat.qa-float .card-tools{ display:flex; }
+      #sx-chat .card-tools .tbtn-close{ font-weight:700; min-width:auto; padding:4px 8px; border-radius:8px; }
+      /* Close button color matches sticky-note palette */
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close{
+        background:#FDE68A; /* amber-300 */
+        border-color: rgba(234,179,8,.50);
+        color:#3b2a05;
+        box-shadow: 0 1px 2px rgba(125,90,8,.18);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close:hover{
+        background:#FCD34D; /* amber-300 -> amber-400 */
+        border-color: rgba(234,179,8,.65);
+      }
+      :host([data-theme="light"]) #sx-chat.qa-float .tbtn-close:focus-visible{
+        outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.35);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close{
+        background: rgba(250,204,21,.18);
+        border-color: rgba(250,204,21,.35);
+        color:#f6f3e6;
+        box-shadow: 0 1px 2px rgba(250,204,21,.12);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close:hover{
+        background: rgba(250,204,21,.26);
+        border-color: rgba(250,204,21,.45);
+      }
+      :host([data-theme="dark"]) #sx-chat.qa-float .tbtn-close:focus-visible{
+        outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.28);
+      }
+      #sx-chat.qa-float.qa-rise{ animation: qaRise .22s cubic-bezier(.2,.7,.3,1) both; }
+      @keyframes qaRise{ from{ opacity:0; transform: translateY(18px) scale(.98);} to{ opacity:1; transform: translateY(0) scale(1);} }
+
+      /* ===== QA Bar ===== */
+      .qa-bar{ padding: 8px 12px 10px; border-top:1px solid var(--border); background: var(--surface); position: relative; transition: background-color .18s ease, border-color .18s ease; }
+      /* Make ask area visually associated with the chat card (light) */
+      :host([data-theme="light"]) .qa-bar{
+        background:
+          linear-gradient(180deg, rgba(255,247,214,.52) 0%, rgba(255,243,191,.36) 100%),
+          var(--surface);
+        border-top-color: rgba(234,179,8,.28);
+      }
+      .qa-url{ font-size:12px; color: #546079; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:6px; }
+      :host([data-theme="dark"]) .qa-url{ color:#9fb0d0; opacity:.95; }
+      .qa-row{ display:flex; gap:8px; align-items:flex-start; }
+      .qa-row textarea{ flex:1 1 auto; min-height:34px; max-height:120px; resize:vertical; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: #fff; color: var(--text); font-size:14px; line-height:1.4; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+      .qa-row textarea::placeholder{ color:#7c6b2a; opacity:.6; }
+      /* Light theme: use white input background for clarity; keep warm focus ring */
+      :host([data-theme="light"]) .qa-row textarea{ background: #ffffff; border-color: rgba(234,179,8,.42); }
+      :host([data-theme="light"]) .qa-row textarea:focus{ outline:none; border-color: rgba(234,179,8,.66); box-shadow: 0 0 0 3px rgba(234,179,8,.22); background: #ffffff; }
+      :host([data-theme="light"]) .qa-row textarea::placeholder{ color:#9a7b0e; opacity:.65; }
+      /* Dark theme: subtle warm tint matching floating chat */
+      :host([data-theme="dark"]) .qa-bar{
+        background:
+          linear-gradient(180deg, rgba(255,220,120,.10) 0%, rgba(255,220,120,.06) 100%),
+          var(--surface);
+        border-top-color: rgba(250,204,21,.22);
+      }
+      :host([data-theme="dark"]) .qa-row textarea{ background: rgba(26,34,52,.75); color: #e2ebf8; border-color: rgba(250,204,21,.28); }
+      :host([data-theme="dark"]) .qa-row textarea:focus{ outline:none; border-color: rgba(250,204,21,.45); box-shadow: 0 0 0 3px rgba(250,204,21,.20); background: rgba(32,40,60,.82); }
+      :host([data-theme="dark"]) .qa-row textarea::placeholder{ color:#d8c48a; opacity:.7; }
+      .qa-row .btn{ flex:0 0 auto; height:34px; padding:8px 12px; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease; }
+      /* Send button styled to match the chat card (light) */
+      #sx-qa-send{ background: #fef3c7; border-color:#fcd34d; color:#7c4a02; font-weight:800; }
+      #sx-qa-send:hover{ background:#fde68a; border-color:#f59e0b; color:#6b3e02; }
+      #sx-qa-send:active{ background:#fcd34d; border-color:#f59e0b; color:#5b3302; }
+      #sx-qa-send:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.28); }
+      :host([data-theme="dark"]) #sx-qa-send{ background: rgba(250,204,21,.16); border-color: rgba(250,204,21,.38); color:#f8f5e3; font-weight:800; }
+      :host([data-theme="dark"]) #sx-qa-send:hover{ background: rgba(250,204,21,.22); border-color: rgba(250,204,21,.50); }
+      :host([data-theme="dark"]) #sx-qa-send:active{ background: rgba(250,204,21,.32); border-color: rgba(250,204,21,.55); }
+      :host([data-theme="dark"]) #sx-qa-send:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.20); }
+      /* Minimized QA restore icon */
+      .qa-restore{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; border:1px solid var(--border); background: var(--surface-2); display:none; place-items:center; cursor:pointer; color:#334155; margin-top:0; align-self:center; transition: box-shadow .18s ease, transform .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease; }
+      .qa-restore svg{ width:16px; height:16px; display:block; stroke:currentColor; }
+      .qa-restore[aria-hidden="false"]{ display:grid; }
+      /* Light theme: match ask area warm palette */
+      :host([data-theme="light"]) .qa-restore{ background:#fef3c7; border-color:#fcd34d; color:#7c4a02; }
+      :host([data-theme="light"]) .qa-restore:hover{ background:#fde68a; border-color:#f59e0b; box-shadow: 0 0 0 6px rgba(234,179,8,.16); }
+      :host([data-theme="light"]) .qa-restore:active{ background:#fcd34d; border-color:#f59e0b; }
+      :host([data-theme="light"]) .qa-restore:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(234,179,8,.28); }
+      /* Dark theme: warm tint to align with ask area */
+      :host([data-theme="dark"]) .qa-restore{ border-color: rgba(250,204,21,.38); background: rgba(250,204,21,.16); color:#f8f5e3; }
+      :host([data-theme="dark"]) .qa-restore:hover{ background: rgba(250,204,21,.22); border-color: rgba(250,204,21,.50); box-shadow: 0 0 0 6px rgba(250,204,21,.18); }
+      :host([data-theme="dark"]) .qa-restore:active{ background: rgba(250,204,21,.32); border-color: rgba(250,204,21,.55); }
+      :host([data-theme="dark"]) .qa-restore:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(250,204,21,.20); }
+      .qa-restore.flash{ animation: qaRestorePulse 1.05s ease-in-out 3; }
+      /* Pulse ring color switched from blue to warm amber to match ask area */
+      @keyframes qaRestorePulse{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(234,179,8,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(234,179,8,.22); } }
+      .qa-restore.flash-done{ animation: qaRestorePulseDone 1.05s ease-in-out 3; }
+      @keyframes qaRestorePulseDone{ 0%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0); } 50%{ transform: scale(1.12); box-shadow: 0 0 0 10px rgba(34,197,94,.22); } }
+
       /* ===== Accessibility ===== */
       @media (prefers-reduced-motion: reduce){
         .btn, .card{ transition: none; }
@@ -1337,7 +1697,7 @@
       <div class="wrap" id="sx-wrap">
         <div class="dragbar" id="sx-drag"></div>
         <div class="appbar">
-          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div></div>
+          <div class="brand"><span class="logo"></span><div class="title" id="sx-app-title">麦乐可 AI 摘要阅读器</div><div id="sx-adf-ind" class="adf-ind" role="switch" aria-checked="false" aria-label="" title="" tabindex="0"></div><div id="sx-reader-ind" class="reader-ind" role="button" aria-label="阅读模式" title="阅读模式" tabindex="0"></div><div id="sx-pdf-ind" class="pdf-ind" role="button" aria-label="导入 PDF" title="导入 PDF" tabindex="0"></div></div>
           <div class="actions">
             <button id="sx-settings" class="btn" title="设置">设置</button>
             <button id="sx-run" class="btn primary">提取并摘要</button>
@@ -1348,16 +1708,47 @@
         <div class="container" id="sx-container">
           <div class="empty-illus" id="sx-empty-arrow" aria-hidden="true"></div>
           <section class="section">
+            <div id="sx-pdf" class="card card-head" data-title="PDF 预览" style="display:none"></div>
+          </section>
+          <section class="section">
+            <div id="sx-chat" class="card card-head" data-title="你问我答" style="display:none">
+              <div class="chat-list" id="sx-chat-list"></div>
+            </div>
+          </section>
+          <section class="section">
             <div id="sx-summary" class="card card-head" data-title="摘要"></div>
           </section>
           <section class="section">
             <div id="sx-cleaned" class="card card-head" data-title="可读正文"></div>
           </section>
         </div>
+        <div class="qa-bar" id="sx-qa-area" role="form" aria-label="页面问答">
+          <div class="qa-url" id="sx-qa-url" title=""></div>
+          <div class="qa-row">
+            <textarea id="sx-qa-input" rows="1" placeholder="基于当前网页提问…"></textarea>
+            <button id="sx-qa-send" class="btn" type="button">发送</button>
+          </div>
+        </div>
         <div class="footer">
           <div class="footer-row">
-            <small id="sx-footer-note">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</small>
+            <div class="note-tip" id="sx-footer-note" tabindex="0" aria-label="注意事项" title="注意事项">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="chev" aria-hidden="true"></span>
+              <div class="note-tooltip" id="sx-footer-note-tooltip">注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。</div>
+            </div>
             <div class="footer-controls">
+              <div class="force-dark-toggle" id="sx-pick">
+                <span class="label" id="sx-pick-label">隐藏元素</span>
+                <button class="toggle-btn" id="sx-pick-btn" aria-label="隐藏元素" title="选择页面元素并生成隐藏规则">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <line x1="12" y1="1" x2="12" y2="5"></line>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="1" y1="12" x2="5" y2="12"></line>
+                    <line x1="19" y1="12" x2="23" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
               <div class="force-dark-toggle" id="sx-force-dark">
                 <span class="label" id="sx-force-dark-label">强制深色</span>
                 <button class="toggle-btn" id="sx-force-dark-btn" aria-label="强制深色模式" title="强制深色模式">
@@ -1401,6 +1792,9 @@
           </div>
         </div>
       </div>`;
+
+    // Bind QA bar interactions
+    try { setupQABar(shadow); } catch {}
     return host;
   }
 
@@ -1415,6 +1809,11 @@
     const mode=themeOverride||'auto';
     const theme=(mode==='light'||mode==='dark')? mode: computeTheme();
     if (shadow.host.getAttribute('data-theme')!==theme) shadow.host.setAttribute('data-theme',theme);
+    // Also sync theme to reader overlay if it's open
+    try{
+      const ov = document.getElementById('sx-reader-overlay');
+      if (ov && ov.getAttribute('data-theme') !== theme) ov.setAttribute('data-theme', theme);
+    }catch{}
   }
   function markThemeButtonsActive(shadow){
     shadow.getElementById('sx-theme')?.querySelectorAll('.theme-btn').forEach(b=>{
@@ -1430,6 +1829,22 @@
 
   // ===== 状态渲染（组件化）=====
   let currentLangCache='zh';
+  // Reader translate cache (per page session; no persistence across reload)
+  let __readerTransCache = null; // { key, translated: string[] | nulls (markdown per block), done: bool, forceView: 'original'|'translated'|null }
+  function readerCacheKey(title, markdown){ return `${title||''}\n----\n${String(markdown||'')}`; }
+  function readerCacheMatches(title, markdown){ try{ return !!__readerTransCache && __readerTransCache.key === readerCacheKey(title, markdown); }catch{ return false; } }
+  function readerCacheEnsure(title, markdown, n){
+    const key = readerCacheKey(title, markdown);
+    if (!__readerTransCache || __readerTransCache.key !== key){
+      __readerTransCache = { key, translated: Array.from({length: n}, ()=>null), done: false, forceView: null };
+    } else if (!Array.isArray(__readerTransCache.translated) || __readerTransCache.translated.length !== n){
+      __readerTransCache.translated = Array.from({length: n}, ()=>null);
+      __readerTransCache.done = false;
+    }
+    return __readerTransCache;
+  }
+  function readerCacheSetBlock(i, md){ if (!__readerTransCache) return; try{ __readerTransCache.translated[i] = String(md||''); }catch{} }
+  function readerCacheCountDone(){ try{ return (__readerTransCache?.translated||[]).reduce((a,x)=> a + (x?1:0), 0); }catch{ return 0; } }
 
   // 组件：卡片（Vue 启用时使用）
   function CardComponent(props){
@@ -1514,6 +1929,35 @@
             alert.className='alert'; alert.innerHTML=`<button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${currentLangCache==='en'?'Failed to copy image to clipboard':'复制图片到剪贴板失败'}</p></div>`;
             box.insertBefore(alert, box.querySelector('.md'));
           }catch{}
+          // Runtime recompute pages for robust validation and to avoid closure issues
+          const pagesRuntime = (function(){
+            try{
+              const out = new Set();
+              norm.split(',').filter(Boolean).forEach(seg=>{
+                const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN; let lo=Number.isFinite(b)?Math.min(a,b):a; let hi=Number.isFinite(b)?Math.max(a,b):a; for(let i=lo;i<=hi;i++){ if(i>=1 && i<=totalPages) out.add(i); } }
+              });
+              return Array.from(out).sort((a,b)=>a-b);
+            }catch{ return []; }
+          })();
+          if (!Array.isArray(pagesRuntime) || pagesRuntime.length===0){
+            const msg = currentLangCache==='en'
+              ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.`
+              : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+            try{ const errEl = pdfCard.__pdfElems?.err; if (errEl){ errEl.textContent = msg; errEl.style.display=''; } }catch{}
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          if (hasNumber && hasOutOfBounds){
+            const msg = currentLangCache==='en'
+              ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.`
+              : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+            try{ const errEl = pdfCard.__pdfElems?.err; if (errEl){ errEl.textContent = msg; errEl.style.display=''; } }catch{}
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          // adopt runtime pages
+          try{ pages = pagesRuntime; }catch{}
         } else {
           try{
             const card=this.$refs.card;
@@ -1584,6 +2028,63 @@
     try{ $s.firstElementChild?.classList?.add('revive'); $c.firstElementChild?.classList?.add('revive'); }catch{}
   }
 
+  function setSummaryTitleBySource(meta){
+    try{
+      const isPdf = !!(meta && meta.source === 'pdf');
+      const base = (currentLangCache==='en' ? 'Summary' : '摘要');
+      let label = isPdf ? (currentLangCache==='en' ? 'Summary (PDF)' : '摘要 (PDF)') : base;
+      // Append pages label when provided (for PDF summaries)
+      try{
+        const extra = meta && typeof meta.pagesLabel === 'string' ? meta.pagesLabel.trim() : '';
+        if (isPdf && extra){ label = `${label} ${extra}`; }
+      }catch{}
+      if (vmSummary && typeof vmSummary.title !== 'undefined'){
+        vmSummary.title = label;
+      } else {
+        const el = (typeof shadow!=='undefined' && shadow && shadow.getElementById) ? shadow.getElementById('sx-summary') : document.getElementById('sx-summary');
+        if (el) el.setAttribute('data-title', label);
+      }
+    }catch{}
+  }
+
+  // Build a human-friendly pages label for PDF ranges, respecting language
+  function formatPdfPagesLabel(pages){
+    try{
+      if (!Array.isArray(pages) || pages.length===0) return '';
+      const sorted = Array.from(new Set(pages)).sort((a,b)=>a-b);
+      const segs = [];
+      let start = null, prev = null;
+      for (const n of sorted){
+        if (start===null){ start = n; prev = n; continue; }
+        if (n === prev + 1){ prev = n; continue; }
+        segs.push(start===prev ? `${start}` : `${start}–${prev}`);
+        start = n; prev = n;
+      }
+      if (start!==null){ segs.push(start===prev ? `${start}` : `${start}–${prev}`); }
+      if (currentLangCache==='en'){
+        return segs.length===1 && !segs[0].includes('–') ? `Page ${segs[0]}` : `Pages ${segs.join(',')}`;
+      } else {
+        const zhSegs = segs.map(s=>s.replace('–','-'));
+        if (zhSegs.length===1 && !zhSegs[0].includes('-')) return `第${zhSegs[0]}页`;
+        return `第${zhSegs.join('，')}页`;
+      }
+    }catch{ return ''; }
+  }
+
+  function setCleanedTitleBySource(meta){
+    try{
+      const isPdf = !!(meta && meta.source === 'pdf');
+      const base = (currentLangCache==='en' ? 'Readable Content' : '可读正文');
+      const label = isPdf ? (currentLangCache==='en' ? 'Readable Content (PDF)' : '可读正文 (PDF)') : base;
+      if (vmCleaned && typeof vmCleaned.title !== 'undefined'){
+        vmCleaned.title = label;
+      } else {
+        const el = (typeof shadow!=='undefined' && shadow && shadow.getElementById) ? shadow.getElementById('sx-cleaned') : document.getElementById('sx-cleaned');
+        if (el) el.setAttribute('data-title', label);
+      }
+    }catch{}
+  }
+
   function applyTrialLabelToFloatButton(shadow){
     const btn = shadow.getElementById('sx-run'); if(!btn) return;
     chrome.storage.sync.get(['aiProvider']).then(async ({ aiProvider })=>{
@@ -1614,18 +2115,18 @@
     const step = async ()=>{
       try{
         const st = await getState(tabId);
-        if (st.status==='done'){ setLoading(shadow,false); await render(st.summary, st.cleaned); stopPolling(); return; }
+        if (st.status==='done'){ setSummarizing(shadow,false); setLoading(shadow,false); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} await render(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling(); return; }
         if (st.status==='error'){
-          setLoading(shadow,false);
+          setSummarizing(shadow,false); setLoading(shadow,false);
           const i18n = await loadI18n(); const lang = i18n? await i18n.getCurrentLanguage():'zh';
           shadow.getElementById('sx-summary').innerHTML =
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>${lang==='zh'?'发生错误，请重试。':'An error occurred, please try again.'}</p></div></div>`;
           stopPolling(); return;
         }
-        if (st.status==='partial'){ setLoading(shadow,true); await render(st.summary, null); }
-        else if (st.status==='running'){ setLoading(shadow,true); skeleton(shadow); }
+        if (st.status==='partial'){ setSummarizing(shadow,true); setLoading(shadow,true); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} await render(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} }
+        else if (st.status==='running'){ setSummarizing(shadow,true); setLoading(shadow,true); try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{} skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{} }
       }catch{}
-      if (Date.now()-start>hardTimeout){ setLoading(shadow,false); stopPolling(); return; }
+      if (Date.now()-start>hardTimeout){ setSummarizing(shadow,false); setLoading(shadow,false); stopPolling(); return; }
       interval = Math.min(maxInterval, Math.round(interval*1.25));
       pollTimer = setTimeout(step, interval);
     };
@@ -1651,6 +2152,16 @@
   // ===== 启动 =====
   const host = ensurePanel();
   const shadow = host.shadowRoot;
+  // Detect reload; on reload we clear any previous Q&A UI and local history for this URL
+  let __suppressRestoreOnce = false;
+  try{
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation');
+    if (nav && nav[0] && nav[0].type === 'reload') {
+      __suppressRestoreOnce = true;
+      try{ chrome.runtime.sendMessage({ type: 'QA_UI_CLEAR' }); }catch{}
+      try{ const key = 'sx_qa_hist_v1:' + String(location.href||'').split('#')[0]; chrome.storage.local.remove([key]); }catch{}
+    }
+  }catch{}
 
   // 动态定位折叠箭头到“提取并摘要”按钮正下方
   function updateEmptyArrowPosition(){
@@ -1709,6 +2220,86 @@
   // 关闭
   const stopThemeWatch = startThemeWatchers(shadow);
   shadow.getElementById('sx-close')?.addEventListener('click', ()=>{ stopThemeWatch(); host.remove(); window[MARK]=false; });
+  // Prevent scroll from chaining to page when hovering panel body
+  (function bindPanelScrollContainment(){
+    try{
+      const container = shadow.getElementById('sx-container');
+      if (!container) return;
+
+      const isScrollable = (el)=>{
+        if (!el || el === container || el.nodeType !== 1) return false;
+        const cs = getComputedStyle(el);
+        const oy = cs.overflowY || cs.overflow;
+        if (!/(auto|scroll)/i.test(oy)) return false;
+        return (el.scrollHeight - el.clientHeight) > 1;
+      };
+      const nearestScroller = (start)=>{
+        let el = start instanceof Node ? start : null;
+        while (el && el !== container) {
+          if (isScrollable(el)) return el;
+          el = el.parentElement;
+        }
+        return container; // fallback to container itself
+      };
+      const canScroll = (el, dy)=>{
+        if (!el) return false;
+        if ((el.scrollHeight - el.clientHeight) <= 1) return false;
+        if (dy < 0) return el.scrollTop > 0; // up
+        if (dy > 0) return (el.scrollTop + el.clientHeight) < (el.scrollHeight - 1); // down
+        return false;
+      };
+
+      const onWheel = (e)=>{
+        try{
+          const dy = e.deltaY || 0;
+          const scroller = nearestScroller(e.target);
+          if (canScroll(scroller, dy)) {
+            // Let this scroller handle it; just stop propagation to avoid page scroll
+            e.stopPropagation();
+            return;
+          }
+          // At edge (or no inner scroller) — prevent default so the page doesn’t scroll
+          e.preventDefault();
+          e.stopPropagation();
+        }catch{}
+      };
+      container.addEventListener('wheel', onWheel, { passive:false });
+
+      // Touch containment with nearest scroller semantics
+      let lastY = 0;
+      container.addEventListener('touchstart', (e)=>{
+        try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{}
+      }, { passive:true });
+      container.addEventListener('touchmove', (e)=>{
+        try{
+          if (!e.touches || !e.touches[0]) return;
+          const y = e.touches[0].clientY; const dy = lastY ? (lastY - y) : 0; // positive -> scroll down
+          const scroller = nearestScroller(e.target);
+          const can = canScroll(scroller, dy);
+          if (!can) { e.preventDefault(); e.stopPropagation(); }
+          else { e.stopPropagation(); }
+          lastY = y;
+        }catch{}
+      }, { passive:false });
+    }catch{}
+  })();
+  // 阅读模式
+  shadow.getElementById('sx-reader-ind')?.addEventListener('click', async ()=>{
+    if (summarizing) return; // Block during processing
+    try{ await openReaderOverlay(); }catch(e){ console.warn('reader overlay failed', e); }
+  });
+  // PDF 导入
+  shadow.getElementById('sx-pdf-ind')?.addEventListener('click', async ()=>{
+    if (summarizing) return; // Block during processing
+    try{ await openPdfPanel(); }catch(e){ console.warn('pdf panel failed', e); }
+  });
+  // Ensure reader tooltip
+  try{ ensureReaderIndicatorTooltip(shadow); }catch{}
+  try{ ensurePdfIndicatorTooltip(shadow); }catch{}
+  // 元素选择器按钮
+  shadow.getElementById('sx-pick-btn')?.addEventListener('click', () => {
+    try { startElementPicker(); } catch (e) { console.warn('startElementPicker failed:', e); }
+  });
 
   // 保持折叠箭头在窗口尺寸变化时也对齐
   try{ window.addEventListener('resize', ()=>{ try{ updateEmptyArrowPosition(); }catch{} }, { passive:true }); }catch{}
@@ -1754,12 +2345,44 @@
     }
     
     // 应用强制深色模式
-    applyForceDarkMode(forceDarkMode);
+    applyForceDarkModeSmart(forceDarkMode);
   });
 
   // 拖宽 + 记忆
   (function bindDrag(){
     const drag=shadow.getElementById('sx-drag'); const wrapEl=shadow.getElementById('sx-wrap');
+    // 当你问我答浮窗距离面板右缘小于安全距离时（含预测），阻止进一步缩小面板
+    const SAFE_MARGIN = 10; // px
+    function isQATouchingRightEdge(deltaShrinkPx = 0){
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard || chatCard.style.display==='none' || !chatCard.classList.contains('qa-float')) return false;
+        const container = shadow.getElementById('sx-container');
+        if (!container) return false;
+        const cr = chatCard.getBoundingClientRect();
+        const pr = container.getBoundingClientRect();
+        // 当前实际距离（不含容器 padding）
+        let dist = pr.right - cr.right;
+        // 若用户自定义了位置（left 定位），面板缩小时容器右缘向左移动，距离会随之减少
+        if (chatCard.classList.contains('qa-custom-pos') && deltaShrinkPx > 0) dist -= deltaShrinkPx;
+        return dist < SAFE_MARGIN;
+      }catch{ return false; }
+    }
+    function isQATouchingLeftEdge(deltaShrinkPx = 0){
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard || chatCard.style.display==='none' || !chatCard.classList.contains('qa-float')) return false;
+        const container = shadow.getElementById('sx-container');
+        if (!container) return false;
+        const cr = chatCard.getBoundingClientRect();
+        const pr = container.getBoundingClientRect();
+        // 当前左侧距离（不含容器 padding）
+        let dist = cr.left - pr.left;
+        // 若卡片靠右锚定（默认非自定义位置），缩小面板（从右侧收缩）会让 left 同步向右移动，左距将减少 deltaShrinkPx
+        if (!chatCard.classList.contains('qa-custom-pos') && deltaShrinkPx > 0) dist -= deltaShrinkPx;
+        return dist < SAFE_MARGIN;
+      }catch{ return false; }
+    }
     function clamp(px){
       const vw=Math.max(document.documentElement.clientWidth, window.innerWidth||0);
       const minW=Math.min(320, vw-80), maxW=Math.max(320, Math.min(720, vw-80));
@@ -1767,25 +2390,1358 @@
     }
     function setW(clientX){
       const vw=Math.max(document.documentElement.clientWidth, window.innerWidth||0);
-      const fromRight=vw-clientX; const w=clamp(fromRight);
+      const fromRight=vw-clientX; let w=clamp(fromRight);
+      const curW = parseInt(getComputedStyle(host).width,10) || host.clientWidth || 0;
+      // 预测收缩量（>0 表示正在缩小）
+      const delta = Math.max(0, curW - w);
+      // 若与右/左缘的预测距离将小于安全值，则不再缩小
+      if (delta > 0 && (isQATouchingRightEdge(delta) || isQATouchingLeftEdge(delta))) {
+        w = curW; // 锁住当前宽度，直到不再贴边
+      }
       host.style.width = `${w}px`; try{ chrome.storage.sync.set({ float_panel_width: w }); }catch{}
     }
     let dragging=false;
     function start(){ dragging=true; wrapEl?.classList.add('dragging'); document.documentElement.style.userSelect='none'; try{ updateEmptyArrowPosition(); }catch{} }
-    function end(){ dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect=''; window.removeEventListener('mousemove', mm, true); window.removeEventListener('mouseup', mu, true); window.removeEventListener('touchmove', tm, {capture:true, passive:false}); window.removeEventListener('touchend', te, {capture:true}); }
-    const mm=(ev)=>{ if(!dragging) return; ev.preventDefault(); setW(ev.clientX); updateEmptyArrowPosition(); };
+    function end(){
+      dragging=false; wrapEl?.classList.remove('dragging'); document.documentElement.style.userSelect='';
+      // Mouse/touch fallback cleanup
+      window.removeEventListener('mousemove', mm, true);
+      window.removeEventListener('mouseup', mu, true);
+      try{ window.removeEventListener('touchmove', tm, {capture:true, passive:false}); }catch{}
+      try{ window.removeEventListener('touchend', te, {capture:true}); }catch{}
+      // Pointer events cleanup
+      try{ window.removeEventListener('pointermove', pm, true); }catch{}
+      try{ window.removeEventListener('pointerup', pu, true); }catch{}
+      try{ window.removeEventListener('pointercancel', pc, true); }catch{}
+      try{ drag.removeEventListener('lostpointercapture', pc, { capture:true }); }catch{}
+    }
+    const mm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
     const mu=()=>{ if(!dragging) return; end(); };
     const tm=(ev)=>{ if(!dragging) return; if(ev.touches && ev.touches[0]) setW(ev.touches[0].clientX); updateEmptyArrowPosition(); ev.preventDefault(); };
     const te=()=>{ if(!dragging) return; end(); };
-    drag?.addEventListener('mousedown',(e)=>{ start(); e.preventDefault(); window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
-    drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
+    const hasPointer = (typeof window !== 'undefined') && ('PointerEvent' in window);
+    // Mouse/touch fallback path (older browsers). In Chrome we prefer Pointer Events.
+    if (!hasPointer){
+      drag?.addEventListener('mousedown',(e)=>{ start(); try{ e.preventDefault(); }catch{} window.addEventListener('mousemove', mm, true); window.addEventListener('mouseup', mu, true); });
+      drag?.addEventListener('touchstart',(e)=>{ start(); e.preventDefault(); window.addEventListener('touchmove', tm, {capture:true, passive:false}); window.addEventListener('touchend', te, {capture:true}); }, {passive:false});
+    }
+    // Pointer events path: more robust on PDF viewer and special pages
+    const pm=(ev)=>{ if(!dragging) return; try{ ev.preventDefault(); }catch{} setW(ev.clientX); updateEmptyArrowPosition(); };
+    const pu=(ev)=>{ if(!dragging) return; try{ drag.releasePointerCapture(ev.pointerId); }catch{} end(); };
+    const pc=(ev)=>{ if(!dragging) return; end(); };
+    if (hasPointer){
+      drag?.addEventListener('pointerdown', (e)=>{
+        start();
+        try{ drag.setPointerCapture(e.pointerId); }catch{}
+        try{ e.preventDefault(); }catch{}
+        // Track moves on window to avoid missing events when leaving handle
+        window.addEventListener('pointermove', pm, true);
+        window.addEventListener('pointerup', pu, { once:true, capture:true });
+        window.addEventListener('pointercancel', pc, { once:true, capture:true });
+        drag.addEventListener('lostpointercapture', pc, { once:true });
+      });
+    }
     drag?.addEventListener('dblclick', async ()=>{
       const cur=parseInt(getComputedStyle(host).width,10)||420;
       const target=cur<520? 560: 380;
-      const w=clamp(target); host.style.width=`${w}px`; try{ chrome.storage.sync.set({ float_panel_width:w }); }catch{}
+      let w=clamp(target);
+      // 若双击目标会导致“缩小”，且预测距离将小于安全值（左右任一），则保持当前宽度不变
+      if (w < cur && (isQATouchingRightEdge(cur - w) || isQATouchingLeftEdge(cur - w))) w = cur;
+      host.style.width=`${w}px`; try{ chrome.storage.sync.set({ float_panel_width:w }); }catch{}
     });
     try{ chrome.storage.sync.get(['float_panel_width']).then(({float_panel_width})=>{ if(Number.isFinite(+float_panel_width)) host.style.width = `${clamp(+float_panel_width)}px`; updateEmptyArrowPosition(); }); }catch{}
   })();
+
+  async function ensureReadable(){
+    try{
+      if (typeof window.__AI_READ_EXTRACT__ === 'function') return true;
+    }catch{}
+    // Ask background to inject content bridge and return payload
+    try{ await chrome.runtime.sendMessage({ type: 'REQUEST_READABLE', ping:true }); }catch{}
+    return typeof window.__AI_READ_EXTRACT__ === 'function';
+  }
+
+  async function fetchReadable(){
+    try{
+      if (await ensureReadable()){
+        try{ return window.__AI_READ_EXTRACT__(); }catch{}
+      }
+      const resp = await chrome.runtime.sendMessage({ type: 'REQUEST_READABLE' });
+      if (resp?.ok) return resp.data;
+    }catch(e){ console.warn('fetchReadable failed', e); }
+    return { title: document.title||'', pageLang: document.documentElement.getAttribute('lang')||'', text:'', markdown:'' };
+  }
+
+  function createReaderOverlay(markdown, title){
+    const existing = document.getElementById('sx-reader-overlay'); if (existing) existing.remove();
+    const ov = document.createElement('div'); ov.id='sx-reader-overlay'; ov.style.position='fixed'; ov.style.inset='0'; ov.style.zIndex='2147483646';
+    const sh = ov.attachShadow({mode:'open'});
+    const theme = shadow.host.getAttribute('data-theme') || 'light';
+    const style = document.createElement('style');
+    style.textContent = `
+      :host{ --bg: #f5f7fb; --scrim: rgba(15,23,42,.55); --surface:#ffffff; --border:#e6eaf2; --text:#0f172a; --primary:#3b82f6; --bar-h:44px; color-scheme: light; }
+      :host, :host *{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif !important; }
+      :host([data-theme="dark"]) { --bg:#0b1220; --scrim: rgba(0,0,0,.55); --surface:#111a2e; --border:#1f2a44; --text:#e8eef9; --primary:#8ea2ff; color-scheme: dark; }
+      .scrim{ position:fixed; inset:0; background: var(--scrim); backdrop-filter: blur(2px); }
+      .wrap{ position:fixed; left:50%; top:6vh; transform: translateX(-50%); width:min(980px, 92vw); max-height:88vh; overflow:hidden; background: var(--surface); color: var(--text); border:1px solid var(--border); border-radius:16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); display:flex; flex-direction:column; }
+      .bar{ position:absolute; top:0; left:0; right:0; height: var(--bar-h); display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px; box-sizing:border-box; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); z-index:2; }
+      .body{ flex:1 1 auto; overflow:auto; padding-top: var(--bar-h); scrollbar-gutter: stable both-edges; overscroll-behavior: contain; }
+      :host([data-theme="dark"]) .bar{ background: linear-gradient(180deg, rgba(17,26,46,.65), rgba(17,26,46,0)); }
+      .close{ width:28px; height:28px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:grid; place-items:center; }
+      .close:hover{ background: rgba(0,0,0,.06); }
+      :host([data-theme="dark"]) .close:hover{ background: rgba(255,255,255,.08); }
+      .act{ height:28px; padding:0 10px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+      .act:hover{ background: rgba(0,0,0,.06); }
+      :host([data-theme="dark"]) .act:hover{ background: rgba(255,255,255,.08); }
+      .act[disabled]{ opacity:.6; cursor:default; }
+      .sel{ height:28px; padding:0 8px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--text); cursor:pointer; font-size:13px; }
+      :host([data-theme="dark"]) .sel{ background: rgba(255,255,255,.02); }
+      /* Integrated button progress */
+      #sx-reader-translate{ position: relative; overflow: hidden; }
+      #sx-reader-translate .fill{ position:absolute; left:0; top:0; height:100%; width:0%; background: var(--primary); opacity:.35; transition: width .22s ease, opacity .22s ease; z-index:0; }
+      :host([data-theme="dark"]) #sx-reader-translate .fill{ opacity:.5; }
+      #sx-reader-translate .fill::after{ content:""; position:absolute; right:0; top:0; width:2px; height:100%; background: var(--primary); opacity:.9; box-shadow: 0 0 6px var(--primary); }
+      #sx-reader-translate .label{ position:relative; z-index:1; }
+      #sx-reader-translate.busy{ box-shadow: 0 0 0 1px var(--primary) inset; }
+      /* Double current horizontal padding for wider side spacing */
+      .inner{ padding:20px 60px 30px; }
+      .md{ font-size:17px; line-height:1.8; }
+      .md h1{ margin:12px 0 10px; font-size:26px; font-weight:900; }
+      .md h2{ margin:14px 0 8px; font-size:22px; font-weight:800; }
+      .md h3{ margin:12px 0 6px; font-size:18px; font-weight:700; }
+      .md p{ margin:10px 0; }
+      .md a{ color: var(--primary); }
+      .md ul,.md ol{ margin:8px 0 8px 18px; }
+      .md li{ margin:4px 0; }
+      .md blockquote{ margin:14px 0; padding:10px 12px; border-left:3px solid #cfe0ff; border-radius:10px; background: rgba(207,224,255,.22); }
+      :host([data-theme="dark"]) .md blockquote{ border-left-color:#2a3f66; background: rgba(26,34,52,.55); }
+      .md code{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:.92em; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:6px; padding:0 .35em; }
+      .md pre{ margin:10px 0; padding:12px; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.28); border-radius:12px; overflow:auto; line-height:1.6; }
+      .md img{ display:block; margin:10px 0; border-radius:12px; max-width:100%; height:auto; }
+      /* Progressive translate blocks */
+      .md .blk{ margin:10px 0; }
+      .md .blk .tran{ display:none; }
+      .md .blk.translated .orig{ display:none; }
+      .md .blk.translated .tran{ display:block; }
+      #sx-reader-md[data-force-view="original"] .blk .orig{ display:block !important; }
+      #sx-reader-md[data-force-view="original"] .blk .tran{ display:none !important; }
+      #sx-reader-md[data-force-view="translated"] .blk .orig{ display:none !important; }
+      #sx-reader-md[data-force-view="translated"] .blk .tran{ display:block !important; }
+    `;
+    sh.appendChild(style);
+    const root = document.createElement('div'); sh.appendChild(root);
+    sh.host.setAttribute('data-theme', theme);
+    const tLbl = (currentLangCache==='en' ? 'Translate Original' : '翻译原文');
+    const tLblWorking = (currentLangCache==='en' ? 'Translating…' : '正在翻译…');
+    const tShowOriginal = (currentLangCache==='en' ? 'Show Original' : '显示原文');
+    const tShowTranslation = (currentLangCache==='en' ? 'Show Translation' : '显示翻译');
+    const tClose = (currentLangCache==='en' ? 'Close' : '关闭');
+    const tProviderLblFree = (currentLangCache==='en' ? 'Free service (unstable)' : '免费服务（可能不稳定）');
+    const tProviderLblSettingsPlaceholder = (currentLangCache==='en' ? 'Use Settings' : '使用设置');
+    const tExportPdfLbl = (currentLangCache==='en' ? 'Export PDF' : '导出 PDF');
+    root.innerHTML = `
+      <div class="scrim"></div>
+      <div class="wrap" role="dialog" aria-modal="true" aria-label="阅读模式">
+        <div class="bar">
+          <select class="sel" id="sx-reader-provider" aria-label="Provider">
+            <option value="free">${tProviderLblFree}</option>
+            <option value="settings" id="sx-reader-provider-s2">${tProviderLblSettingsPlaceholder}</option>
+          </select>
+          <button class="act" id="sx-reader-translate" aria-label="${tLbl}"><span class="fill" aria-hidden="true"></span><span class="label">${tLbl}</span></button>
+          <button class="act" id="sx-reader-export" aria-label="${tExportPdfLbl}" title="${tExportPdfLbl}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M12 18v-6"/>
+              <path d="M9 15l3 3 3-3"/>
+            </svg>
+          </button>
+          <button class="close" aria-label="${tClose}">✕</button>
+        </div>
+        <div class="body">
+          <div class="inner"><div class="md" id="sx-reader-md"></div></div>
+        </div>
+      </div>`;
+    const close = async () => {
+      try{ ov.remove(); host.style.display=''; }catch{}
+      // After coming back from reader, restore chat geometry exactly as before
+      try{
+        const ui = await loadQAUIState();
+        const chatCard = shadow.getElementById('sx-chat');
+        if (!chatCard) return;
+        const shouldFloat = (typeof ui?.float === 'boolean') ? !!ui.float : chatCard.classList.contains('qa-float');
+        if (!shouldFloat) return;
+        const containerEl = shadow.getElementById('sx-container');
+        const contRect = containerEl?.getBoundingClientRect?.();
+        const g = ui?.lastGeom;
+        if (!g || !contRect) return;
+        chatCard.classList.add('qa-float');
+        chatCard.style.minWidth = '0px';
+        chatCard.style.width = Math.round(g.width||chatCard.getBoundingClientRect().width) + 'px';
+        chatCard.style.setProperty('--qa-w', Math.round(g.width||chatCard.getBoundingClientRect().width) + 'px');
+        chatCard.style.height = Math.round(g.height||chatCard.getBoundingClientRect().height) + 'px';
+        chatCard.style.setProperty('--qa-h', Math.round(g.height||chatCard.getBoundingClientRect().height) + 'px');
+        if (g.custom){
+          chatCard.classList.add('qa-custom-pos');
+          chatCard.style.right=''; chatCard.style.bottom='';
+          chatCard.style.left = Math.round(g.left||0) + 'px';
+          chatCard.style.top  = Math.round(g.top||0) + 'px';
+        } else {
+          chatCard.classList.remove('qa-custom-pos');
+          const gap = Math.max(10, Math.round(g.rightGap || 16));
+          chatCard.style.right = gap + 'px';
+          chatCard.style.left = '';
+          chatCard.style.top = '';
+          chatCard.style.bottom = '';
+        }
+        // Lock size after restore so autosize won't shrink it
+        chatCard.dataset.userSized = '1';
+        chatCard._qaHasRestored = true;
+        chatCard._qaSizeLocked = true;
+      }catch{}
+    };
+    root.querySelector('.close')?.addEventListener('click', close);
+    sh.querySelector('.scrim')?.addEventListener('click', close);
+    document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
+    document.documentElement.appendChild(ov);
+    // auto-focus close for accessibility
+    try{ sh.querySelector('.close')?.focus(); }catch{}
+
+
+    // Helper to ensure pdf-lib is available (tries min and non-min UMD builds)
+    async function ensurePdfLibLoaded(){
+      // Prefer ESM import to avoid isolated world/global leakage
+      if (window.__pdfLibModule) return window.__pdfLibModule;
+      try{
+        const url = chrome.runtime.getURL('vendor/pdf-lib.esm.js');
+        const mod = await import(url);
+        if (mod && (mod.PDFDocument || mod.default)) { window.__pdfLibModule = mod; return mod; }
+      }catch{}
+      if (window.PDFLib || (typeof globalThis!== 'undefined' && globalThis.PDFLib)) return (window.PDFLib||globalThis.PDFLib);
+      const tryLoad = (path)=> new Promise((resolve, reject)=>{
+        const s = document.createElement('script'); s.src = chrome.runtime.getURL(path); s.onload = ()=>resolve(); s.onerror = ()=>reject(new Error('load failed: '+path)); document.documentElement.appendChild(s);
+      });
+      try{ await tryLoad('vendor/pdf-lib.min.js'); }catch{}
+      if (window.PDFLib || (typeof globalThis!== 'undefined' && globalThis.PDFLib)) return (window.PDFLib||globalThis.PDFLib);
+      try{ await tryLoad('vendor/pdf-lib.js'); }catch{}
+      return (window.PDFLib|| (typeof globalThis!== 'undefined' ? globalThis.PDFLib : undefined));
+    }
+
+    // Bind Export PDF using pdf-lib (no print dialog)
+    try{
+      const exportBtn = sh.getElementById('sx-reader-export');
+      try{
+        // Ensure tooltip is available even if title is ignored by platform
+        const tipText = tExportPdfLbl;
+        exportBtn.setAttribute('title', tipText);
+        const showTip = ()=>{
+          try{
+            const rect = exportBtn.getBoundingClientRect();
+            const tip = document.createElement('div');
+            tip.id = 'sx-reader-export-tip';
+            tip.textContent = tipText;
+            tip.style.position = 'fixed';
+            tip.style.left = Math.round(rect.left + rect.width/2) + 'px';
+            tip.style.top = Math.round(rect.bottom + 10) + 'px';
+            tip.style.transform = 'translateX(-50%)';
+            tip.style.zIndex = '2147483647';
+            // Theme-aware colors: increase contrast in dark mode
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark){
+              tip.style.background = 'rgba(30,41,59,.98)'; // slate-800 almost opaque
+              tip.style.color = '#f8fafc';
+              tip.style.border = '1px solid rgba(148,163,184,.35)'; // slate-400
+              tip.style.boxShadow = '0 8px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06)';
+              tip.style.textShadow = '0 1px 1px rgba(0,0,0,.5)';
+            } else {
+              tip.style.background = 'rgba(17,24,39,.92)';
+              tip.style.color = '#ffffff';
+              tip.style.border = '1px solid rgba(0,0,0,.1)';
+              tip.style.boxShadow = '0 6px 18px rgba(0,0,0,.25)';
+            }
+            tip.style.padding = '6px 10px';
+            tip.style.borderRadius = '8px';
+            tip.style.fontSize = '12px';
+            tip.style.lineHeight = '1';
+            tip.style.pointerEvents = 'none';
+            tip.style.whiteSpace = 'nowrap';
+            document.body.appendChild(tip);
+            exportBtn.__sxTip = tip;
+          }catch{}
+        };
+        const hideTip = ()=>{ try{ exportBtn.__sxTip?.remove(); exportBtn.__sxTip=null; }catch{} };
+        exportBtn.addEventListener('mouseenter', showTip);
+        exportBtn.addEventListener('mouseleave', hideTip);
+        exportBtn.addEventListener('blur', hideTip);
+        exportBtn.addEventListener('click', hideTip);
+      }catch{}
+      if (exportBtn){
+        exportBtn.addEventListener('click', async ()=>{
+          try{
+            if (summarizing) return;
+            exportBtn.disabled = true; exportBtn.classList.add('busy');
+            // Ensure pdf-lib is loaded
+            const PDFLibNS = await ensurePdfLibLoaded();
+            const { PDFDocument, rgb } = (PDFLibNS && (PDFLibNS.PDFDocument ? PDFLibNS : (PDFLibNS.default || {}))) || PDFLibNS || {};
+            if (!PDFDocument) throw new Error('pdf-lib not available');
+
+            // Render current reader DOM to image via SVG foreignObject → canvas
+            const mdEl = sh.getElementById('sx-reader-md'); if (!mdEl) throw new Error('no content');
+            const clone = mdEl.cloneNode(true);
+            // Strip hyperlinks and normalize whitespace to avoid isolated lines around linked words
+            try{
+              const stripHyperlinks = (root)=>{
+                try{
+                  const anchors = Array.from(root.querySelectorAll('a[href]'));
+                  for (const a of anchors){
+                    try{
+                      // Mark parent <p> that only contains this link so we can inline it later
+                      try{
+                        const p = a.parentElement;
+                        if (p && p.tagName && p.tagName.toLowerCase()==='p'){
+                          const onlyLinkChild = (p.children.length === 1 && p.children[0] === a);
+                          if (onlyLinkChild) { p.setAttribute('data-sx-link-only','1'); }
+                        }
+                      }catch{}
+
+                      const textRaw = a.textContent || '';
+                      const textNorm = String(textRaw).replace(/\s+/g,' ');
+                      const children = Array.from(a.childNodes);
+                      if (children.length === 1 && children[0].nodeType === Node.TEXT_NODE){
+                        a.replaceWith(document.createTextNode(textNorm));
+                      } else {
+                        // Unwrap preserving content, but ensure normalized text nodes
+                        const frag = document.createDocumentFragment();
+                        const tmp = document.createTextNode(textNorm);
+                        frag.appendChild(tmp);
+                        a.replaceWith(frag);
+                      }
+                    }catch{}
+                  }
+                }catch{}
+              };
+              const inlineLinkOnlyParagraphs = (root)=>{
+                try{
+                  const ps = Array.from(root.querySelectorAll('p[data-sx-link-only="1"]'));
+                  for (const p of ps){
+                    try{
+                      const t = (p.textContent||'').replace(/\s+/g,' ').trim();
+                      const txt = document.createTextNode((t ? (' '+t+' ') : ''));
+                      p.replaceWith(txt);
+                    }catch{}
+                  }
+                }catch{}
+              };
+              const mergeAndNormalizeTextNodes = (el)=>{
+                try{
+                  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                  const nodes = [];
+                  let n; while ((n = walker.nextNode())) { nodes.push(n); }
+                  for (const node of nodes){
+                    try{ node.nodeValue = String(node.nodeValue||'').replace(/[\t\n\r]+/g,' ').replace(/\s{2,}/g,' '); }catch{}
+                  }
+                  // Merge adjacent text nodes within each element
+                  const mergeIn = (root)=>{
+                    try{
+                      for (const child of Array.from(root.childNodes)){
+                        if (child.nodeType === Node.ELEMENT_NODE) mergeIn(child);
+                        // Merge sequential text nodes
+                        if (child.nodeType === Node.TEXT_NODE){
+                          let next = child.nextSibling;
+                          while (next && next.nodeType === Node.TEXT_NODE){
+                            try{
+                              const a = child.nodeValue || '';
+                              const b = next.nodeValue || '';
+                              // Ensure a single space at the boundary
+                              const join = (a && /\S$/.test(a) && b && /^\S/.test(b)) ? (a+' '+b) : (a+b);
+                              child.nodeValue = join.replace(/\s{2,}/g,' ');
+                              const toRemove = next; next = next.nextSibling; toRemove.remove();
+                            }catch{ break; }
+                          }
+                        }
+                      }
+                    }catch{}
+                  };
+                  mergeIn(el);
+                }catch{}
+              };
+              stripHyperlinks(clone);
+              inlineLinkOnlyParagraphs(clone);
+              mergeAndNormalizeTextNodes(clone);
+            }catch{}
+            // Try to inline images to avoid cross-origin taint when rasterizing
+            async function inlineImages(root){
+              const imgs = Array.from(root.querySelectorAll('img'));
+              await Promise.all(imgs.map(async (img)=>{
+                try{
+                  let src = img.getAttribute('src')||''; if (!src) return;
+                  if (/^data:/i.test(src)) return; // already inline
+                  // absolutize
+                  try{ src = new URL(src, location.href).href; }catch{}
+                  const resp = await fetch(src, { mode:'cors' });
+                  if (!resp.ok) return;
+                  const blob = await resp.blob();
+                  const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
+                  img.setAttribute('src', String(dataUrl||''));
+                }catch{}
+              }));
+            }
+            try{ await inlineImages(clone); }catch{}
+            let imgMap = null; // will be initialized after we attach to DOM and dedupe
+            const wrap = document.createElement('div'); wrap.style.position='fixed'; wrap.style.left='-99999px'; wrap.style.top='0'; wrap.style.pointerEvents='none'; wrap.style.background='#fff';
+            wrap.appendChild(clone); document.body.appendChild(wrap);
+            // After attached, dedupe vertically-adjacent duplicate images (e.g., CN/EN duplicated blocks)
+            try{
+              const imgs = Array.from(clone.querySelectorAll('img'));
+              let last = null;
+              for (const el of imgs){
+                try{
+                  const src = el.getAttribute('src')||''; if(!src){ last = el; continue; }
+                  if (last){
+                    const prevSrc = last.getAttribute('src')||'';
+                    if (src && prevSrc && src === prevSrc){
+                      const r1 = last.getBoundingClientRect(); const r2 = el.getBoundingClientRect();
+                      const near = Math.abs((r2.top||0) - (r1.bottom||0)) < 64; // stacked closely
+                      if (near){ try{ el.remove(); }catch{} continue; }
+                    }
+                  }
+                  last = el;
+                }catch{ last = el; }
+              }
+            }catch{}
+            // Preload images after dedupe (only safe sources to avoid canvas taint)
+            try{
+              imgMap = new WeakMap();
+              const nodes = Array.from(clone.querySelectorAll('img'));
+              await Promise.all(nodes.map(el=> new Promise((res)=>{
+                try{
+                  const src = el.getAttribute('src')||''; if(!src){ res(); return; }
+                  // Only draw images that are guaranteed safe for canvas export
+                  const safe = /^data:/i.test(src) || /^blob:/i.test(src) || /^chrome-extension:/i.test(src);
+                  if (!safe){ res(); return; }
+                  const im = new Image();
+                  try{ im.crossOrigin = 'anonymous'; }catch{}
+                  im.onload = ()=>{ try{ imgMap.set(el, im); }catch{} res(); };
+                  im.onerror = ()=> res();
+                  im.src = src;
+                }catch{ res(); }
+              })));
+            }catch{}
+            // Try simplified rendering approach - direct canvas rendering without SVG
+            const rect = clone.getBoundingClientRect();
+            // Use A4 width; final height decided after measurement pass
+            const cw = 794; // A4 width at 96 DPI (210mm * 96/25.4)
+            let ch = 1; // temporary, will resize after we measure
+            
+            // Create canvas and render HTML content directly
+            const canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            
+            // Set white background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cw, ch);
+            
+            // Enhanced text rendering with proper styling and structure
+            // Use canvas pixel space pagination to avoid later scaling causing overlap
+            // If shouldDraw=false, only measure total height/pages
+            const renderStructuredContent = (element, ctx, x, y, maxWidth, pageHeightPx, topMarginPx, bottomMarginPx, shouldDraw=true, imgMapRef=null) => {
+              let currentY = y; // y within the current page in canvas pixels
+              let pageIndex = 0;
+              const getPageBottomLimit = ()=> (pageIndex + 1) * pageHeightPx - bottomMarginPx;
+              
+              const processNode = (node, isTitle = false, isHeading = false, isBold = false, isItalic = false) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const text = node.textContent.trim();
+                  if (!text) return currentY;
+                  
+                  // Set font based on context - using larger sizes for Letter paper
+                  let fontSize = 20; // Reasonable base font size
+                  let fontWeight = 'normal';
+                  let fontStyle = 'normal';
+                  
+                  if (isTitle) {
+                    fontSize = 28; // Large title
+                    fontWeight = 'bold';
+                  } else if (isHeading) {
+                    fontSize = 24; // Large headings
+                    fontWeight = 'bold';
+                  } else if (isBold) {
+                    fontWeight = 'bold';
+                  }
+                  
+                  if (isItalic) {
+                    fontStyle = 'italic';
+                  }
+                  
+                  ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px Arial, "PingFang SC", "Microsoft YaHei", sans-serif`;
+                  
+                  // Handle text wrapping — enforce CJK wrapping and fallback to word wrapping
+                  const lineHeight = fontSize * 1.6; // Increased line height for better readability
+                  const textStr = String(text || '');
+                  const hasCJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(textStr);
+
+                  const flushLine = () => {
+                    if (!line) return;
+                    if (currentY + lineHeight > getPageBottomLimit()){
+                      pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx;
+                    }
+                    if (shouldDraw) ctx.fillText(line, x, currentY);
+                    currentY += lineHeight;
+                    line = '';
+                    cjkCountInLine = 0;
+                  };
+
+                  let line = '';
+                  let cjkCountInLine = 0;
+
+                  if (hasCJK) {
+                    const chars = Array.from(textStr);
+                    // Conservative width to reduce overflow risk
+                    const effectiveMax = Math.floor(maxWidth * 0.90);
+                    for (const ch of chars){
+                      if (ch === '\n'){ flushLine(); continue; }
+                      // collapse spaces at line start
+                      if (/^\s$/.test(ch) && !line) continue;
+                      const isCjkChar = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(ch);
+                      const testLine = line + ch;
+                      const w = ctx.measureText(testLine).width;
+                      // Force break if width exceeds or reached 35 CJK chars on the line
+                      if ((isCjkChar && cjkCountInLine >= 40) || (w > effectiveMax && line)){
+                        flushLine();
+                      }
+                      line += ch;
+                      if (isCjkChar) cjkCountInLine += 1;
+                    }
+                    flushLine();
+                  } else {
+                    // English and others: word-based wrapping
+                    const words = textStr.split(/\s+/);
+                    for (const word of words) {
+                      const testLine = line + (line ? ' ' : '') + word;
+                      const w = ctx.measureText(testLine).width;
+                      if (w > maxWidth && line) {
+                        flushLine();
+                        line = word; // start new line with current word
+                      } else {
+                        line = testLine;
+                      }
+                    }
+                    if (line.trim()) flushLine();
+                  }
+                  
+                  // Add extra spacing after different elements
+                  if (isTitle || isHeading) {
+                    currentY += lineHeight * 0.8; // More space after titles/headings
+                  } else {
+                    currentY += lineHeight * 0.3; // Some space after paragraphs
+                  }
+                  
+                  return currentY;
+                }
+                
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                  const tagName = node.tagName.toLowerCase();
+                  
+                  // Handle different HTML elements
+                  switch (tagName) {
+                    case 'img':{
+                      try{
+                        const im = imgMapRef && imgMapRef.get ? imgMapRef.get(node) : null;
+                        // If image not preloaded, skip gracefully
+                        if (im && im.width && im.height){
+                          // Compute draw size with aspect ratio, bounded by maxWidth
+                          const naturalW = im.naturalWidth || im.width;
+                          const naturalH = im.naturalHeight || im.height;
+                          const drawW = Math.min(maxWidth, Math.max(24, naturalW));
+                          const drawH = Math.max(24, Math.round(drawW * (naturalH / Math.max(1,naturalW))));
+                          // Page break if not enough space
+                          if (currentY + drawH > getPageBottomLimit()){
+                            pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx;
+                          }
+                          if (shouldDraw) ctx.drawImage(im, x, currentY, drawW, drawH);
+                          currentY += drawH + 40; // spacing after image (increase)
+                        }
+                      }catch{}
+                      break; }
+                    case 'h1':
+                      if (currentY + 40 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 30; // Extra spacing before title
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, true, false, false, false);
+                      }
+                      currentY += 20; // Extra spacing after title
+                      break;
+                    case 'h2':
+                    case 'h3':
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                      if (currentY + 30 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 25; // Extra spacing before heading
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, true, false, false);
+                      }
+                      currentY += 15; // Extra spacing after heading
+                      break;
+                    case 'p':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      currentY += 20; // More paragraph spacing
+                      break;
+                    case 'strong':
+                    case 'b':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, true, false);
+                      }
+                      break;
+                    case 'em':
+                    case 'i':
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, true);
+                      }
+                      break;
+                    case 'li':
+                      // Add bullet point
+                      if (currentY + 24 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      ctx.font = 'normal normal 20px Arial, sans-serif';
+                      if (shouldDraw) ctx.fillText('• ', x, currentY);
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      currentY += 15; // More spacing between list items
+                      break;
+                    case 'ul':
+                    case 'ol':
+                      if (currentY + 20 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 15; // Spacing before list
+                      for (const child of node.childNodes) {
+                        if (child.nodeType === Node.ELEMENT_NODE) {
+                          currentY = processNode(child, false, false, false, false);
+                        }
+                      }
+                      currentY += 15; // Spacing after list
+                      break;
+                    case 'blockquote':
+                      if (currentY + 40 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 20; // More spacing before quote
+                      // Draw quote bar
+                      ctx.fillStyle = '#3b82f6';
+                      ctx.fillRect(x - 10, currentY - 15, 4, 30);
+                      ctx.fillStyle = '#000000';
+                      
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, true);
+                      }
+                      currentY += 20; // More spacing after quote
+                      break;
+                    case 'br':
+                      if (currentY + 30 > getPageBottomLimit()) { pageIndex += 1; currentY = pageIndex * pageHeightPx + topMarginPx; }
+                      currentY += 30; // More spacing for line breaks
+                      break;
+                    default:
+                      // Process child nodes for other elements
+                      for (const child of node.childNodes) {
+                        currentY = processNode(child, false, false, false, false);
+                      }
+                      break;
+                  }
+                }
+                
+                return currentY;
+              };
+              
+              processNode(element);
+              return { pagesUsed: pageIndex + 1, lastY: currentY };
+            };
+            
+            // Start rendering from top with proper margins in canvas pixel space
+            ctx.fillStyle = '#000000';
+            const CANVAS_A4_W_PT = 595.28, CANVAS_A4_H_PT = 841.89; const marginsPt = 36; // keep sync with PDF settings
+            const usableWPt = CANVAS_A4_W_PT - marginsPt*2; const usableHPt = CANVAS_A4_H_PT - marginsPt*2;
+            const scaleForPdf = usableWPt / cw;
+            const pageHeightPx = Math.max(1, Math.floor(usableHPt / scaleForPdf));
+            const marginCanvasPx = Math.round((marginsPt / 72) * 96); // ~48px at 96dpi
+            const startX = marginCanvasPx; const startY = marginCanvasPx;
+            const maxWidth = cw - marginCanvasPx*2;
+            // First measure to compute total canvas height
+            const measureCanvas = document.createElement('canvas'); measureCanvas.width = cw; measureCanvas.height = 1; const measureCtx = measureCanvas.getContext('2d');
+            const measurement = renderStructuredContent(clone, measureCtx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/false, imgMap);
+            ch = Math.max(pageHeightPx * measurement.pagesUsed, pageHeightPx);
+            // Resize real canvas and paint background, then draw
+            canvas.height = ch; ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cw,ch); ctx.fillStyle = '#000000';
+            renderStructuredContent(clone, ctx, startX, startY, maxWidth, pageHeightPx, marginCanvasPx, marginCanvasPx, /*shouldDraw=*/true, imgMap);
+            
+            const pngDataUrl = canvas.toDataURL('image/png');
+            try{ document.body.removeChild(wrap); }catch{}
+            
+            if (!pngDataUrl || pngDataUrl === 'data:,') {
+              throw new Error('Canvas rendering failed');
+            }
+
+            // Build PDF (A4 size), proper scaling for readable text
+            const pdfDoc = await PDFDocument.create();
+            const A4_W = 595.28, A4_H = 841.89; // A4 size in points (210 x 297 mm)
+            const margins = 36; // 0.5 inch margins (about 12.7mm)
+            const usableW = A4_W - (margins * 2);
+            const usableH = A4_H - (margins * 2);
+            
+            // Calculate scaling to fit canvas width to PDF page width
+            const scale = usableW / cw;
+            const scaledHeight = ch * scale;
+            
+            // Slice the large canvas into page-sized tiles to avoid stretching
+            const tileSrcHeight = Math.max(1, Math.floor(usableH / scale)); // in source canvas pixels
+            const pageCount = Math.max(1, Math.ceil(ch / tileSrcHeight));
+
+            // Reusable page canvas for slicing
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = cw; // full width of source canvas
+            const pageCtx = pageCanvas.getContext('2d');
+            pageCtx.imageSmoothingEnabled = true;
+
+            for (let i = 0; i < pageCount; i++) {
+              const srcY = i * tileSrcHeight;
+              const srcH = Math.min(tileSrcHeight, ch - srcY);
+              if (srcH <= 0) break;
+
+              // Resize pageCanvas height to current tile height
+              if (pageCanvas.height !== srcH) { pageCanvas.height = srcH; }
+              // Clear and draw the slice from the big canvas
+              pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+              pageCtx.drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
+
+              // Encode this tile to PNG bytes
+              const tileDataUrl = pageCanvas.toDataURL('image/png');
+              const tileBytes = await fetch(tileDataUrl).then(r=>r.arrayBuffer());
+              const tilePng = await pdfDoc.embedPng(tileBytes);
+
+              // Compute destination height in PDF points after scaling by width
+              const destH = srcH * scale; // keep aspect ratio
+              const page = pdfDoc.addPage([A4_W, A4_H]);
+              page.drawImage(tilePng, {
+                x: margins,
+                y: A4_H - margins - destH,
+                width: usableW,
+                height: destH
+              });
+            }
+            const bytes = await pdfDoc.save();
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = (title || document.title || 'document') + '.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 2000);
+          }catch(e){
+            console.warn('export pdf failed', e);
+            const msg = (e && e.message) ? e.message : (e && e.type) ? `render error (${e.type})` : String(e||'');
+            alert((currentLangCache==='en'?'Export failed: ':'导出失败：') + msg);
+          }
+          finally{ exportBtn.disabled = false; exportBtn.classList.remove('busy'); }
+        });
+      }
+    }catch{}
+
+    // Build initial content as block wrappers for progressive translation
+    try{
+      const mdEl = sh.getElementById('sx-reader-md');
+      const originalMdFull = `${title ? `# ${title}\n\n` : ''}${markdown || ''}`.replace(/\r\n?/g,'\n');
+      // Split into blocks while preserving code fences
+      function splitBlocks(md){
+        const lines = String(md||'').split('\n');
+        const segs = []; let buf=[]; let inCode=false; let code=[];
+        for(const line of lines){
+          if(!inCode && /^```/.test(line)){ if(buf.length){ segs.push({type:'text', text: buf.join('\n')}); buf=[]; } inCode=true; code=[line]; continue; }
+          if(inCode){ code.push(line); if(/^```\s*$/.test(line)){ inCode=false; segs.push({type:'code', text: code.join('\n')}); code=[]; } continue; }
+          buf.push(line);
+        }
+        if(inCode && code.length){ segs.push({type:'code', text: code.join('\n')}); }
+        if(buf.length){ segs.push({type:'text', text: buf.join('\n')}); }
+        const out=[];
+        for(const s of segs){
+          if(s.type==='code'){ out.push(s.text); continue; }
+          const parts = s.text.split(/\n\s*\n+/).map(t=>t.trim()).filter(Boolean);
+          out.push(...parts);
+        }
+        return out;
+      }
+      function renderInner(md){
+        const tmp=document.createElement('div');
+        tmp.innerHTML = renderMarkdown(md);
+        const inner = tmp.querySelector('.md');
+        return inner? inner.innerHTML : tmp.innerHTML;
+      }
+      const blocks = splitBlocks(originalMdFull);
+      mdEl.innerHTML='';
+      blocks.forEach((b,i)=>{
+        const wrap = document.createElement('div');
+        wrap.className='blk';
+        wrap.setAttribute('data-i', String(i));
+        const origHTML = renderInner(b);
+        wrap.innerHTML = `<div class="orig">${origHTML}</div><div class="tran"></div>`;
+        mdEl.appendChild(wrap);
+      });
+      // Expose for translator
+      sh.__sxReaderBlocks = blocks;
+      // Pre-fill from cache if available
+      try{
+        if (readerCacheMatches(title, markdown) && Array.isArray(__readerTransCache?.translated)){
+          const arr = __readerTransCache.translated;
+          for (let i=0;i<blocks.length;i++){
+            const val = arr[i]; if (!val) continue;
+            const holder = mdEl.querySelector(`.blk[data-i="${i}"]`);
+            const tran = holder?.querySelector('.tran');
+            if (holder && tran){
+              const tmp=document.createElement('div'); tmp.innerHTML = renderMarkdown(val); const inner = tmp.querySelector('.md');
+              tran.innerHTML = inner ? inner.innerHTML : tmp.innerHTML;
+              holder.classList.add('translated');
+            }
+          }
+          // Apply last view preference if fully done
+          if (__readerTransCache.done){
+            const view = __readerTransCache.forceView || 'translated';
+            mdEl.setAttribute('data-force-view', view);
+            try{
+              const b = sh.querySelector('#sx-reader-translate');
+              if (b){ const lab=b.querySelector('.label'); if(lab) lab.textContent = (view==='translated') ? tShowOriginal : tShowTranslation; }
+            }catch{}
+          }
+        }
+      }catch{}
+    }catch{}
+
+    // Prevent scroll chaining: when user continues to scroll at edges, don't scroll page
+    try{
+      const scroller = sh.querySelector('.body');
+      const scrim = sh.querySelector('.scrim');
+      const stopIfEdge = (e)=>{
+        if (!scroller) return;
+        const dy = e.deltaY || 0;
+        const atTop = scroller.scrollTop <= 0;
+        const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+        // Always stop propagation so it never reaches the page
+        if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+        else { e.stopPropagation(); }
+      };
+      // Wheel (mouse/trackpad/autoscroll)
+      sh.addEventListener('wheel', stopIfEdge, { passive:false, capture:true });
+      // Touch: block when at edges
+      let lastY = 0;
+      sh.addEventListener('touchstart', (e)=>{ try{ lastY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }catch{} }, { passive:true, capture:true });
+      sh.addEventListener('touchmove', (e)=>{
+        try{
+          if (!scroller || !e.touches || !e.touches[0]) return;
+          const y = e.touches[0].clientY; const dy = lastY ? (lastY - y) : 0; // positive dy means scroll down
+          const atTop = scroller.scrollTop <= 0;
+          const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+          if ((dy < 0 && atTop) || (dy > 0 && atBottom)) { e.preventDefault(); e.stopPropagation(); }
+          else { e.stopPropagation(); }
+          lastY = y;
+        }catch{}
+      }, { passive:false, capture:true });
+      // Also absorb wheel on scrim area so background never scrolls while overlay is open
+      scrim?.addEventListener('wheel', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
+      scrim?.addEventListener('touchmove', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false });
+    }catch{}
+
+    // Translate action with provider dropdown (free worker or settings AI), progressive per-block replace and final toggle
+    try{
+      const btn = root.querySelector('#sx-reader-translate');
+      const sel = root.querySelector('#sx-reader-provider');
+      const selOpt2 = root.querySelector('#sx-reader-provider-s2');
+      function settingsProviderLabel(ai){
+        const zh = {
+          openai: '使用设置中的 ChatGPT 进行翻译',
+          deepseek: '使用设置中的 DeepSeek 进行翻译',
+          trial: '使用试用服务进行翻译',
+          custom: '使用自定义服务进行翻译'
+        };
+        const en = {
+          openai: 'Use Settings: ChatGPT',
+          deepseek: 'Use Settings: DeepSeek',
+          trial: 'Use Settings: Trial',
+          custom: 'Use Settings: Custom'
+        };
+        const map = (currentLangCache==='en') ? en : zh;
+        const k = (ai==='openai'||ai==='deepseek'||ai==='trial'||ai==='custom') ? ai : 'trial';
+        return map[k];
+      }
+      let providerMode = 'free';
+      (async () => {
+        try{
+          const got = await chrome.storage.sync.get({ reader_translate_provider: 'free' });
+          providerMode = (got?.reader_translate_provider === 'settings') ? 'settings' : 'free';
+          if (sel) sel.value = providerMode;
+          // Also set the label of the Settings option based on current settings.aiProvider
+          try{
+            const st = await chrome.storage.sync.get({ aiProvider: 'trial' });
+            const ai = st?.aiProvider || 'trial';
+            if (selOpt2) selOpt2.textContent = settingsProviderLabel(ai);
+            sel?.setAttribute('title', providerMode==='free' ? tProviderLblFree : settingsProviderLabel(ai));
+          }catch{}
+        }catch{}
+      })();
+      sel?.addEventListener('change', async ()=>{
+        try{
+          providerMode = (sel.value === 'settings') ? 'settings' : 'free';
+          await chrome.storage.sync.set({ reader_translate_provider: providerMode });
+          if (selOpt2){
+            const st = await chrome.storage.sync.get({ aiProvider: 'trial' });
+            const ai = st?.aiProvider || 'trial';
+            selOpt2.textContent = settingsProviderLabel(ai);
+          }
+        }catch{}
+      });
+      if (btn){
+        let inProgress = false;
+        let allDone = !!(__readerTransCache && readerCacheMatches(title, markdown) && __readerTransCache.done);
+        const mdEl = sh.getElementById('sx-reader-md');
+        const blocks = Array.isArray(sh.__sxReaderBlocks) ? sh.__sxReaderBlocks.slice(0) : [];
+        const btnFill = btn.querySelector('.fill');
+        const overallTotal = blocks.length;
+        const preDoneBase = (readerCacheMatches(title, markdown) ? readerCacheCountDone() : 0);
+        function setProgressPct(pct, doneText){
+          try{
+            if (!btnFill) return;
+            const v = Math.max(0, Math.min(100, Math.round(pct)));
+            btnFill.style.width = v + '%';
+            btn.setAttribute('aria-valuenow', String(v));
+            if (doneText) btn.setAttribute('title', doneText);
+          }catch{}
+        }
+
+        async function translateBlock(idx, text, targetName){
+          const holder = mdEl?.querySelector(`.blk[data-i="${idx}"]`);
+          if (!holder) return;
+          const tran = holder.querySelector('.tran');
+          const isCode = /^```/.test(String(text||'').trim());
+          if (isCode){
+            // keep code as original
+            const orig = holder.querySelector('.orig');
+            if (tran && orig){ tran.innerHTML = orig.innerHTML; }
+            holder.classList.add('translated');
+            return;
+          }
+          let txt = '';
+          if (providerMode === 'settings'){
+            const res = await chrome.runtime.sendMessage({ type: 'SX_READER_TRANSLATE_BLOCK', text, target: (targetName==='English'?'en':'zh') }).catch(()=> null);
+            if (!res?.ok) throw new Error(res?.error || 'translate failed');
+            txt = String(res.text || '').trim();
+          } else {
+            // Free worker (Gemini via CF)
+            const sys = 'You are a professional translator. Translate faithfully. Preserve Markdown structure (headings, lists, blockquotes, code fences, links, images). Do not add commentary. Output ONLY translated Markdown for THIS BLOCK — no HTML and no extra notes. Keep code fences unchanged.';
+            const user = `Translate the following Markdown block into ${targetName}. Return ONLY the translated Markdown for this block.\n\n<<<BLOCK>>>\n${text}\n<<<END>>>`;
+            const body = { model: 'models/gemini-2.5-flash', temperature: 0.2, messages: [{ role:'system', content: sys }, { role:'user', content: user }] };
+            const controller = new AbortController();
+            const to = setTimeout(()=>{ try{ controller.abort(); }catch{} }, 180000);
+            const resp = await fetch('https://gemini.mallocfeng1982.win/v1/chat/completions', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: controller.signal });
+            clearTimeout(to);
+            const raw = await resp.text().catch(()=> '');
+            let j={}; try{ j = raw ? JSON.parse(raw) : {}; }catch{}
+            txt = String(j?.choices?.[0]?.message?.content || '').trim();
+            if (!txt){
+              const reason = j?.error?.message || j?.error || j?.message || j?.promptFeedback?.blockReason || (`HTTP ${resp.status}`);
+              console.warn('[Reader Translate] Block failed', { idx, status: resp.status, body: raw });
+              throw new Error(reason || 'empty');
+            }
+            txt = txt.replace(/^\s*<article>\s*/i,'').replace(/\s*<\/article>\s*$/i,'');
+            txt = txt.replace(/^\s*```(?:markdown)?\s*/i,'').replace(/\s*```\s*$/i,'');
+            txt = txt.replace(/^\s*<<<BLOCK>>>\s*/i,'').replace(/\s*<<<END>>>\s*$/i,'');
+          }
+          if (tran){
+            // Render only inner content to avoid nested .md
+            const tmp=document.createElement('div'); tmp.innerHTML = renderMarkdown(txt); const inner = tmp.querySelector('.md');
+            tran.innerHTML = inner ? inner.innerHTML : tmp.innerHTML;
+          }
+          holder.classList.add('translated');
+          // update cache
+          readerCacheSetBlock(idx, txt);
+        }
+
+        btn.addEventListener('click', async ()=>{
+          if (inProgress) return;
+          if (allDone){
+            // Toggle view
+            const cur = mdEl?.getAttribute('data-force-view') || 'translated';
+            const next = (cur === 'translated') ? 'original' : 'translated';
+            mdEl?.setAttribute('data-force-view', next);
+            try{ const lab=btn.querySelector('.label'); if(lab) lab.textContent = (next === 'translated') ? tShowOriginal : tShowTranslation; }catch{}
+            try{ if (__readerTransCache) __readerTransCache.forceView = next; }catch{}
+            return;
+          }
+          inProgress = true;
+          try{ btn.classList.add('busy'); btn.setAttribute('disabled','true'); btn.querySelector('.label').textContent = tLblWorking; }catch{}
+          try{ setProgressPct((preDoneBase/Math.max(1,overallTotal))*100, `${preDoneBase}/${overallTotal}`); }catch{}
+          try{
+            // target language
+            let outLang = 'zh';
+            try{
+              const got = await chrome.storage.sync.get({ output_lang: 'zh' });
+              const v = String(got?.output_lang || 'zh').toLowerCase();
+              outLang = (v==='en' || v==='english' || v==='en-us') ? 'en' : 'zh';
+            }catch{}
+            const targetName = (outLang==='en') ? 'English' : 'Chinese (Simplified)';
+
+            // Build work list skipping cached results
+            readerCacheEnsure(title, markdown, blocks.length);
+            const todo = [];
+            for (let i=0;i<blocks.length;i++){ if (!__readerTransCache.translated[i]) todo.push(i); }
+            if (todo.length === 0){
+              allDone = true;
+              try{ mdEl?.setAttribute('data-force-view', __readerTransCache.forceView || 'translated'); }catch{}
+              try{ const lab=btn.querySelector('.label'); if(lab) lab.textContent = (__readerTransCache.forceView || 'translated') === 'translated' ? tShowOriginal : tShowTranslation; btn.removeAttribute('disabled'); }catch{}
+              return;
+            }
+
+            let done = 0; const total = todo.length;
+            const CONCURRENCY = 3;
+            let nextIndex = 0;
+            async function runWorker(){
+              while(true){
+                const k = nextIndex++;
+                if (k >= total) break;
+                const i = todo[k];
+                const b = blocks[i];
+                try{ await translateBlock(i, b, targetName); }
+                catch(e){ console.warn('Block translate error', i, e); /* keep original */ }
+                finally{
+                  done++;
+                  const doneOverall = preDoneBase + done;
+                  const pct = (doneOverall/Math.max(1,overallTotal))*100;
+                  try{ setProgressPct(pct, `${doneOverall}/${overallTotal}`); }catch{}
+                }
+              }
+            }
+            const workers = Array.from({length: Math.min(CONCURRENCY, Math.max(1,total))}, ()=> runWorker());
+            await Promise.all(workers);
+            allDone = true;
+            try{ if (__readerTransCache){ __readerTransCache.done = true; __readerTransCache.forceView = 'translated'; } }catch{}
+            try{ mdEl?.setAttribute('data-force-view', __readerTransCache?.forceView || 'translated'); }catch{}
+            try{ btn.querySelector('.label').textContent = tShowOriginal; btn.removeAttribute('disabled'); btn.classList.remove('busy'); }catch{}
+            try{ setProgressPct(100, `${overallTotal}/${overallTotal}`); setTimeout(()=>{ try{ setProgressPct(0, ''); }catch{} }, 400); }catch{}
+          }catch(e){
+            try{ btn.removeAttribute('disabled'); btn.querySelector('.label').textContent = (currentLangCache==='en' ? 'Retry Translate' : '重试翻译'); btn.classList.remove('busy'); }catch{}
+            try{ setProgressPct(0, `0/${overallTotal}`); }catch{}
+            try{ alert((currentLangCache==='en' ? 'Translate failed: ' : '翻译失败：') + (e?.message || String(e))); }catch{}
+          }finally{ inProgress = false; }
+        });
+      }
+    }catch{}
+  }
+
+  async function openReaderOverlay(){
+    // Snapshot current chat geometry to avoid size changes when we return
+    try{
+      const chatCard = shadow.getElementById('sx-chat');
+      const containerEl = shadow.getElementById('sx-container');
+      if (chatCard && containerEl && chatCard.style.display !== 'none'){
+        const rect = chatCard.getBoundingClientRect();
+        const contRect = containerEl.getBoundingClientRect();
+        const left = rect.left - contRect.left + containerEl.scrollLeft;
+        const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+        const custom = chatCard.classList.contains('qa-custom-pos');
+        const rightGap = contRect.right - rect.right;
+        const lastGeom = { custom, left, top, width: rect.width, height: rect.height, rightGap: Math.max(10, Math.round(rightGap)) };
+        const float = chatCard.classList.contains('qa-float');
+        saveQAUIState({ lastGeom, float });
+      }
+    }catch{}
+    // If a PDF is loaded in the sidepanel, build Reader content from the selected PDF pages
+    try{
+      const pdfCard = shadow.getElementById('sx-pdf');
+      const pdfLoaded = !!pdfCard?.__pdfDoc;
+      if (pdfLoaded){
+        // Decide pages from range input or current page
+        let pages = null;
+        try{
+          const pagesInput = pdfCard.__pdfElems?.pagesInput;
+          const parse = pdfCard.__pdfElems?.parsePageRanges;
+          const val = String(pagesInput?.value||'').trim();
+          if (val && typeof parse === 'function'){ pages = parse(val); }
+          // Fallback: robust on-the-fly normalization like Run button
+          if ((!Array.isArray(pages) || pages.length===0) && val){
+            try{
+              const totalPages = pdfCard.__numPages || 1;
+              const norm = val.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+              const out = new Set();
+              norm.split(',').filter(Boolean).forEach(seg=>{
+                const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                if (m){
+                  const a = parseInt(m[1],10);
+                  const b = m[2] ? parseInt(m[2],10) : NaN;
+                  let lo = Number.isFinite(b) ? Math.min(a,b) : a;
+                  let hi = Number.isFinite(b) ? Math.max(a,b) : a;
+                  if (Number.isFinite(lo) && Number.isFinite(hi)){
+                    for (let i=lo;i<=hi;i++){ if (i>=1 && i<=totalPages) out.add(i); }
+                  }
+                }
+              });
+              const arr = Array.from(out).sort((a,b)=>a-b);
+              if (arr.length) pages = arr;
+            }catch{}
+          }
+        }catch{}
+        if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+        // Extract text for the selected pages with enhanced formatting
+        let text = '';
+        try{
+          for (const num of pages){
+            const page = await pdfCard.__pdfDoc.getPage(num);
+            const tc = await page.getTextContent();
+            
+            // Enhanced text extraction with formatting preservation
+            const textItems = [];
+            const pageWidth = page.view[2] - page.view[0]; // Get page width
+            
+            // First pass: collect all text items with their positions
+            for (const item of (tc.items||[])){
+              if (!item || typeof item.str !== 'string' || !item.str.trim()) continue;
+              
+              const str = item.str;
+              const x = item.transform ? item.transform[4] : 0;
+              const y = item.transform ? item.transform[5] : 0;
+              const fontSize = item.transform ? Math.abs(item.transform[0]) : 12;
+              const fontName = item.fontName || '';
+              const width = item.width || 0;
+              
+              textItems.push({
+                str: str,
+                x: x,
+                y: y,
+                fontSize: fontSize,
+                fontName: fontName,
+                width: width
+              });
+            }
+            
+            // Sort by Y position (top to bottom), then by X position (left to right)
+            textItems.sort((a, b) => {
+              const yDiff = Math.abs(a.y - b.y);
+              if (yDiff > 2) return b.y - a.y; // Different lines, sort by Y
+              return a.x - b.x; // Same line, sort by X
+            });
+            
+            // Group items into lines and process formatting
+            const lines = [];
+            let currentLine = [];
+            let lastY = null;
+            
+            for (const item of textItems) {
+              // Check if this is a new line
+              if (lastY !== null && Math.abs(item.y - lastY) > 2) {
+                if (currentLine.length > 0) {
+                  lines.push(currentLine);
+                  currentLine = [];
+                }
+              }
+              currentLine.push(item);
+              lastY = item.y;
+            }
+            if (currentLine.length > 0) {
+              lines.push(currentLine);
+            }
+            
+            // Process each line for formatting and structure
+            const formattedChunks = [];
+            
+            for (const line of lines) {
+              if (line.length === 0) continue;
+              
+              // Detect column structure (left/right layout)
+              const leftItems = [];
+              const rightItems = [];
+              const centerThreshold = pageWidth * 0.4; // 40% from left as threshold
+              
+              for (const item of line) {
+                if (item.x < centerThreshold) {
+                  leftItems.push(item);
+                } else {
+                  rightItems.push(item);
+                }
+              }
+              
+              // Process left and right columns separately
+              const processColumn = (items) => {
+                if (items.length === 0) return '';
+                
+                let columnText = '';
+                let lastX = -1;
+                
+                for (const item of items) {
+                  // Add space if there's a gap between items
+                  if (lastX > 0 && item.x - lastX > 5) {
+                    columnText += ' ';
+                  }
+                  
+                  // Detect formatting
+                  let formattedStr = item.str;
+                  
+                  // Detect superscript/subscript (smaller font size): only wrap short numeric markers
+                  if (item.fontSize < 8) {
+                    const t = String(item.str||'').trim();
+                    if (/^\d{1,3}$/.test(t)) formattedStr = `^${t}^`;
+                    else formattedStr = t || item.str;
+                  }
+                  // Detect heading-like formatting (larger font size)
+                  else if (item.fontSize > 14) {
+                    formattedStr = `**${item.str}**`;
+                  }
+                  // Detect bold-like formatting
+                  else if (item.fontName.toLowerCase().includes('bold') || 
+                           item.fontName.toLowerCase().includes('black')) {
+                    formattedStr = `**${item.str}**`;
+                  }
+                  // Detect italic-like formatting
+                  else if (item.fontName.toLowerCase().includes('italic') || 
+                           item.fontName.toLowerCase().includes('oblique')) {
+                    formattedStr = `*${item.str}*`;
+                  }
+                  
+                  columnText += formattedStr;
+                  lastX = item.x + item.width;
+                }
+                
+                return columnText.trim();
+              };
+              
+              let leftText = processColumn(leftItems);
+              let rightText = processColumn(rightItems);
+
+              // If left looks like a superscripted heading captured (short small-font run before a title), drop it
+              // Example: "^New features available with iOS 26^" — only numeric superscripts should remain
+              if (/\^[^\d^][\s\S]*?\^$/.test(leftText)){
+                leftText = leftText.replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              }
+              if (/\^[^\d^][\s\S]*?\^$/.test(rightText)){
+                rightText = rightText.replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              }
+              
+              // Combine columns with smart superscript handling and artifact filtering
+              let lineText = '';
+              if (leftText && rightText) {
+                // Check if both columns have the same superscript number
+                const leftSupMatch = leftText.match(/\^(\d+)\^/);
+                const rightSupMatch = rightText.match(/\^(\d+)\^/);
+                
+                if (leftSupMatch && rightSupMatch && leftSupMatch[1] === rightSupMatch[1]) {
+                  // Same superscript in both columns, keep only one
+                  const supNum = leftSupMatch[1];
+                  const cleanLeft = leftText.replace(/\^\d+\^/g, '').trim();
+                  const cleanRight = rightText.replace(/\^\d+\^/g, '').trim();
+                  lineText = `${cleanLeft} | ${cleanRight} ^${supNum}^`;
+                } else {
+                  // Different or no superscripts, keep both
+                  lineText = `${leftText} | ${rightText}`;
+                }
+                // If one side degenerates into just a small number or punct, drop it
+                if (/^\(?\d{1,3}\)?[\.:]?$/.test(leftText) && rightText.length>2) lineText = rightText;
+                if (/^\(?\d{1,3}\)?[\.:]?$/.test(rightText) && leftText.length>2) lineText = leftText;
+              } else if (leftText) {
+                lineText = leftText;
+              } else if (rightText) {
+                lineText = rightText;
+              }
+              
+              if (lineText.trim()) {
+                formattedChunks.push(lineText.trim());
+              }
+            }
+            
+            // Post-process to improve formatting
+            const processedChunks = [];
+            for (let i = 0; i < formattedChunks.length; i++) {
+              let chunk = String(formattedChunks[i]||'').trim();
+              
+              // Clean up excessive bold/italic markers
+              chunk = chunk.replace(/\*\*\*\*/g, '').replace(/\*\*\*/g, '**');
+              
+              // Handle isolated numbers (likely page numbers/figure labels)
+              if (/^\(?\d{1,3}\)?[\.:]?$/.test(chunk)) {
+                // Skip isolated small numbers (likely page numbers or footnotes)
+                continue;
+              }
+              
+              // Clean up duplicate superscript markers
+              chunk = chunk.replace(/\^\^/g, '^');
+              
+              // Handle superscript numbers (footnotes, references) - already handled with ^ markers
+              
+              // Detect and format list items (avoid false positives like single-digit artifacts)
+              if (/^\d{1,2}[\.\)]\s/.test(chunk)) {
+                // Numbered list
+                chunk = `- ${chunk.replace(/^\d{1,2}[\.\)]\s/, '')}`;
+              } else if (chunk.match(/^[•·▪▫‣⁃]\s/)) {
+                // Bullet list
+                chunk = `- ${chunk.replace(/^[•·▪▫‣⁃]\s/, '')}`;
+              } else if (chunk.match(/^[-*]\s/)) {
+                // Already formatted list
+                chunk = chunk;
+              }
+              
+              // Detect potential headings (short lines with bold formatting)
+              if (chunk.match(/^\*\*[^*]+\*\*$/) && chunk.length < 100) {
+                // Convert to proper heading
+                chunk = chunk.replace(/^\*\*(.+)\*\*$/, '### $1');
+              }
+              
+              // Detect potential code blocks or technical content
+              if (chunk.match(/^[A-Z_][A-Z0-9_]*\s*[=:]/) || 
+                  chunk.match(/^[a-z]+\.[a-z]+\(/) ||
+                  chunk.match(/^[A-Z][a-z]+[A-Z][a-z]+/) ||
+                  chunk.match(/^[0-9]+\.[0-9]+\.[0-9]+/)) {
+                chunk = `\`${chunk}\``;
+              }
+              
+              // Detect URLs and email addresses
+              chunk = chunk.replace(/(https?:\/\/[^\s]+)/g, '[$1]($1)');
+              chunk = chunk.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '[$1](mailto:$1)');
+              
+              // Detect potential quotes or emphasized text
+              if (chunk.match(/^[""''].*[""'']$/) && chunk.length > 10) {
+                chunk = `> ${chunk.replace(/^[""''](.*)[""'']$/, '$1')}`;
+              }
+              
+              // Clean up column separators that might be too prominent
+              chunk = chunk.replace(/\s*\|\s*/g, ' | ');
+              
+              // Clean up duplicate superscripts in column separators
+              chunk = chunk
+                // numeric duplicates around column pipe
+                .replace(/\^(\d{1,3})\^\s*\|\s*\^\1\^/g, '^$1^')
+                // numeric duplicates separated by spaces
+                .replace(/\^(\d{1,3})\^\s+\^\1\^/g, '^$1^')
+                // remove non-numeric caret-wrapped texts mistakenly marked
+                .replace(/\^([^\d^][\s\S]*?)\^/g, '$1');
+              
+              // Only add non-empty chunks
+              if (chunk.trim()) {
+                processedChunks.push(chunk);
+              }
+            }
+            
+            if (processedChunks.length){
+              if (text) text += '\n\n';
+              text += (currentLangCache==='en'?`## Page ${num}`:`## 第 ${num} 页`) + '\n\n' + processedChunks.join('\n\n');
+            }
+          }
+        }catch{}
+        const pdfTitle = pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档');
+        const mdFromPdf = text; // let createReaderOverlay add the title once
+        if (mdFromPdf && mdFromPdf.trim()){
+          createReaderOverlay(mdFromPdf, pdfTitle);
+          try{ host.style.display='none'; }catch{}
+          return;
+        }
+      }
+    }catch{}
+
+    const data = await fetchReadable();
+    const md = data?.markdown || '';
+    const title = data?.title || '';
+    createReaderOverlay(md, title);
+    // hide sidepanel while reading
+    try{ host.style.display='none'; }catch{}
+  }
 
   // 关闭 notice 清理
   shadow.addEventListener('click',(e)=>{
@@ -1808,22 +3764,763 @@
       const t_app = currentLangCache==='zh'?'麦乐可 AI 摘要阅读器':'SummarizerX AI Reader';
       const t_set = currentLangCache==='zh'?'设置':'Settings';
       const t_run = currentLangCache==='zh'?'提取并摘要':'Extract & Summarize';
+      const t_qa_title = currentLangCache==='zh'?'你问我答':'Q&A';
+      const t_qa_ph = currentLangCache==='zh'?'基于当前网页提问…':'Ask about this page…';
+      const t_qa_send = currentLangCache==='zh'?'发送':'Send';
       const t_close = currentLangCache==='zh'?'关闭':'Close';
       const t_appear = currentLangCache==='zh'?'外观':'Appearance';
       const t_force_dark = currentLangCache==='zh'?'强制深色':'Force Dark';
+      const t_note_label = currentLangCache==='zh'?'注意事项':'Notes';
       const t_note = currentLangCache==='zh'?'注：部分页面（如 chrome://、扩展页、PDF 查看器）不支持注入。':'Note: Some pages (like chrome://, extension pages, PDF viewers) do not support injection.';
+      const t_pick = currentLangCache==='zh'?'隐藏元素':'Hide element';
+      const t_pick_tt = currentLangCache==='zh'?'选择页面元素并生成隐藏规则':'Pick a page element and create a hide rule';
       shadow.getElementById('sx-app-title').textContent = t_app;
       const runBtn=shadow.getElementById('sx-run'); if(runBtn && !runBtn.disabled) runBtn.textContent=t_run;
       const settingsBtn=shadow.getElementById('sx-settings'); if(settingsBtn){ settingsBtn.textContent=t_set; settingsBtn.title=t_set; }
       const closeBtn=shadow.getElementById('sx-close'); if(closeBtn){ closeBtn.title=t_close; closeBtn.setAttribute('aria-label', t_close); }
       shadow.getElementById('sx-theme-label').textContent=t_appear;
       shadow.getElementById('sx-force-dark-label').textContent=t_force_dark;
-      shadow.getElementById('sx-footer-note').textContent=t_note;
+      const pickLbl=shadow.getElementById('sx-pick-label'); if (pickLbl) { pickLbl.textContent=t_pick; }
+      const pickBtn=shadow.getElementById('sx-pick-btn'); if (pickBtn) { pickBtn.title=t_pick_tt; pickBtn.setAttribute('aria-label', t_pick); }
+      try{ await updateAdblockIndicator(shadow); }catch{}
+      // Reader icon tooltip text
+      try{
+        ensureReaderIndicatorTooltip(shadow);
+        const rid = shadow.getElementById('sx-reader-ind');
+        const tip = rid?.querySelector('.reader-tip');
+        const txt = currentLangCache==='en' ? 'Click to open Reader mode' : '点击切换到阅读模式';
+        if (tip) tip.textContent = txt;
+        try{ rid?.removeAttribute('title'); }catch{}
+        rid?.setAttribute('aria-label', currentLangCache==='en' ? 'Reader mode' : '阅读模式');
+      }catch{}
+      // PDF icon tooltip text
+      try{
+        ensurePdfIndicatorTooltip(shadow);
+        const pid = shadow.getElementById('sx-pdf-ind');
+        const tip = pid?.querySelector('.reader-tip');
+        const txt = currentLangCache==='en' ? 'Import a PDF and preview page 1' : '导入 PDF 并预览第 1 页';
+        if (tip) tip.textContent = txt;
+        try{ pid?.removeAttribute('title'); }catch{}
+        pid?.setAttribute('aria-label', currentLangCache==='en' ? 'Import PDF' : '导入 PDF');
+      }catch{}
+      const qaRestore=shadow.getElementById('sx-qa-restore'); if (qaRestore) qaRestore.title = (currentLangCache==='en' ? 'Show Q&A' : '显示你问我答');
+      // Sync quick-ask heading language if present
+      try{
+        const qaTitle = shadow.querySelector('.quick-ask .title');
+        if (qaTitle) qaTitle.textContent = (currentLangCache==='en'?'You might ask:':'猜你想问：');
+      }catch{}
+      const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
+      const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
+      const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
       shadow.getElementById('sx-summary').setAttribute('data-title', currentLangCache==='zh'?'摘要':'Summary');
       shadow.getElementById('sx-cleaned').setAttribute('data-title', currentLangCache==='zh'?'可读正文':'Readable Content');
+      try { shadow.getElementById('sx-pdf')?.setAttribute('data-title', currentLangCache==='zh'?'PDF 预览':'PDF Preview'); } catch {}
+      try { shadow.getElementById('sx-chat').setAttribute('data-title', t_qa_title); } catch {}
+      try { const i=shadow.getElementById('sx-qa-input'); if(i) i.placeholder=t_qa_ph; } catch {}
+      try { const b=shadow.getElementById('sx-qa-send'); if(b) b.textContent=t_qa_send; } catch {}
+      try { const u=shadow.getElementById('sx-qa-url'); if(u){ u.textContent=location.href; u.title=location.href; } } catch {}
     }catch(e){ console.warn('Failed to update UI text:', e); }
     try{ updateEmptyArrowPosition(); }catch{}
     try{ ensureShareButton(shadow); }catch{}
+  }
+
+  async function updateAdblockIndicator(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      // ensure tooltip exists before updating text
+      ensureAdblockIndicatorTooltip(shadow);
+      const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+      const enabled = !!adblock_enabled;
+      el.classList.toggle('on', enabled);
+      const txt = currentLangCache==='en' ? (enabled ? 'Ad filtering: On' : 'Ad filtering: Off') : (enabled ? '广告过滤：已开启' : '广告过滤：未开启');
+      // Use custom tooltip instead of native title (faster, larger)
+      try{ const tip = el.querySelector('.adf-tip'); if (tip) tip.textContent = txt; }catch{}
+      try{ el.removeAttribute('title'); }catch{}
+      el.setAttribute('aria-label', txt);
+      el.setAttribute('aria-checked', enabled ? 'true':'false');
+    }catch{}
+  }
+
+  function bindAdblockIndicatorToggle(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      const toggle = async ()=>{
+        if (summarizing) return; // Block during processing
+        try{
+          const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
+          const next = !adblock_enabled;
+          await chrome.storage.sync.set({ adblock_enabled: next });
+          // Optimistic UI: update immediately
+          await updateAdblockIndicator(shadow);
+        }catch(e){ console.warn('toggle adblock failed', e); }
+      };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); toggle(); } });
+    }catch{}
+  }
+
+  function ensureAdblockIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-adf-ind'); if (!el) return;
+      let tip = el.querySelector('.adf-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'adf-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        // Hover/focus show quickly; hide quickly on leave/blur
+        let showTid = null, hideTid = null;
+        const show = ()=>{
+          try{ clearTimeout(hideTid); }catch{}
+          showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120);
+        };
+        const hide = ()=>{
+          try{ clearTimeout(showTid); }catch{}
+          hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60);
+        };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
+    }catch{}
+  }
+
+  function ensureReaderIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-reader-ind'); if (!el) return;
+      let tip = el.querySelector('.reader-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'reader-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        let showTid = null, hideTid = null;
+        const show = ()=>{ try{ clearTimeout(hideTid); }catch{} showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120); };
+        const hide = ()=>{ try{ clearTimeout(showTid); }catch{} hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60); };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
+    }catch{}
+  }
+
+  function ensurePdfIndicatorTooltip(shadow){
+    try{
+      const el = shadow.getElementById('sx-pdf-ind'); if (!el) return;
+      let tip = el.querySelector('.reader-tip');
+      if (!tip){
+        tip = document.createElement('div'); tip.className = 'reader-tip'; tip.setAttribute('role','tooltip');
+        el.appendChild(tip);
+        let showTid = null, hideTid = null;
+        const show = ()=>{ try{ clearTimeout(hideTid); }catch{} showTid = setTimeout(()=>{ try{ tip.classList.add('on'); }catch{} }, 120); };
+        const hide = ()=>{ try{ clearTimeout(showTid); }catch{} hideTid = setTimeout(()=>{ try{ tip.classList.remove('on'); }catch{} }, 60); };
+        el.addEventListener('mouseenter', show);
+        el.addEventListener('mouseleave', hide);
+        el.addEventListener('focus', show);
+        el.addEventListener('blur', hide);
+      }
+      const txt = currentLangCache==='en' ? 'Import a PDF and preview page 1' : '导入 PDF 并预览第 1 页';
+      tip.textContent = txt;
+      try{ el.removeAttribute('title'); }catch{}
+      el.setAttribute('aria-label', currentLangCache==='en' ? 'Import PDF' : '导入 PDF');
+    }catch{}
+  }
+
+  async function openPdfPanel(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      // Record whether summary/cleaned currently have meaningful content, so we can restore after PDF closes
+      try{
+        const sumEl = shadow.getElementById('sx-summary');
+        const clnEl = shadow.getElementById('sx-cleaned');
+        const hasSkel = !!(sumEl?.querySelector('.skl') || clnEl?.querySelector('.skl'));
+        const sumTextLen = (sumEl ? String(sumEl.textContent||'').replace(/\s+/g,'').length : 0);
+        const clnTextLen = (clnEl ? String(clnEl.textContent||'').replace(/\s+/g,'').length : 0);
+        shadow.__sxHadCardsBeforePdf = !hasSkel && (sumTextLen > 20 || clnTextLen > 20);
+      }catch{}
+      // hide others to create a focused interface
+      try{ shadow.getElementById('sx-chat').style.display = 'none'; }catch{}
+      try{ shadow.getElementById('sx-summary').style.display = 'none'; }catch{}
+      try{ shadow.getElementById('sx-cleaned').style.display = 'none'; }catch{}
+      // build once
+      if (!card.__built){ buildPdfPanel(card); card.__built = true; }
+      card.style.display = '';
+      try{ updateRunButtonState(shadow); }catch{}
+
+      // If sidepanel is folded, expand it similarly to summarize flow
+      const wrapEl = shadow.getElementById('sx-wrap');
+      const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
+      try{
+        if (wasEmpty){
+          wrapEl.classList.remove('fx-intro');
+          wrapEl.classList.add('expanding');
+          const container = shadow.getElementById('sx-container');
+          const wrapRect = wrapEl.getBoundingClientRect();
+          const appbar = shadow.querySelector('.appbar');
+          const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
+          const appH = appbar ? appbar.getBoundingClientRect().height : 0;
+          const footH = footer ? footer.getBoundingClientRect().height : 0;
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
+          container.style.willChange = 'height';
+          container.style.contain = 'layout style';
+          container?.style.setProperty('--sx-target', target + 'px');
+          let done = false; const finish = ()=>{
+            if (done) return; done = true;
+            try{
+              wrapEl.classList.remove('is-empty');
+              wrapEl.classList.remove('expanding');
+              card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 700);
+              try{ updateEmptyArrowPosition(); }catch{}
+            }catch{}
+          };
+          container?.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 900);
+        } else {
+          // play subtle pull-in when already expanded
+          card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 700);
+        }
+      }catch{}
+
+      // scroll into view after potential expand
+      try{ card.scrollIntoView({ behavior:'smooth', block:'start' }); }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch(e){ console.warn('openPdfPanel failed', e); }
+  }
+
+  function collapseSidepanelToInitial(){
+    try{
+      const wrapEl = shadow.getElementById('sx-wrap');
+      const container = shadow.getElementById('sx-container');
+      if (!wrapEl || !container) return;
+      // Prepare for smooth collapse: lock current height as start value
+      const curH = container.getBoundingClientRect().height;
+      wrapEl.classList.add('is-empty');
+      wrapEl.classList.add('expanding');
+      container.style.willChange = 'height';
+      container.style.contain = 'layout style';
+      container.style.setProperty('--sx-target', Math.max(0, Math.round(curH)) + 'px');
+      // next frame: set target to collapsed height (66px defined in CSS)
+      requestAnimationFrame(()=>{
+        try{
+          container.style.setProperty('--sx-target', '66px');
+          const finish = ()=>{
+            try{
+              wrapEl.classList.remove('expanding');
+              // keep is-empty to retain collapsed state
+              updateEmptyArrowPosition();
+            }catch{}
+          };
+          container.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 700);
+        }catch{}
+      });
+    }catch{}
+  }
+
+  function hidePdfPanel(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      // remove resize listener if any
+      try{ if (card.__onResize) window.removeEventListener('resize', card.__onResize); }catch{}
+      try{ if (card.__unbindDnD) { card.__unbindDnD(); card.__unbindDnD = null; } }catch{}
+      // hide card
+      card.style.display = 'none';
+      // If we had existing summary/cleaned content before opening PDF, restore them and keep sidepanel open
+      const hadCards = !!shadow.__sxHadCardsBeforePdf;
+      if (hadCards){
+        try{ const s = shadow.getElementById('sx-summary'); if (s) s.style.display=''; }catch{}
+        try{ const c = shadow.getElementById('sx-cleaned'); if (c) c.style.display=''; }catch{}
+        try{ const wrapEl = shadow.getElementById('sx-wrap'); wrapEl?.classList?.remove('is-empty'); }catch{}
+        try{ updateEmptyArrowPosition(); }catch{}
+      } else {
+        // Otherwise fold back to initial state like first open
+        collapseSidepanelToInitial();
+      }
+      // restore QA placeholder and URL to page context
+      try{
+        const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this page…':'基于当前网页提问…'); }
+        const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = location.href; qu.title = location.href; }
+      }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch{}
+  }
+
+  function buildPdfPanel(card){
+    try{
+      const t_close = currentLangCache==='en'?'Close':'关闭';
+      const t_hint = currentLangCache==='en'?'Drop a PDF here, or click to choose':'拖放 PDF 到此，或点击选择';
+      card.innerHTML = `
+        <div class="card-tools"><button id="sx-pdf-close" class="tbtn" title="${t_close}">${t_close}</button></div>
+        <div class="pdf-panel" id="sx-pdf-panel">
+          <div class="pdf-dropzone" id="sx-pdf-dropzone" tabindex="0">
+            <div class="pdf-drop-hint" id="sx-pdf-hint">${t_hint}</div>
+            <input type="file" id="sx-pdf-input" accept="application/pdf" style="display:none" />
+            <div style="margin-top:8px">
+              <button id="sx-pdf-load-url" class="tbtn" type="button" style="display:none"></button>
+            </div>
+          </div>
+          <div class="pdf-error" id="sx-pdf-range-error" role="alert" style="display:none"></div>
+          <div class="pdf-toolbar" id="sx-pdf-toolbar" style="display:none">
+            <button class="tbtn pdf-nav-btn" id="sx-pdf-prev" type="button" aria-label="${currentLangCache==='en'?'Previous page':'上一页'}" title="${currentLangCache==='en'?'Previous page':'上一页'}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="tbtn pdf-nav-btn" id="sx-pdf-next" type="button" aria-label="${currentLangCache==='en'?'Next page':'下一页'}" title="${currentLangCache==='en'?'Next page':'下一页'}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="sep" aria-hidden="true"></span>
+            <label for="sx-pdf-page" class="pdf-page-label">${currentLangCache==='en'?'Page:':'页码：'}</label>
+            <input id="sx-pdf-page" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            <span class="pdf-page-total">/ <span id="sx-pdf-total">1</span></span>
+            <span class="sep" aria-hidden="true"></span>
+            <label for="sx-pdf-pages" class="pdf-pages-label">${currentLangCache==='en'?'Range:':'范围：'}</label>
+            <input id="sx-pdf-pages" type="text" placeholder="${currentLangCache==='en'?'e.g., 1-3,5':'例如: 1-3,5'}" />
+          </div>
+          <div class="pdf-view" id="sx-pdf-view" style="display:none">
+            <canvas id="sx-pdf-canvas"></canvas>
+          </div>
+          <div class="pdf-error" id="sx-pdf-error" role="alert" style="display:none"></div>
+        </div>
+      `;
+      const closeBtn = card.querySelector('#sx-pdf-close');
+      closeBtn?.addEventListener('click', hidePdfPanel);
+      const drop = card.querySelector('#sx-pdf-dropzone');
+      const input = card.querySelector('#sx-pdf-input');
+      const toolbar = card.querySelector('#sx-pdf-toolbar');
+      const prevBtn = card.querySelector('#sx-pdf-prev');
+      const nextBtn = card.querySelector('#sx-pdf-next');
+      const pageInput = card.querySelector('#sx-pdf-page');
+      const totalSpan = card.querySelector('#sx-pdf-total');
+      const pagesInput = card.querySelector('#sx-pdf-pages');
+      const loadUrlBtn = card.querySelector('#sx-pdf-load-url');
+      const view = card.querySelector('#sx-pdf-view');
+      const canvas = card.querySelector('#sx-pdf-canvas');
+      const err = card.querySelector('#sx-pdf-error');
+      const rangeErr = card.querySelector('#sx-pdf-range-error');
+      const hint = card.querySelector('#sx-pdf-hint');
+
+      // expose for other handlers
+      card.__pdfElems = { drop, input, toolbar, prevBtn, nextBtn, pageInput, totalSpan, pagesInput, loadUrlBtn, view, canvas, err, rangeErr, hint };
+      try{ card.__pdfElems.parsePageRanges = parsePageRanges; }catch{}
+      card.__input = input;
+
+      const showErr = (msg)=>{ try{ err.textContent = msg; err.style.display=''; }catch{} };
+      const clearErr = ()=>{ try{ err.textContent=''; err.style.display='none'; }catch{} };
+      const setTitle = (txt)=>{ try{ card.setAttribute('data-title', txt); }catch{} };
+
+      const updateControls = ()=>{
+        try{
+          const num = card.__pageNum||1, total = card.__numPages||1;
+          if (pageInput) pageInput.value = String(num);
+          if (totalSpan) totalSpan.textContent = String(total);
+          if (prevBtn) prevBtn.disabled = num<=1;
+          if (nextBtn) nextBtn.disabled = num>=total;
+        }catch{}
+      };
+
+      const parsePageRanges = (txt)=>{
+        try{
+          const total = card.__numPages||1;
+          let s = String(txt||'').trim(); if (!s) return null; // null => use current page
+          // Normalize common CJK punctuation and dash variants
+          s = s.replace(/[、，]/g, ',');
+          const out = new Set();
+          s.split(/[,]/).map(x=>x.trim()).filter(Boolean).forEach(seg=>{
+            // remove spaces inside and normalize range separators (ASCII hyphen, en/em dashes, fullwidth minus, tildes, 至/到)
+            let norm = seg.replace(/\s+/g,'').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-');
+            const m = norm.match(/^(\d+)-(\d+)$/);
+            if (m){
+              let a = parseInt(m[1],10), b = parseInt(m[2],10);
+              if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+              if (a>b) [a,b] = [b,a];
+              for (let i=a; i<=b; i++){ if (i>=1 && i<=total) out.add(i); }
+            } else {
+              const n = parseInt(norm,10); if (Number.isFinite(n) && n>=1 && n<=total) out.add(n);
+            }
+          });
+          return Array.from(out).sort((a,b)=>a-b);
+        }catch{ return []; }
+      };
+
+      const renderPage = async (num)=>{
+        clearErr();
+        try{
+          if (!card.__pdfDoc) return;
+          // Cancel any ongoing render
+          try{ card.__renderTask?.cancel(); }catch{}
+          const pdf = card.__pdfDoc;
+          const page = await pdf.getPage(num);
+          // compute scale to fit width
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const containerWidth = Math.max(320, card.clientWidth - 28);
+          const viewport0 = page.getViewport({ scale: 1 });
+          const scale = Math.max(0.5, Math.min(3.0, containerWidth / viewport0.width));
+          const viewport = page.getViewport({ scale });
+          const ctx = canvas.getContext('2d', { alpha:false });
+          canvas.width = Math.floor(viewport.width * dpr);
+          canvas.height = Math.floor(viewport.height * dpr);
+          canvas.style.width = Math.floor(viewport.width) + 'px';
+          canvas.style.height = Math.floor(viewport.height) + 'px';
+          const renderContext = { canvasContext: ctx, viewport, transform: dpr !== 1 ? [dpr,0,0,dpr,0,0] : undefined };
+          const task = page.render(renderContext);
+          card.__renderTask = task;
+          await task.promise;
+          card.__pageNum = num;
+          updateControls();
+        }catch(e){
+          if (e && e.name === 'RenderingCancelledException') return;
+          showErr((currentLangCache==='en'?'Failed to render page: ':'渲染页面失败：') + (e?.message||e));
+        }
+      };
+
+      const gotoPage = async (num)=>{
+        try{ expandPdfCard(); }catch{}
+        const total = card.__numPages||1;
+        if (num < 1 || num > total){
+          showErr(currentLangCache==='en' ? `Page out of range (1-${total})` : `页码超出范围（1-${total}）`);
+          updateControls();
+          return;
+        }
+        await renderPage(num);
+        try{ view.style.display = ''; }catch{}
+        try{ toolbar.style.display = ''; }catch{}
+        try{ updateRunButtonState(shadow); }catch{}
+      };
+
+      // When range has value, disable single page input; re-enable when cleared
+      let rangeGotoTid = null;
+      const updatePageInputState = ()=>{
+        try{
+          const hasRange = !!(pagesInput && String(pagesInput.value||'').trim());
+          if (pageInput){
+            pageInput.disabled = hasRange;
+            pageInput.setAttribute('aria-disabled', hasRange ? 'true' : 'false');
+            pageInput.title = hasRange ? (currentLangCache==='en'?'Disabled when Range is filled':'填写范围时禁用页码') : '';
+          }
+          // If range present and a PDF is loaded, preview the first page in the range
+          try{ clearTimeout(rangeGotoTid); }catch{}
+          if (hasRange && card.__pdfDoc){
+            const arr = parsePageRanges(pagesInput.value);
+            if (Array.isArray(arr) && arr.length){
+              rangeGotoTid = setTimeout(()=>{ try{ gotoPage(arr[0]); }catch{} }, 240);
+            }
+          }
+        }catch{}
+      };
+      pagesInput?.addEventListener('input', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } updateRunButtonState(shadow); }catch{} });
+      pagesInput?.addEventListener('change', ()=>{ updatePageInputState(); try{ const re = card.__pdfElems?.rangeErr; if (re){ re.textContent=''; re.style.display='none'; } const ee = card.__pdfElems?.err; if (ee){ ee.textContent=''; ee.style.display='none'; } const arr = parsePageRanges(pagesInput.value); if (Array.isArray(arr) && arr.length) gotoPage(arr[0]); updateRunButtonState(shadow); }catch{} });
+      updatePageInputState();
+
+      // Disable Run while PDF is loading (before a document is set)
+      try{ updateRunButtonState(shadow); }catch{}
+
+      const handleFiles = async (file)=>{
+        clearErr();
+        if (!file){ showErr(currentLangCache==='en'?'No file selected':'未选择文件'); return; }
+        if (!/\.pdf($|\?)/i.test(file.name) && file.type !== 'application/pdf'){
+          showErr(currentLangCache==='en'?'Please choose a PDF file':'请选择 PDF 文件'); return;
+        }
+        try{
+          const ab = await file.arrayBuffer();
+          card.__pdfName = file?.name || 'document.pdf';
+          try{ const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this PDF…':'基于当前 PDF 提问…'); } }catch{}
+          try{ const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = (currentLangCache==='en'?'PDF: ':'PDF：') + (card.__pdfName||'document.pdf'); qu.title = qu.textContent; } }catch{}
+          // Lazy import pdf.js
+          let pdfjs;
+          try{
+            pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs'));
+          }catch(impErr){
+            showErr((currentLangCache==='en'?'Failed to load PDF library: ':'加载 PDF 库失败：') + (impErr?.message||impErr));
+            return;
+          }
+          try{
+            // Set worker src (requires vendor/pdfjs/pdf.worker.mjs to exist)
+            pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs');
+          }catch{}
+          const loadingTask = pdfjs.getDocument({ data: ab });
+          const pdf = await loadingTask.promise;
+          card.__pdfDoc = pdf;
+          card.__pageNum = 1;
+          card.__numPages = pdf.numPages || 1;
+          try{ toolbar.style.display = ''; }catch{}
+          try{ view.style.display = ''; }catch{}
+          setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览');
+          updateControls();
+          await renderPage(1);
+          try{ updateRunButtonState(shadow); }catch{}
+          try{
+            const msg = currentLangCache==='en'
+              ? 'Use the toolbar to flip pages. After selecting the page or range, click "Extract & Summarize" to analyze.'
+              : '使用上/下一页或输入页码翻页。完成页码或范围选择后，点击“提取并摘要”按钮进行内容分析。';
+            hint.textContent = msg;
+          }catch{}
+        }catch(e){
+          // common worker error hint
+          const needWorker = /GlobalWorkerOptions\.workerSrc|WorkerMessageHandler|worker/i.test(e?.message||'');
+          if (needWorker){
+            showErr(currentLangCache==='en'?
+              'Missing pdf.worker.mjs. Please add vendor/pdfjs/pdf.worker.mjs to the extension.' :
+              '缺少 pdf.worker.mjs。请将文件复制到 vendor/pdfjs/pdf.worker.mjs 后重试。');
+          }else{
+            showErr((currentLangCache==='en'?'Failed to render PDF: ':'渲染 PDF 失败：') + (e?.message||e));
+          }
+        }
+      };
+
+      drop?.addEventListener('click', (ev)=>{ try{ if (ev && ev.target && ev.target.closest && ev.target.closest('#sx-pdf-load-url')) return; }catch{} input?.click(); });
+      input?.addEventListener('change', ()=>{ const f = input.files && input.files[0]; if (f) handleFiles(f); });
+      // Robust DnD: handle enter/over/leave/drop and also capture at host to prevent page navigation
+      const onEnter = (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }catch{} };
+      const onOver  = (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }catch{} };
+      const onLeave = ()=>{ try{ drop.classList.remove('drag'); }catch{} };
+      const onDrop  = (ev)=>{
+        try{
+          ev.preventDefault(); ev.stopPropagation(); drop.classList.remove('drag');
+          const dt = ev.dataTransfer;
+          const file = dt && dt.files && dt.files[0] ? dt.files[0] : null;
+          if (file) { handleFiles(file); return; }
+          // Fallback: if a URL was dropped and looks like a PDF, try load via URL
+          try{
+            const url = dt?.getData('text/uri-list') || dt?.getData('text/plain') || '';
+            if (/^https?:\/\/.*\.pdf(\b|[?#])/i.test(url)){
+              (async ()=>{
+                let pdfjs; try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch{ return; }
+                try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+                const loadingTask = pdfjs.getDocument({ url });
+                const pdf = await loadingTask.promise;
+                card.__pdfDoc = pdf; card.__pageNum = 1; card.__numPages = pdf.numPages||1; card.__pdfName = (new URL(url)).pathname.split('/').pop()||'document.pdf';
+                try{ toolbar.style.display=''; view.style.display=''; setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览'); updateControls(); await renderPage(1); updateRunButtonState(shadow); }catch{}
+              })();
+            }
+          }catch{}
+        }catch{}
+      };
+      drop?.addEventListener('dragenter', onEnter, { capture:true });
+      drop?.addEventListener('dragover',  onOver,  { capture:true });
+      drop?.addEventListener('dragleave', onLeave);
+      drop?.addEventListener('drop',      onDrop,  { capture:true });
+
+      // Global capture on window/document to robustly suppress default page navigation when dropping files
+      const globalOver = (ev)=>{
+        try{
+          const path = ev.composedPath ? ev.composedPath() : [];
+          const hit = path && path.indexOf(drop) !== -1;
+          let inside = hit;
+          if (!inside){
+            const r = drop.getBoundingClientRect();
+            const x = ev.clientX, y = ev.clientY;
+            inside = (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
+          }
+          if (inside){ ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; drop.classList.add('drag'); }
+        }catch{}
+      };
+      const globalDrop = (ev)=>{
+        try{
+          const path = ev.composedPath ? ev.composedPath() : [];
+          const hit = path && path.indexOf(drop) !== -1;
+          let inside = hit;
+          if (!inside){
+            const r = drop.getBoundingClientRect();
+            const x = ev.clientX, y = ev.clientY;
+            inside = (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
+          }
+          if (inside){ onDrop(ev); }
+        }catch{}
+      };
+      try{
+        window.addEventListener('dragover', globalOver, { capture:true });
+        window.addEventListener('drop',     globalDrop, { capture:true });
+        document.addEventListener('dragover', globalOver, { capture:true });
+        document.addEventListener('drop',     globalDrop, { capture:true });
+        // Keep a reference for possible cleanup
+        card.__unbindDnD = ()=>{
+          try{ window.removeEventListener('dragover', globalOver, { capture:true }); }catch{}
+          try{ window.removeEventListener('drop',     globalDrop, { capture:true }); }catch{}
+          try{ document.removeEventListener('dragover', globalOver, { capture:true }); }catch{}
+          try{ document.removeEventListener('drop',     globalDrop, { capture:true }); }catch{}
+        };
+      }catch{}
+
+      // Toolbar events
+      prevBtn?.addEventListener('click', ()=>{
+        try{
+          if (pagesInput){ pagesInput.value = ''; }
+          try{ updatePageInputState(); }catch{}
+          gotoPage((card.__pageNum||1) - 1);
+        }catch{}
+      });
+      nextBtn?.addEventListener('click', ()=>{
+        try{
+          if (pagesInput){ pagesInput.value = ''; }
+          try{ updatePageInputState(); }catch{}
+          gotoPage((card.__pageNum||1) + 1);
+        }catch{}
+      });
+      pageInput?.addEventListener('keydown', (ev)=>{
+        try{
+          if (ev.key === 'Enter'){
+            ev.preventDefault();
+            const n = parseInt(pageInput.value, 10);
+            if (Number.isFinite(n)) gotoPage(n); else showErr(currentLangCache==='en'?'Invalid page number':'页码无效');
+          }
+        }catch{}
+      });
+      pageInput?.addEventListener('input', ()=>{ try{ updateRunButtonState(shadow); }catch{} });
+      pageInput?.addEventListener('blur', ()=>{
+        try{
+          const n = parseInt(pageInput.value, 10);
+          if (Number.isFinite(n)) gotoPage(n); else updateControls();
+        }catch{}
+      });
+
+      // Load from current URL when directly viewing a PDF
+      try{
+        const isPdf = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+        if (isPdf && loadUrlBtn){
+          loadUrlBtn.style.display='';
+          loadUrlBtn.textContent = currentLangCache==='en' ? 'Load this PDF (from URL)' : '从当前页面加载 PDF';
+          // On Chrome's built-in PDF viewer page, drag-and-drop to web content is intercepted by the viewer.
+          // Make this explicit in UI and suggest the two supported actions.
+          try{
+            drop.classList.add('dnd-off');
+            const msg = currentLangCache==='en'
+              ? 'Tip: On PDF viewer pages, drag & drop is blocked by the browser. Click the button below or choose a file. After choosing the page or range, click "Extract & Summarize" to analyze the content.'
+              : '提示：浏览器的 PDF 查看器会拦截拖拽。请点击下方按钮“从当前页面加载 PDF”，或点击选择本地文件。完成页码或范围选择后，点击“提取并摘要”按钮完成内容分析。';
+            if (hint) hint.textContent = msg;
+          }catch{}
+          loadUrlBtn.addEventListener('click', async (ev)=>{
+            try{ ev.preventDefault(); ev.stopPropagation(); }catch{}
+            clearErr();
+            try{
+              let pdfjs;
+              try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch(e){ showErr((currentLangCache==='en'?'Failed to load PDF library: ':'加载 PDF 库失败：') + (e?.message||e)); return; }
+              try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+              const loadingTask = pdfjs.getDocument({ url: location.href });
+              const pdf = await loadingTask.promise;
+              card.__pdfDoc = pdf; card.__pageNum = 1; card.__numPages = pdf.numPages||1;
+              card.__pdfName = (location.pathname.split('/').pop()||'document.pdf');
+              try{ toolbar.style.display=''; }catch{}
+              try{ view.style.display=''; }catch{}
+              setTitle(currentLangCache==='en'?'PDF Preview':'PDF 预览');
+              updateControls();
+              await renderPage(1);
+              try{ updateRunButtonState(shadow); }catch{}
+              try{
+                const msg = currentLangCache==='en'
+                  ? 'Use the toolbar to flip pages. After selecting the page or range, click "Extract & Summarize" to analyze.'
+                  : '使用上/下一页或输入页码翻页。完成页码或范围选择后，点击“提取并摘要”按钮进行内容分析。';
+                if (hint) hint.textContent = msg;
+              }catch{}
+            }catch(e){ showErr((currentLangCache==='en'?'Failed to open current PDF: ':'加载当前 PDF 失败：') + (e?.message||e)); }
+          });
+        }
+      }catch{}
+
+      // Re-render on resize to keep width-fit
+      let rtid = null;
+      const onResize = ()=>{
+        try{ clearTimeout(rtid); }catch{}
+        rtid = setTimeout(()=>{ try{ if (card.__pdfDoc && card.style.display !== 'none') renderPage(card.__pageNum||1); }catch{} }, 120);
+      };
+      try{ window.addEventListener('resize', onResize, { passive:true }); card.__onResize = onResize; }catch{}
+
+      // Expand on any user interaction when collapsed
+      const maybeExpand = (ev)=>{
+        try{
+          if (!card.classList.contains('pdf-collapsed')) return;
+          // ignore clicks on the close button
+          if (ev && ev.target && ev.target.closest && ev.target.closest('#sx-pdf-close')) return;
+          expandPdfCard();
+        }catch{}
+      };
+      try{ card.addEventListener('click', maybeExpand); }catch{}
+      try{ card.addEventListener('focusin', maybeExpand); }catch{}
+    }catch(e){ console.warn('buildPdfPanel failed', e); }
+  }
+
+  function collapsePdfCard(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      card.classList.add('pdf-collapsed');
+    }catch{}
+  }
+
+  function expandPdfCard(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      if (card.classList.contains('pdf-collapsed')){
+        card.classList.remove('pdf-collapsed');
+        try{ card.classList.add('pull-in'); setTimeout(()=>{ try{ card.classList.remove('pull-in'); }catch{} }, 600); }catch{}
+      }
+    }catch{}
+  }
+
+  // Hide only the PDF card (keep sidepanel open), and restore QA context to page
+  function hidePdfCardSoft(){
+    try{
+      const card = shadow.getElementById('sx-pdf'); if (!card) return;
+      card.style.display = 'none';
+      try{
+        const qa = shadow.getElementById('sx-qa-input'); if (qa){ qa.placeholder = (currentLangCache==='en'?'Ask about this page…':'基于当前网页提问…'); }
+        const qu = shadow.getElementById('sx-qa-url'); if (qu){ qu.textContent = location.href; qu.title = location.href; }
+      }catch{}
+      try{ updateRunButtonState(shadow); }catch{}
+    }catch{}
+  }
+
+  // If current tab is a PDF URL, briefly flash the PDF import icon to prompt user.
+  function flashPdfIconIfPdfUrl(shadow){
+    try{
+      if (shadow.__sxPdfHaloShown) return;
+      const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+      if (!isPdfUrl) return;
+      const el = shadow.getElementById('sx-pdf-ind'); if (!el) return;
+      shadow.__sxPdfHaloShown = true;
+      el.classList.add('halo-pulse');
+      const clear = ()=>{ try{ el.classList.remove('halo-pulse'); }catch{} };
+      // Safety clear after ~3 pulses
+      setTimeout(clear, 3400);
+      try{ el.addEventListener('animationend', clear, { once:true }); }catch{}
+    }catch{}
+  }
+
+  // Enable/disable the Run button based on PDF context and inputs
+  function updateRunButtonState(shadow){
+    try{
+      const btn = shadow.getElementById('sx-run'); if (!btn) return;
+      // Default: enabled unless current tab is a PDF URL and PDF card not ready/invalid
+      let disable = false;
+      const card = shadow.getElementById('sx-pdf');
+      const pdfCardOpen = !!card && card.style.display !== 'none';
+      const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+
+      // Rule: When the PDF card is open, disable Run until the PDF is properly loaded and inputs are valid.
+      // This applies regardless of whether the current tab URL is a PDF URL.
+      if (pdfCardOpen){
+        disable = true;
+        const loaded = !!card?.__pdfDoc;
+        if (loaded){
+          const pagesInput = card.__pdfElems?.pagesInput;
+          const pageInput = card.__pdfElems?.pageInput;
+          const parse = card.__pdfElems?.parsePageRanges;
+          const total = card.__numPages || 1;
+          const hasRange = !!(pagesInput && String(pagesInput.value||'').trim());
+          if (hasRange){
+            try{
+              const arr = parse ? parse(pagesInput.value) : [];
+              if (Array.isArray(arr) && arr.length>0) disable = false; else disable = !/\d/.test(String(pagesInput.value||''));
+            }catch{ disable = !/\d/.test(String(pagesInput.value||'')); }
+          } else {
+            const n = parseInt(pageInput?.value, 10);
+            disable = !(Number.isFinite(n) && n>=1 && n<=total);
+          }
+        }
+      } else if (isPdfUrl){
+        // If on a PDF viewer tab but card is not open, keep disabled by default
+        disable = true;
+      }
+      // Also keep disabled during summarizing state
+      btn.disabled = !!(disable || summarizing);
+    }catch{}
   }
 
   function setLoading(shadow,loading){
@@ -1835,6 +4532,8 @@
       else{ runBtn.textContent = currentLangCache==='en' ? 'Extract & Summarize':'提取并摘要'; }
     }
     if (bar) bar.classList.toggle('hidden', !loading);
+    // After toggling loading state, re-evaluate whether Run should remain enabled
+    try{ updateRunButtonState(shadow); }catch{}
   }
 
   // ==== Vue 挂载（如果可用）====
@@ -1884,6 +4583,1005 @@
     if (vmCleaned) vmCleaned.html = cleanedHTML; else shadow.getElementById('sx-cleaned').innerHTML = cleanedHTML;
   }
 
+  // Append 3 quick ask suggestions at the bottom of summary card
+  function ensureQuickAsk(shadow, qs){
+    try{
+      const list = Array.isArray(qs)? qs.filter(Boolean).slice(0,3): [];
+      const card = shadow.getElementById('sx-summary'); if (!card) return;
+      let box = card.querySelector('.quick-ask');
+      if (list.length===0){ if (box) box.remove(); return; }
+      if (!box){
+        box = document.createElement('div'); box.className='quick-ask';
+        const style = document.createElement('style'); style.textContent = `
+          .quick-ask{ margin-top:14px; padding-top:10px; border-top:1px dashed var(--border); }
+          .quick-ask .title{ font-size:12px; color:#56627a; margin-bottom:6px; }
+          :host([data-theme="dark"]) .quick-ask .title{ color:#9fb0d0; }
+          .quick-ask .qitem{ display:block; font-size:14px; color:#1e40af; text-decoration:underline; text-underline-offset:3px; margin:6px 0; cursor:pointer; background:none; border:0; padding:0; text-align:left; }
+          .quick-ask .qitem:hover{ color:#0f172a; }
+          :host([data-theme="dark"]) .quick-ask .qitem{ color:#93c5fd; }
+          :host([data-theme="dark"]) .quick-ask .qitem:hover{ color:#e2ebf8; }
+        `;
+        card.appendChild(style);
+        const inner = document.createElement('div'); inner.className='qa-inner';
+        const title = document.createElement('div'); title.className='title'; title.textContent = (currentLangCache==='en'?'You might ask:':'猜你想问：');
+        inner.appendChild(title);
+        box.appendChild(inner);
+        card.appendChild(box);
+      }
+      const inner = box.querySelector('.qa-inner');
+      // remove old qitems
+      inner.querySelectorAll('.qitem').forEach(n=>n.remove());
+      // append new
+      list.forEach(q=>{
+        const a=document.createElement('button'); a.type='button'; a.className='qitem'; a.textContent=q; a.title=(currentLangCache==='en'?'Ask: ':'提问：')+q;
+        // Prevent any default navigation (including about:blank) and bubbling to underlying links
+        const ask = ()=>{
+          try{
+            const qaInput = shadow.getElementById('sx-qa-input');
+            const qaSend  = shadow.getElementById('sx-qa-send');
+            if (qaInput){ qaInput.value = q; qaInput.dispatchEvent(new Event('input', {bubbles:true})); }
+            // mark this turn as triggered from quick-ask so chat can jump to the new question reliably
+            try{ shadow.__sxFromQuickAsk = Date.now(); }catch{}
+            qaSend?.click();
+          }catch{}
+        };
+        a.addEventListener('click', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} ask(); });
+        a.addEventListener('auxclick', (ev)=>{ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} }); // block middle-click
+        a.addEventListener('mousedown', (ev)=>{ if (ev.button!==0){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} } });
+        inner.appendChild(a);
+      });
+
+      // One-time: capture-phase guard on shadow root to prevent composed events from escaping and
+      // triggering site-level navigation/scroll handlers (avoids page refresh or jump-to-top)
+      if (!shadow.__sxQuickAskGuard){
+        const guard = (ev)=>{
+          try{
+            const path = ev.composedPath ? ev.composedPath() : [];
+            const hits = path && path.some(n=> n && n.classList && n.classList.contains('qitem'));
+            if (hits){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }
+          }catch{}
+        };
+        // Use bubble phase so target's own handlers run first (ensures QA ask executes),
+        // then stop the event from escaping to the page.
+        ['click','mousedown','mouseup','pointerdown','pointerup'].forEach(t=>{
+          try{ shadow.addEventListener(t, guard, false); }catch{}
+        });
+        shadow.__sxQuickAskGuard = true;
+      }
+    }catch{}
+  }
+
+  // ===== QA logic =====
+  let chatMode = false;
+  let chatVisible = false; // whether chat card is currently shown
+  let hasSummarizeTriggered = false; // becomes true once user clicks Extract & Summarize (or state indicates run)
+  let summarizing = false; // when true, block Q&A input and send
+  let qaSending = false; // track if a QA request is in-flight
+  const chatHistory = [];
+  let chatBubblesUI = [];
+  let qaTxn = 0; // cancel token for in-flight QA
+  // Track last QA source to auto-switch context between PDF and page
+  let lastQASource = null; // 'pdf' | 'page' | null
+  // Track last summary source so Q&A can follow summarize source even if PDF panel is hidden
+  let lastSummarySource = null; // 'pdf' | 'page' | null
+
+  // Persist lightweight QA UI state per-tab via background session storage
+  async function saveQAUIState(part){
+    try{ await chrome.runtime.sendMessage({ type: 'QA_UI_SET', ui: part||{} }); }catch{}
+  }
+  async function loadQAUIState(){
+    try{
+      const r = await chrome.runtime.sendMessage({ type: 'QA_UI_GET' });
+      return r?.ok ? (r.data||{}) : {};
+    }catch{ return {}; }
+  }
+
+  // Robust local backup: persist completed dialogue history by page URL (excludes in-flight turns)
+  function pageHistKey(){ try{ const u=location.href.split('#')[0]; return 'sx_qa_hist_v1:' + u; }catch{ return 'sx_qa_hist_v1:unknown'; } }
+  async function saveHistoryLocal(hist){
+    try{ const key = pageHistKey(); await chrome.storage.local.set({ [key]: { hist: Array.isArray(hist)? hist: [], updatedAt: Date.now() } }); }catch{}
+  }
+  async function loadHistoryLocal(){
+    try{ const key = pageHistKey(); const obj = await chrome.storage.local.get([key]); return obj?.[key] || null; }catch{ return null; }
+  }
+
+  function updateQAControls(shadow){
+    try{
+      const qaInput = shadow.getElementById('sx-qa-input');
+      const qaSend = shadow.getElementById('sx-qa-send');
+      const blocked = !!(summarizing || qaSending);
+      if (qaInput) qaInput.disabled = blocked;
+      if (qaSend) qaSend.disabled = blocked;
+    }catch{}
+  }
+  function setSummarizing(shadow, on){ 
+    summarizing = !!on; 
+    updateQAControls(shadow);
+    // Disable/enable indicator buttons during processing
+    updateIndicatorButtons(shadow, !on);
+  }
+
+  // Update indicator buttons (adblock, reader, PDF) enabled/disabled state
+  function updateIndicatorButtons(shadow, enabled){
+    try{
+      const adfInd = shadow.getElementById('sx-adf-ind');
+      const readerInd = shadow.getElementById('sx-reader-ind');
+      const pdfInd = shadow.getElementById('sx-pdf-ind');
+      
+      if (adfInd){
+        adfInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        adfInd.style.opacity = enabled ? '1' : '0.5';
+        adfInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+      if (readerInd){
+        readerInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        readerInd.style.opacity = enabled ? '1' : '0.5';
+        readerInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+      if (pdfInd){
+        pdfInd.style.pointerEvents = enabled ? 'auto' : 'none';
+        pdfInd.style.opacity = enabled ? '1' : '0.5';
+        pdfInd.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      }
+    }catch{}
+  }
+  function setupQABar(shadow){
+    const qaInput = shadow.getElementById('sx-qa-input');
+    const qaSend = shadow.getElementById('sx-qa-send');
+    // Ensure a restore icon exists in the QA bar (right side)
+    let qaRestore = shadow.getElementById('sx-qa-restore');
+    try{
+      if (!qaRestore){
+        qaRestore = document.createElement('button');
+        qaRestore.id = 'sx-qa-restore';
+        qaRestore.className = 'qa-restore';
+        qaRestore.type = 'button';
+        qaRestore.setAttribute('aria-hidden','true');
+        qaRestore.title = currentLangCache==='en' ? 'Show Q&A' : '显示你问我答';
+        qaRestore.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>';
+        const qaRow = shadow.querySelector('.qa-row');
+        if (qaRow){ qaRow.appendChild(qaRestore); }
+      }
+    }catch{}
+    const chatCard = shadow.getElementById('sx-chat');
+    const chatList = shadow.getElementById('sx-chat-list');
+    if (!qaInput || !qaSend || !chatCard || !chatList) return;
+
+    // Ensure a close button exists (for floating mode)
+    const ensureChatTools = ()=>{
+      try{
+        let tools = chatCard.querySelector('.card-tools');
+        if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+        let closeBtn = tools.querySelector('.tbtn-close');
+        const label = currentLangCache==='en' ? 'Close' : '关闭';
+        if (!closeBtn){
+          closeBtn = document.createElement('button');
+          closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+          closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+          tools.insertBefore(closeBtn, tools.firstChild || null);
+          closeBtn.addEventListener('click', ()=>{
+            minimizeChat();
+          });
+        }
+        // ensure resize handle exists for visual hint and easy grabbing
+        let rh = chatCard.querySelector('.qa-resize-handle');
+        if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+      }catch{}
+    };
+
+    // Minimize/Restore state
+    let chatMinimized = false;
+    let savedGeom = null; // { custom, left, top, width, height, rightGap }
+    const setBgCardHoverDisabled = (disabled)=>{ try{ shadow.getElementById('sx-wrap')?.classList?.toggle('qa-hover-off', !!disabled); }catch{} };
+
+    function getContainerBounds(){
+      const contRect = containerEl.getBoundingClientRect();
+      const cs = getComputedStyle(containerEl);
+      const padL = parseInt(cs.paddingLeft)||0;
+      const padR = parseInt(cs.paddingRight)||0;
+      const viewLeft = containerEl.scrollLeft;
+      const viewRight = viewLeft + contRect.width;
+      const SAFE = 10;
+      const innerLeftAbs = viewLeft + padL + SAFE;
+      const innerRightAbs = viewRight - padR - SAFE;
+      const availW = Math.max(0, innerRightAbs - innerLeftAbs);
+      return { contRect, innerLeftAbs, innerRightAbs, availW };
+    }
+
+    function minimizeChat(){
+      try{
+        if (!chatCard.classList.contains('qa-float')){ chatCard.style.display='none'; chatVisible=false; return; }
+        // Save current geometry relative to container
+        const rect = chatCard.getBoundingClientRect();
+        const { contRect } = getContainerBounds();
+        const left = rect.left - contRect.left + containerEl.scrollLeft;
+        const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+        const width = rect.width; const height = rect.height;
+        const custom = chatCard.classList.contains('qa-custom-pos');
+        const rightGap = contRect.right - rect.right; // for right-anchored restore
+        savedGeom = { custom, left, top, width, height, rightGap: Math.max(10, Math.round(rightGap)) };
+
+        // Animate towards QA restore icon and then hide
+        try{
+          const qaBar = shadow.getElementById('sx-qa-area');
+          const ccRect = rect;
+          let iconRect = qaRestore?.getBoundingClientRect?.();
+          if (!iconRect || iconRect.width===0 || iconRect.height===0){
+            // Fallback to QA row right side
+            const row = shadow.querySelector('.qa-row');
+            const r = row? row.getBoundingClientRect() : qaBar.getBoundingClientRect();
+            iconRect = { left: r.right-18, top: r.top, width: 18, height: r.height };
+          }
+          const ccX = ccRect.left + ccRect.width/2;
+          const ccY = ccRect.top  + ccRect.height/2;
+          const icX = iconRect.left + iconRect.width/2;
+          const icY = iconRect.top  + iconRect.height/2;
+          const dx = Math.round(icX - ccX);
+          const dy = Math.round(icY - ccY);
+          chatCard.style.transition = 'transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s ease';
+          chatCard.style.willChange = 'transform, opacity';
+          chatCard.style.transform = `translate(${dx}px, ${dy}px) scale(.6)`;
+          chatCard.style.opacity = '0';
+          setTimeout(()=>{
+            chatCard.style.display='none';
+            chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange='';
+          }, 240);
+        }catch{ chatCard.style.display='none'; }
+
+        // Show restore icon
+        if (qaRestore){ qaRestore.setAttribute('aria-hidden','false'); qaRestore.classList.add('flash'); setTimeout(()=>{ try{ qaRestore.classList.remove('flash'); }catch{} }, 3300); }
+        chatMinimized = true; chatVisible = false; setBgCardHoverDisabled(false);
+        try{ saveQAUIState({ visible:false, minimized:true, float:true, lastGeom: savedGeom }); }catch{}
+      }catch{}
+    }
+
+    function restoreChat(){
+      try{
+        // Get icon position BEFORE hiding it, to animate from its center
+        let iconRect = qaRestore?.getBoundingClientRect?.();
+        if (!iconRect || iconRect.width===0 || iconRect.height===0){
+          const qaBar = shadow.getElementById('sx-qa-area');
+          const row = shadow.querySelector('.qa-row');
+          const r = row? row.getBoundingClientRect() : qaBar.getBoundingClientRect();
+          iconRect = { left: r.right-18, top: r.top, width: 18, height: r.height };
+        }
+
+        updateQABottomVar();
+        chatCard.style.display='';
+        chatCard.classList.add('qa-float');
+        // size + pos restore with current bounds
+        const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+        const hardMaxW = 1400;
+        const baseW = Math.min(hardMaxW, Math.round(savedGeom?.width || 420));
+        const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+        chatCard.style.minWidth = '0px';
+        chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+        // Clamp height to visible container area above QA bar
+        const maxHByCont = Math.max(260, Math.min(1100, Math.floor((getContainerBounds().contRect.height - getQABottomGap()) - 10)));
+        const wantH = savedGeom?.height? Math.max(260, Math.min(1100, Math.round(savedGeom.height))) : parseInt(getComputedStyle(chatCard).height)||360;
+        const h = Math.max(260, Math.min(maxHByCont, wantH));
+        chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
+        try{ chatCard._qaHasRestored = true; chatCard._qaSizeLocked = true; }catch{}
+        if (savedGeom && savedGeom.custom){
+          // Clamp left within current bounds
+          const maxLeft = innerRightAbs - width;
+          const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(savedGeom.left)));
+          chatCard.classList.add('qa-custom-pos');
+          chatCard.style.right=''; chatCard.style.bottom='';
+          chatCard.style.left = left + 'px';
+          // keep previous top if possible
+          try{
+            const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
+            const topMin = containerEl.scrollTop;
+            const top = Math.max(topMin, Math.min(topMax, Math.round(savedGeom.top)));
+            chatCard.style.top = top + 'px';
+          }catch{}
+        } else {
+          // Right-anchored restore; respect at least 10px and saved right gap if any
+          chatCard.classList.remove('qa-custom-pos');
+          const gap = Math.max(10, savedGeom?.rightGap || 16);
+          chatCard.style.right = gap + 'px';
+          chatCard.style.left = '';
+          chatCard.style.top = '';
+          chatCard.style.bottom = '';
+        }
+        // Animate from restore icon to final spot
+        try{
+          const finalRect = chatCard.getBoundingClientRect();
+          const fx = finalRect.left + finalRect.width/2;
+          const fy = finalRect.top  + finalRect.height/2;
+          const ix = iconRect.left + iconRect.width/2;
+          const iy = iconRect.top  + iconRect.height/2;
+          const dx = Math.round(ix - fx);
+          const dy = Math.round(iy - fy);
+          chatCard.style.willChange = 'transform, opacity';
+          chatCard.style.transform = `translate(${dx}px, ${dy}px) scale(.6)`;
+          chatCard.style.opacity = '0';
+          requestAnimationFrame(()=>{
+            chatCard.style.transition = 'transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s ease';
+            chatCard.style.transform = 'translate(0,0) scale(1)';
+            chatCard.style.opacity = '1';
+            const done=()=>{ try{ chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange=''; }catch{} };
+            chatCard.addEventListener('transitionend', done, { once:true });
+            // Hide the restore icon only after animation kicks in
+            try{ qaRestore?.setAttribute('aria-hidden','true'); }catch{}
+          });
+        }catch{}
+        chatMinimized = false; chatVisible = true; setBgCardHoverDisabled(true);
+        try{
+          const rectNow = chatCard.getBoundingClientRect();
+          const contRect2 = containerEl.getBoundingClientRect();
+          const geom = {
+            custom: chatCard.classList.contains('qa-custom-pos'),
+            left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+            top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+            width: rectNow.width,
+            height: rectNow.height,
+            rightGap: contRect2.right - rectNow.right
+          };
+          saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+        }catch{}
+      }catch{}
+    }
+
+    try{ qaRestore?.addEventListener('click', async ()=>{
+      try{
+        if (chatMinimized) { restoreChat(); return; }
+        // Not marked minimized but user wants to restore: show from saved geometry
+        const ui = await loadQAUIState();
+        // Show chat card; prefer saved float flag, fallback to hasSummarizeTriggered
+        const shouldFloat = (typeof ui?.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+        chatCard.style.display='';
+        if (shouldFloat){
+          chatCard.classList.add('qa-float'); setBgCardHoverDisabled(true);
+          // Ensure tools (close + resize handle)
+          try{
+            let tools = chatCard.querySelector('.card-tools');
+            if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+            let closeBtn = tools.querySelector('.tbtn-close');
+            if (!closeBtn){
+              const label = currentLangCache==='en' ? 'Close' : '关闭';
+              closeBtn = document.createElement('button');
+              closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+              closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+              tools.insertBefore(closeBtn, tools.firstChild || null);
+              closeBtn.addEventListener('click', ()=>{
+                try{ chatCard.dispatchEvent(new CustomEvent('sx-minimize-chat', { bubbles:false })); }catch{}
+              });
+            }
+            let rh = chatCard.querySelector('.qa-resize-handle');
+            if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+          }catch{}
+        }
+        else { chatCard.classList.remove('qa-float'); setBgCardHoverDisabled(false); }
+        chatVisible = true;
+        // Apply geometry if floating and snapshot present
+        if (shouldFloat && ui?.lastGeom){
+          const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+          const hardMaxW = 1400;
+          const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+          const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+          chatCard.style.minWidth = '0px';
+          chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+          const maxHByCont = Math.max(260, Math.min(1100, Math.floor((contRect.height - getQABottomGap()) - 10)));
+          const wantH = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+          const h = Math.max(260, Math.min(maxHByCont, wantH));
+          chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
+          if (ui.lastGeom.custom){
+            const maxLeft = innerRightAbs - width;
+            const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(ui.lastGeom.left||0)));
+            chatCard.classList.add('qa-custom-pos');
+            chatCard.style.right=''; chatCard.style.bottom='';
+            chatCard.style.left = left + 'px';
+            const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
+            const topMin = containerEl.scrollTop;
+            const top = Math.max(topMin, Math.min(topMax, Math.round(ui.lastGeom.top||0)));
+            chatCard.style.top = top + 'px';
+          } else {
+            chatCard.classList.remove('qa-custom-pos');
+            const gap = Math.max(10, Math.round(ui.lastGeom.rightGap || 16));
+            chatCard.style.right = gap + 'px';
+            chatCard.style.left = '';
+            chatCard.style.top = '';
+            chatCard.style.bottom = '';
+          }
+        }
+        // hide restore icon after showing
+        try{ qaRestore?.setAttribute('aria-hidden','true'); }catch{}
+        // persist visibility
+        saveQAUIState({ visible:true, minimized:false, float: shouldFloat });
+      }catch{}
+    }); }catch{}
+
+    // No-op clamp to keep calls safe (we don't auto-move/auto-resize on container changes)
+    const clampFloatWithinContainer = ()=>{};
+
+    const updateQABottomVar = ()=>{
+      try{
+        const qaBar  = shadow.getElementById('sx-qa-area');
+        const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60;
+        // keep a gap above the QA bar; adjust with latest overall upward shift (+2px)
+        chatCard.style.setProperty('--qa-bottom', (qaH + 19) + 'px');
+      }catch{}
+    };
+    const getQABottomGap = ()=>{
+      try{ const qaBar = shadow.getElementById('sx-qa-area'); const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60; return (qaH + 19); }catch{ return 72; }
+    };
+    try{ window.addEventListener('resize', ()=>{ requestAnimationFrame(()=>{ updateQABottomVar(); clampFloatWithinContainer(); }); }, { passive:true }); }catch{}
+
+    // Rehydration moved to startup sequence after state is known
+
+    // Drag & resize for floating chat
+    const containerEl = shadow.getElementById('sx-container');
+    let dragState = null; // {startX,startY, startLeft, startTop}
+    let resizeState = null; // {startX,startY, startW, startH}
+
+    const startDrag = (ev)=>{
+      if (!chatCard.classList.contains('qa-float')) return;
+      // ignore drags starting on buttons or resize handle
+      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
+      if (path.some(n=> n?.classList?.contains?.('tbtn') || n?.classList?.contains?.('qa-resize-handle'))) return;
+      // limit drag start within header area
+      const rect = chatCard.getBoundingClientRect();
+      if ((ev.clientY - rect.top) > 52) return; // only header
+      // switch to absolute left/top positioning
+      const contRect = containerEl.getBoundingClientRect();
+      const left = rect.left - contRect.left + containerEl.scrollLeft;
+      const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+      chatCard.classList.add('qa-custom-pos');
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+      chatCard.style.right = '';
+      chatCard.style.bottom = '';
+      dragState = { startX: ev.clientX, startY: ev.clientY, startLeft: left, startTop: top };
+      try{ chatCard.setPointerCapture(ev.pointerId); }catch{}
+      ev.preventDefault();
+    };
+    const onDrag = (ev)=>{
+      if (!dragState) return;
+      const dx = ev.clientX - dragState.startX; const dy = ev.clientY - dragState.startY;
+      const contRect = containerEl.getBoundingClientRect();
+      const cardRect = chatCard.getBoundingClientRect();
+      const cs = getComputedStyle(containerEl);
+      const padL = parseInt(cs.paddingLeft)||0;
+      const padR = parseInt(cs.paddingRight)||0;
+      const viewLeft = containerEl.scrollLeft;
+      const viewTop  = containerEl.scrollTop;
+      const viewRight = viewLeft + contRect.width;
+      const viewBottom = viewTop + contRect.height;
+        const marginL = 10, marginR = 10, marginT = 0, marginB = 0;
+      const minLeft = viewLeft + padL + marginL;
+      const minTop  = viewTop + marginT; // no vertical padding considered for now
+      const maxLeft = viewRight - padR - marginR - cardRect.width;
+      const maxTop  = viewBottom - marginB - cardRect.height;
+      const left = Math.max(minLeft, Math.min(maxLeft, dragState.startLeft + dx));
+      const top  = Math.max(minTop,  Math.min(maxTop,  dragState.startTop + dy));
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+    };
+    const endDrag = (ev)=>{
+      if (!dragState) return;
+      dragState = null;
+      try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+      }catch{}
+    };
+
+    const rh = ()=> chatCard.querySelector('.qa-resize-handle');
+    const inResizeZone = (ev)=>{
+      try{
+        const rect = chatCard.getBoundingClientRect();
+        const zone = 24; // px from bottom-right corner
+        return (ev.clientX >= rect.right - zone) && (ev.clientY >= rect.bottom - zone);
+      }catch{ return false; }
+    };
+    const startResize = (ev)=>{
+      if (!chatCard.classList.contains('qa-float')) return;
+      const handle = rh();
+      const hitHandle = !!(handle && ev.target === handle);
+      const hitZone = inResizeZone(ev);
+      if (!hitHandle && !hitZone) return;
+      // ensure custom pos so we don't fight bottom/right
+      const rect = chatCard.getBoundingClientRect();
+      const contRect = containerEl.getBoundingClientRect();
+      const left = rect.left - contRect.left + containerEl.scrollLeft;
+      const top  = rect.top  - contRect.top  + containerEl.scrollTop;
+      chatCard.classList.add('qa-custom-pos');
+      chatCard.style.left = left + 'px';
+      chatCard.style.top  = top + 'px';
+      chatCard.style.right = '';
+      chatCard.style.bottom = '';
+      resizeState = { startX: ev.clientX, startY: ev.clientY, startW: rect.width, startH: rect.height, pointerId: ev.pointerId };
+      // Mark as user-sized so future autosize won't override
+      try{ chatCard.dataset.userSized = '1'; chatCard._qaSizeLocked = true; }catch{}
+      try{ chatCard.setPointerCapture(ev.pointerId); }catch{}
+      // Ensure we always end resizing on release, even if pointer capture is lost
+      try{
+        window.addEventListener('pointermove', onResize, true);
+        window.addEventListener('pointerup', endResize, true);
+        window.addEventListener('pointercancel', endResize, true);
+        window.addEventListener('blur', endResize, true);
+        // Fallbacks for environments/events that might miss pointerup
+        window.addEventListener('mouseup', endResize, true);
+        window.addEventListener('mouseleave', endResize, true);
+      }catch{}
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    const onResize = (ev)=>{
+      if (!resizeState) return;
+      // If this move is from a different pointer, ignore. If mouse buttons released, stop resizing.
+      if (resizeState.pointerId !== undefined && ev.pointerId !== undefined && ev.pointerId !== resizeState.pointerId) return;
+      if (ev.buttons === 0) { endResize(ev); return; }
+      const dx = ev.clientX - resizeState.startX; const dy = ev.clientY - resizeState.startY;
+      const contRect = containerEl.getBoundingClientRect();
+      // available viewport (visible) bounds in content coordinates
+      const viewLeft = containerEl.scrollLeft;
+      const viewTop  = containerEl.scrollTop;
+      const viewRight = viewLeft + contRect.width;
+      const viewBottom = viewTop + contRect.height;
+      const minW = 200; const minH = 260; const margin = 10;
+      // current left/top in content coordinates
+      const rect = chatCard.getBoundingClientRect();
+      const left = (parseFloat(chatCard.style.left) || 0);
+      const top  = (parseFloat(chatCard.style.top) || 0);
+      const maxWByEdge = Math.max(minW, Math.round(viewRight - left - margin));
+      const maxHByEdge = Math.max(minH, Math.round(viewBottom - top - margin));
+      const hardMaxW = 1400; const hardMaxH = 1100;
+      const maxW = Math.min(maxWByEdge, hardMaxW);
+      const maxH = Math.min(maxHByEdge, hardMaxH);
+      let w = Math.max(minW, Math.min(maxW, Math.round(resizeState.startW + dx)));
+      let h = Math.max(minH, Math.min(maxH, Math.round(resizeState.startH + dy)));
+      chatCard.style.setProperty('--qa-w', w + 'px');
+      chatCard.style.setProperty('--qa-h', h + 'px');
+      chatCard.style.width = w + 'px';
+      chatCard.style.height = h + 'px';
+      // If we reached boundaries, rebase the starting point so user can continue resizing smoothly
+      try{
+        if ((w<=minW && dx<0) || (w>=maxW && dx>0)){
+          resizeState.startX = ev.clientX; resizeState.startW = w;
+        }
+        if ((h<=minH && dy<0) || (h>=maxH && dy>0)){
+          resizeState.startY = ev.clientY; resizeState.startH = h;
+        }
+      }catch{}
+    };
+    const endResize = (ev)=>{
+      if (!resizeState) return;
+      resizeState = null;
+      try{ chatCard.releasePointerCapture(ev.pointerId); }catch{}
+      try{ clampFloatWithinContainer(); }catch{}
+      try{ chatCard.dataset.userSized = '1'; chatCard._qaSizeLocked = true; }catch{}
+      try{
+        window.removeEventListener('pointermove', onResize, true);
+        window.removeEventListener('pointerup', endResize, true);
+        window.removeEventListener('pointercancel', endResize, true);
+        window.removeEventListener('blur', endResize, true);
+        window.removeEventListener('mouseup', endResize, true);
+        window.removeEventListener('mouseleave', endResize, true);
+      }catch{}
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float:true, lastGeom: geom });
+      }catch{}
+    };
+    try{ chatCard.addEventListener('lostpointercapture', endResize, true); }catch{}
+    // Allow external code to request minimize without direct access to closure
+    try{ chatCard.addEventListener('sx-minimize-chat', ()=>{ try{ minimizeChat(); }catch{} }, false); }catch{}
+
+    // Update cursor when hovering near the bottom-right corner
+    const updateCursor = (ev)=>{
+      try{
+        if (!chatCard.classList.contains('qa-float')) return;
+        if (resizeState) { chatCard.style.cursor = 'nwse-resize'; return; }
+        chatCard.style.cursor = inResizeZone(ev) ? 'nwse-resize' : '';
+      }catch{}
+    };
+
+    // bind drag on card header; resize on handle
+    try{
+      chatCard.addEventListener('pointerdown', startDrag);
+      chatCard.addEventListener('pointermove', onDrag);
+      chatCard.addEventListener('pointerup', endDrag);
+      chatCard.addEventListener('pointercancel', endDrag);
+      chatCard.addEventListener('pointerdown', startResize, true);
+      chatCard.addEventListener('pointermove', onResize);
+      chatCard.addEventListener('pointerup', endResize);
+      chatCard.addEventListener('pointercancel', endResize);
+      chatCard.addEventListener('pointermove', updateCursor, { passive:true });
+      if (!chatCard._qaContRO && window.ResizeObserver){
+        chatCard._qaContRO = new ResizeObserver(()=>{ requestAnimationFrame(()=>clampFloatWithinContainer()); });
+        try{ chatCard._qaContRO.observe(containerEl); }catch{}
+        try{ chatCard._qaContRO.observe(shadow.host); }catch{}
+        try{ chatCard._qaContRO.observe(shadow.getElementById('sx-wrap')); }catch{}
+      }
+    }catch{}
+
+    const showChat = (withRise)=>{
+      // If user previously minimized, restore using saved geometry instead of default sizing
+      try{
+        if (chatMinimized) { restoreChat(); return; }
+      }catch{}
+      chatCard.style.display='';
+      if (hasSummarizeTriggered){
+        ensureChatTools();
+        updateQABottomVar();
+        // First-open sizing: fit to visible container height (avoid being clipped)
+        try{
+          if (!chatCard._qaInitSized && !chatCard.dataset.userSized && !chatCard._qaHasRestored){
+            const container = shadow.getElementById('sx-container');
+            const contH = container?.clientHeight || 0;
+            const qaBottomStr = chatCard.style.getPropertyValue('--qa-bottom') || getComputedStyle(chatCard).getPropertyValue('--qa-bottom');
+            const qaBottom = parseInt(String(qaBottomStr||'').replace(/[^\d.-]/g,'')) || 72;
+            const margin = 12; // bottom safe gap
+            const avail = Math.max(0, contH - qaBottom - margin);
+            let initH = Math.max(280, Math.round(avail * 0.5)); // use half of available height
+            const hardMax = 1100;
+            initH = Math.min(initH, hardMax);
+            chatCard.style.height = initH + 'px';
+            chatCard.style.setProperty('--qa-h', initH + 'px');
+            chatCard._qaInitSized = true;
+            chatCard._qaSizeLocked = true;
+          }
+        }catch{}
+        // keep size vars in sync when user resizes (native or custom)
+        try{
+          if (!chatCard._qaResizeObs){
+            const syncSizeVars = ()=>{
+              const r = chatCard.getBoundingClientRect();
+              chatCard.style.setProperty('--qa-w', Math.round(r.width) + 'px');
+              chatCard.style.setProperty('--qa-h', Math.round(r.height) + 'px');
+            };
+            chatCard._qaResizeObs = new ResizeObserver(()=>syncSizeVars());
+            chatCard._qaResizeObs.observe(chatCard);
+            syncSizeVars();
+          }
+        }catch{}
+        // After entering float mode, ensure bounds are respected
+        try{ clampFloatWithinContainer(); }catch{}
+        chatCard.classList.add('qa-float');
+        if (withRise){ try{ chatCard.classList.add('qa-rise'); setTimeout(()=>chatCard.classList.remove('qa-rise'), 260); }catch{} }
+      } else {
+        // Non-summary phase: behave like original (full-width card)
+        chatCard.classList.remove('qa-float');
+      }
+      chatVisible = true; setBgCardHoverDisabled(chatCard.classList.contains('qa-float'));
+      try{
+        const rectNow = chatCard.getBoundingClientRect();
+        const contRect2 = containerEl.getBoundingClientRect();
+        const geom = {
+          custom: chatCard.classList.contains('qa-custom-pos'),
+          left: rectNow.left - contRect2.left + containerEl.scrollLeft,
+          top:  rectNow.top  - contRect2.top  + containerEl.scrollTop,
+          width: rectNow.width,
+          height: rectNow.height,
+          rightGap: contRect2.right - rectNow.right
+        };
+        saveQAUIState({ visible:true, minimized:false, float: chatCard.classList.contains('qa-float'), lastGeom: geom });
+      }catch{}
+    };
+    // auto-resize textarea to show all input lines (up to max-height)
+    const autoResize = () => {
+      try{
+        qaInput.style.height = 'auto';
+        const max = 120;
+        const h = Math.min(max, qaInput.scrollHeight);
+        qaInput.style.height = h + 'px';
+      }catch{}
+    };
+    qaInput.addEventListener('input', autoResize);
+    // Calculate offset of an element relative to a root container
+    const offsetWithin = (el, root)=>{
+      try{
+        let y = 0; let n = el;
+        while (n && n !== root){ y += n.offsetTop || 0; n = n.offsetParent; }
+        return y;
+      }catch{ return 0; }
+    };
+    // In floating mode: keep the user bubble in view near top, while showing as much of AI answer as possible
+    const adjustChatViewport = (userBubble, aiBubble)=>{
+      try{
+        if (!chatCard.classList.contains('qa-float')) return;
+        if (!userBubble || !aiBubble) return;
+        const H = chatList.clientHeight || 0; if (H<=0) return;
+        const margin = 8;
+        const uTop = offsetWithin(userBubble, chatList);
+        // Anchor the viewport to the user bubble near the top; do not force-scroll to AI bottom.
+        const desiredTop = Math.max(0, uTop - margin);
+        chatList.scrollTo({ top: desiredTop, behavior: 'auto' });
+      }catch{}
+    };
+
+    // In embedded (non-floating) mode: keep viewport anchored at the user question bubble
+    const scrollUserNearTop = (userBubble)=>{
+      try{
+        const scroller = shadow.getElementById('sx-container');
+        if (!scroller || !userBubble) return;
+        let offset = 0; let n = userBubble;
+        while (n && n !== scroller){ offset += n.offsetTop || 0; n = n.offsetParent; }
+        scroller.scrollTo({ top: Math.max(0, offset - 6), behavior: 'smooth' });
+      }catch{}
+    };
+    const appendBubble = (role, html, pending=false)=>{
+      const b = document.createElement('div');
+      b.className = `chat-bubble ${role}`;
+      b.innerHTML = pending ? `<span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>` : html;
+      chatList.appendChild(b);
+      try{ b.classList.add('pull-in'); setTimeout(()=>b.classList.remove('pull-in'), 500); }catch{}
+      try{ if (!chatCard.classList.contains('qa-float')) scrollUserNearTop(b); }catch{}
+      try{
+        // Update UI snapshot (store empty html for pending AI; will be filled on finish)
+        chatBubblesUI.push({ role, html: pending ? '' : String(html||'') });
+        saveQAUIState({ bubbles: chatBubblesUI });
+      }catch{}
+      return b;
+    };
+    const doSend = async ()=>{
+      if (summarizing || qaSending) return; // blocked during summarize or when already sending
+      const q = qaInput.value.trim();
+      if (!q) return;
+      const myTxn = (++qaTxn);
+      const prev = qaSend.textContent;
+      qaSending = true; updateQAControls(shadow);
+      qaSend.textContent = (currentLangCache==='zh'?'发送中…':'Sending…');
+      try{ saveQAUIState({ qaBusy:true, qaTxn: myTxn }); }catch{}
+      // Switch to chat mode on first send
+      if (!chatMode){
+        chatMode = true;
+      }
+      // Show chat; if summary ever triggered, float above summary/cleaned
+      showChat(!chatVisible);
+      // During first/early phase (no summarize yet), hide other cards so only Q&A is visible
+      if (!hasSummarizeTriggered){
+        try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+      } else {
+        // Keep summary/cleaned visible; overlay floats above them
+        try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+      }
+      // Determine current QA source (pdf vs page) and reset history if switching
+      try{
+        const pdfCard = shadow.getElementById('sx-pdf');
+        const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
+        const pdfLoaded = !!pdfCard?.__pdfDoc;
+        const nowSource = (pdfOpen && pdfLoaded) ? 'pdf' : 'page';
+        if (lastQASource !== nowSource){
+          // Clear chat UI and history when switching sources
+          try{ chatList.innerHTML = ''; }catch{}
+          while (chatHistory.length) chatHistory.pop();
+          chatBubblesUI = [];
+          try{ saveQAUIState({ bubbles: [], hist: [] }); }catch{}
+          lastQASource = nowSource;
+        }
+      }catch{}
+
+      const userHtml = escapeHtml(q);
+      const userBubble = appendBubble('user', userHtml, false);
+      // Append AI pending bubble
+      const aiBubble = appendBubble('ai', '', true);
+      // After both bubbles are in, adjust viewport to show user bubble and as much of AI as possible
+      try{ adjustChatViewport(userBubble, aiBubble); requestAnimationFrame(()=>adjustChatViewport(userBubble, aiBubble)); }catch{}
+      // If triggered from quick-ask, force a second pass scroll anchoring on the freshly created bubble
+      try{
+        if (shadow.__sxFromQuickAsk){
+          const delay = 100; // wait for layout/size to settle
+          setTimeout(()=>{
+            try{
+          // Only adjust the chat's own scroller; do not move the sidepanel container.
+          // A second pass ensures the typing bubble is fully visible without clipping.
+          adjustChatViewport(userBubble, aiBubble);
+          requestAnimationFrame(()=>{ try{ adjustChatViewport(userBubble, aiBubble); }catch{} });
+            }catch{}
+          }, delay);
+          try{ delete shadow.__sxFromQuickAsk; }catch{}
+        }
+      }catch{}
+      // Clear the input so user text doesn't linger
+      try{ qaInput.value=''; qaInput.style.height=''; }catch{}
+      // During loading, hide other cards only if summarize hasn't been triggered
+      if (!hasSummarizeTriggered){
+        try{ shadow.getElementById('sx-summary').style.display='none'; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display='none'; }catch{}
+      }
+
+      // If panel is folded, expand like the summarize flow so the card is visible
+      let expanded = false;
+      try{
+        const wrapEl = shadow.getElementById('sx-wrap');
+        const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
+        if (wasEmpty){
+          wrapEl.classList.remove('fx-intro');
+          wrapEl.classList.add('expanding');
+          const container = shadow.getElementById('sx-container');
+          const wrapRect = wrapEl.getBoundingClientRect();
+          const appbar = shadow.querySelector('.appbar');
+          const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
+          const appH = appbar ? appbar.getBoundingClientRect().height : 0;
+          const footH = footer ? footer.getBoundingClientRect().height : 0;
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
+          container.style.willChange = 'height';
+          container.style.contain = 'layout style';
+          container?.style.setProperty('--sx-target', target + 'px');
+          expanded = true;
+          let done=false; const finish=()=>{
+            if (done) return; done=true;
+            try{ wrapEl.classList.remove('is-empty'); wrapEl.classList.remove('expanding'); }catch{}
+          };
+          container?.addEventListener('transitionend', (e)=>{ if (e.propertyName==='height') finish(); }, { once:true });
+          setTimeout(finish, 900);
+        } else {
+          // Already expanded; do nothing special on the card to avoid flicker
+        }
+      }catch{}
+
+      // Global progress bar like summarize
+      try{ setLoading(shadow, true); }catch{}
+      try{
+        // Decide QA source: follow last summarize source if present; otherwise fall back to current PDF visibility
+        let qaMsg = { type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) };
+        try{
+          const pdfCard = shadow.getElementById('sx-pdf');
+          const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
+          const pdfLoaded = !!pdfCard?.__pdfDoc;
+          const usePdfNow = (lastSummarySource === 'pdf') || (pdfOpen && pdfLoaded);
+          if (usePdfNow){
+            let pages = null;
+            try{
+              const pagesInput = pdfCard.__pdfElems?.pagesInput;
+              const parse = pdfCard.__pdfElems?.parsePageRanges;
+              const val = String(pagesInput?.value||'').trim();
+              if (val && typeof parse === 'function'){ pages = parse(val); }
+              // Robust fallback normalization when parse returns empty
+              if ((!Array.isArray(pages) || pages.length===0) && val){
+                try{
+                  const totalPages = pdfCard.__numPages || 1;
+                  const norm = val.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+                  const out = new Set();
+                  norm.split(',').filter(Boolean).forEach(seg=>{
+                    const m = seg.match(/^(\d+)(?:-(\d+))?$/);
+                    if (m){
+                      const a = parseInt(m[1],10);
+                      const b = m[2] ? parseInt(m[2],10) : NaN;
+                      let lo = Number.isFinite(b) ? Math.min(a,b) : a;
+                      let hi = Number.isFinite(b) ? Math.max(a,b) : a;
+                      if (Number.isFinite(lo) && Number.isFinite(hi)){
+                        for (let i=lo;i<=hi;i++){ if (i>=1 && i<=totalPages) out.add(i); }
+                      }
+                    }
+                  });
+                  const arr = Array.from(out).sort((a,b)=>a-b);
+                  if (arr.length) pages = arr;
+                }catch{}
+              }
+            }catch{}
+            if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+            let text = '';
+            for (const num of pages){
+              try{
+                const page = await pdfCard.__pdfDoc.getPage(num);
+                const tc = await page.getTextContent();
+                const chunks = [];
+                for (const it of (tc.items||[])){
+                  const s = (it && typeof it.str === 'string') ? it.str : '';
+                  if (s) chunks.push(s);
+                }
+                if (chunks.length){
+                  if (text) text += '\n\n';
+                  text += (currentLangCache==='en'?`[Page ${num}]`:`[第 ${num} 页]`) + '\n' + chunks.join('\n');
+                }
+              }catch{}
+            }
+            if (text){ qaMsg.pdf = { title: pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档'), text, url: 'pdf://local', pageLang: '' }; }
+          } else {
+            // Fallback: If current tab is a PDF URL, try to read page 1 quickly for QA
+            try{
+              const isPdfUrl = /^(https?:)/i.test(location.href) && /\.pdf(\b|[?#])/i.test(location.href);
+              if (isPdfUrl){
+                let pdfjs;
+                try{ pdfjs = await import(chrome.runtime.getURL('vendor/pdfjs/pdf.mjs')); }catch{}
+                if (pdfjs){
+                  try{ pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.mjs'); }catch{}
+                  const loadingTask = pdfjs.getDocument({ url: location.href });
+                  const pdf = await loadingTask.promise;
+                  const page = await pdf.getPage(1);
+                  const tc = await page.getTextContent();
+                  const chunks = [];
+                  for (const it of (tc.items||[])){
+                    const s = (it && typeof it.str === 'string') ? it.str : '';
+                    if (s) chunks.push(s);
+                  }
+                  const text = chunks.join('\n');
+                  if (text){
+                    const name = (location.pathname.split('/').pop()||'document.pdf');
+                    qaMsg.pdf = { title: name, text, url: location.href, pageLang: '' };
+                  }
+                }
+              }
+            }catch{}
+          }
+        }catch{}
+        const resp = await chrome.runtime.sendMessage(qaMsg);
+        if (!resp?.ok) throw new Error(resp?.error || 'QA failed');
+        // If user minimized during processing, do not auto-pop the chat back
+        if (!chatMinimized) {
+          showChat(false);
+        }
+        const ans = String(resp.answer||'').replace(/^__NO_HIT__\s*/i,'').trim();
+        let html = stripInlineColor(renderMarkdown(ans));
+        // Collapse excessive breaks only within chat bubble rendering
+        html = html
+          .replace(/^(?:<br\s*\/?>(?:\s|&nbsp;)*?)+/i,'')
+          .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
+          .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
+        // If this response is outdated (e.g., user switched away and we invalidated), ignore
+        if (myTxn !== qaTxn) return;
+        aiBubble.innerHTML = html;
+        try{
+          // Fill the last AI bubble in UI snapshot
+          for (let i=chatBubblesUI.length-1; i>=0; i--){ if (chatBubblesUI[i]?.role==='ai'){ chatBubblesUI[i].html = html; break; } }
+          saveQAUIState({ bubbles: chatBubblesUI });
+        }catch{}
+        // After answer renders, keep viewport anchored at the user bubble (both modes)
+        try{ adjustChatViewport(userBubble, aiBubble); setTimeout(()=>adjustChatViewport(userBubble, aiBubble), 50); }catch{}
+        try{ if (!chatCard.classList.contains('qa-float')) scrollUserNearTop(userBubble); }catch{}
+        // track history
+        chatHistory.push({ role:'user', content: q });
+        chatHistory.push({ role:'assistant', content: ans });
+        try{ const h = chatHistory.slice(0); saveQAUIState({ hist: h, qaBusy:false, qaTxn }); saveHistoryLocal(h); }catch{}
+      }catch(e){
+        try{ alert((currentLangCache==='zh'?'提问失败：':'Ask failed: ') + (e?.message || e)); }catch{}
+      } finally {
+        try{ setLoading(shadow, false); }catch{}
+        qaSending = false; updateQAControls(shadow);
+        try{ if (myTxn === qaTxn) saveQAUIState({ qaBusy:false, qaTxn }); }catch{}
+        // Restore label unless still blocked by summarizing
+        if (qaSend && !qaSend.disabled) qaSend.textContent = prev || (currentLangCache==='zh'?'发送':'Send');
+        // If minimized while processing, signal completion on the restore icon (green pulse)
+        try{
+          if (chatMinimized && qaRestore){
+            qaRestore.setAttribute('aria-hidden','false');
+            qaRestore.classList.remove('flash');
+            qaRestore.classList.add('flash-done');
+            setTimeout(()=>{ try{ qaRestore.classList.remove('flash-done'); }catch{} }, 3200);
+          }
+        }catch{}
+      }
+    };
+    qaSend.addEventListener('click', doSend);
+    qaInput.addEventListener('keydown', (ev)=>{
+      if (summarizing || qaSending) return; // ignore input when blocked
+      if (ev.key==='Enter' && ev.shiftKey){
+        // allow newline; resize after the key inserts the line break
+        setTimeout(autoResize, 0);
+        return;
+      }
+      if (ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); doSend(); }
+    });
+  }
+
   function ensureShareButton(shadow){
     try{
       const card = shadow.getElementById('sx-summary');
@@ -1931,6 +5629,39 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      // Mark that summarize has been triggered to switch future Q&A into floating mode
+      hasSummarizeTriggered = true;
+      setSummarizing(shadow, true);
+      // If in chat mode: gracefully hide chat, restore summary/cleaned
+      try{
+        const chatCard = shadow.getElementById('sx-chat');
+        if (chatCard && chatCard.style.display !== 'none'){
+          // If floating, shrink towards QA bar; else use existing fade
+          if (chatCard.classList.contains('qa-float')){
+            try{
+              const qaBar = shadow.getElementById('sx-qa-area');
+              const ccRect = chatCard.getBoundingClientRect();
+              const qaRect = qaBar.getBoundingClientRect();
+              const ccCenterY = ccRect.top + ccRect.height/2;
+              const qaCenterY = qaRect.top + qaRect.height/2;
+              const dy = Math.round(qaCenterY - ccCenterY);
+              chatCard.style.transition = 'transform .24s cubic-bezier(.2,.7,.3,1), opacity .24s ease';
+              chatCard.style.willChange = 'transform, opacity';
+              chatCard.style.transform = `translateY(${dy}px) scale(.92)`;
+              chatCard.style.opacity = '0';
+              setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('qa-float'); chatCard.style.transition=''; chatCard.style.transform=''; chatCard.style.opacity=''; chatCard.style.willChange=''; }catch{} }, 250);
+            }catch{
+              chatCard.classList.add('chat-hide');
+              setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+            }
+          } else {
+            chatCard.classList.add('chat-hide');
+            setTimeout(()=>{ try{ chatCard.style.display='none'; chatCard.classList.remove('chat-hide'); }catch{} }, 280);
+          }
+          try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+          try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+        }
+      }catch{}
       // 若为试用模式但尚未同意条款：直接跳转设置页并中止，不进入运行态
       try {
         const { aiProvider = 'trial', trial_consent = false } = await chrome.storage.sync.get({ aiProvider: 'trial', trial_consent: false });
@@ -1950,6 +5681,36 @@
           return;
         }
       } catch {}
+      // 检查是否在 PDF 预览态
+      const pdfCard = shadow.getElementById('sx-pdf');
+      const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
+      const pdfLoaded = !!pdfCard?.__pdfDoc;
+      const isPdfMode = pdfOpen && pdfLoaded;
+
+      // 清除上一次 PDF 错误提示（若存在），避免在新一轮运行时残留
+      if (isPdfMode){
+        try{
+          const els = pdfCard.__pdfElems;
+          if (els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; }
+          if (els?.err){ els.err.textContent=''; els.err.style.display='none'; }
+        }catch{}
+      }
+
+      // 若已打开 PDF 卡片但尚未加载文档，提示并中止
+      if (pdfOpen && !pdfLoaded){
+        const box=shadow.getElementById('sx-summary');
+        const msg = currentLangCache==='en' ? 'Please load a PDF first, then click Summarize.' : '请先加载 PDF 文件，然后再点击“提取并摘要”。';
+        box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+        setSummarizing(shadow,false); setLoading(shadow,false);
+        return;
+      }
+
+      // 若使用 PDF 源，确保摘要与正文卡片可见
+      if (isPdfMode){
+        try{ shadow.getElementById('sx-summary').style.display=''; }catch{}
+        try{ shadow.getElementById('sx-cleaned').style.display=''; }catch{}
+      }
+
       // Handle folded (empty) state: expand middle first, then reveal cards
       const wrapEl = shadow.getElementById('sx-wrap');
       const wasEmpty = !!wrapEl?.classList?.contains('is-empty');
@@ -1966,8 +5727,136 @@
       if (!wasEmpty) skeleton(shadow);
 
       const tabId=await getActiveTabId(); if(!tabId) throw new Error('未找到活动标签页');
-      const resp=await chrome.runtime.sendMessage({type:'PANEL_RUN_FOR_TAB', tabId});
-      if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+
+      // 在进入运行态前，立即根据来源设置摘要/正文标题（loading 期间也显示 PDF 标记）
+      try{
+        const meta = { source: isPdfMode ? 'pdf' : 'page' };
+        if (isPdfMode){
+          // Compute pages label for title when summarizing from PDF
+          try{
+            const pagesInput = pdfCard.__pdfElems?.pagesInput;
+            const parse = pdfCard.__pdfElems?.parsePageRanges;
+            const val = String(pagesInput?.value||'').trim();
+            let pagesMeta = null;
+            if (val && typeof parse === 'function') pagesMeta = parse(val);
+            if (!Array.isArray(pagesMeta) || pagesMeta.length===0){ pagesMeta = [pdfCard.__pageNum || 1]; }
+            meta.pagesLabel = formatPdfPagesLabel(pagesMeta);
+          }catch{}
+        }
+        setSummaryTitleBySource(meta); setCleanedTitleBySource(meta);
+        // Record summarize source for QA to follow
+        try{ lastSummarySource = meta.source; }catch{}
+      }catch{}
+
+      // 使用 PDF 文本运行或网页抓取
+      if (isPdfMode){
+        // 解析范围：为空则默认当前页
+        const pagesInput = pdfCard.__pdfElems?.pagesInput;
+        let pages = null;
+        try{
+          pages = pagesInput ? (function(){ const v = pagesInput.value||''; const fn = pdfCard.__pdfElems?.parsePageRanges || parsePageRanges; return fn ? fn(v) : null; })() : null;
+        }catch{}
+        const rawRange = String(pagesInput?.value||'').trim();
+        const totalPages = pdfCard.__numPages || 1;
+        // 校验：若用户填写了范围但解析为空，或范围中包含超出总页数的页码，则报错
+        if (rawRange){
+          // Recompute pages at runtime and show errors in PDF card area
+          try{
+            const errEl = pdfCard.__pdfElems?.rangeErr; if (errEl){ errEl.textContent=''; errEl.style.display='none'; }
+            const norm0 = rawRange.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+            let hasNumber0=false, hasOutOfBounds0=false; const out0 = new Set();
+            norm0.split(',').filter(Boolean).forEach(seg=>{
+              const m=seg.match(/^(\d+)(?:-(\d+))?$/);
+              if (m){
+                hasNumber0=true; const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN; let lo=Number.isFinite(b)?Math.min(a,b):a; let hi=Number.isFinite(b)?Math.max(a,b):a;
+                if (lo<1 || hi>totalPages) hasOutOfBounds0=true;
+                for (let i=lo;i<=hi;i++){ if(i>=1 && i<=totalPages) out0.add(i); }
+              }
+            });
+            const arr0 = Array.from(out0).sort((a,b)=>a-b);
+            if (!arr0.length){
+              const msg = currentLangCache==='en' ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.` : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+              if (errEl){ errEl.textContent = msg; errEl.style.display=''; }
+              setSummarizing(shadow,false); setLoading(shadow,false);
+              return;
+            }
+            if (hasNumber0 && hasOutOfBounds0){
+              const msg = currentLangCache==='en' ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.` : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+              if (errEl){ errEl.textContent = msg; errEl.style.display=''; }
+              setSummarizing(shadow,false); setLoading(shadow,false);
+              return;
+            }
+            pages = arr0;
+          }catch{}
+          // Detect any numbers in raw input and whether any are out of [1..total]
+          const norm = rawRange.replace(/[、，]/g, ',').replace(/[～~–—－−]/g,'-').replace(/[至到]/g,'-').replace(/\s+/g,'');
+          let hasNumber=false, hasOutOfBounds=false;
+          try{
+            norm.split(',').filter(Boolean).forEach(seg=>{
+              const m=seg.match(/^(\d+)(?:-(\d+))?$/);
+              if (m){
+                hasNumber=true; const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):NaN;
+                const lo = Number.isFinite(b)? Math.min(a,b) : a; const hi = Number.isFinite(b)? Math.max(a,b) : a;
+                if (lo<1 || hi>totalPages) hasOutOfBounds=true;
+              }
+            });
+          }catch{}
+          if (!Array.isArray(pages) || pages.length===0){
+            const box=shadow.getElementById('sx-summary');
+            const msg = currentLangCache==='en'
+              ? `The selected range has no pages within 1–${totalPages}. Please adjust the range.`
+              : `所选范围在 1–${totalPages} 页内没有有效页码，请调整范围。`;
+            box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+          if (hasNumber && hasOutOfBounds){
+            const box=shadow.getElementById('sx-summary');
+            const msg = currentLangCache==='en'
+              ? `Some pages in the selected range are out of 1–${totalPages}. Please correct the range.`
+              : `范围中包含超出 1–${totalPages} 的页码，请修正后再试。`;
+            box.innerHTML = `<div class="alert"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+            setSummarizing(shadow,false); setLoading(shadow,false);
+            return;
+          }
+        }
+        if (!Array.isArray(pages) || pages.length===0){ pages = [pdfCard.__pageNum || 1]; }
+        // 提取所选页文本（顺序串行）
+        let text = '';
+        try{
+          for (const num of pages){
+            const page = await pdfCard.__pdfDoc.getPage(num);
+            const tc = await page.getTextContent();
+            const chunks = [];
+            for (const it of (tc.items||[])){
+              const s = (it && typeof it.str === 'string') ? it.str : '';
+              if (s) chunks.push(s);
+            }
+            if (chunks.length){
+              if (text) text += '\n\n';
+              text += (currentLangCache==='en'?`[Page ${num}]`:`[第 ${num} 页]`) + '\n' + chunks.join('\n');
+            }
+          }
+          if (!text){ throw new Error(currentLangCache==='en'?'No text extracted from selected pages':'所选页面未能提取到文本'); }
+        }catch(e){
+          const box=shadow.getElementById('sx-summary');
+          const msg = (currentLangCache==='en'?'Failed to read PDF text: ':'读取 PDF 文本失败：') + (e?.message||e);
+          box.innerHTML = `<div class=\"alert\"><button class=\"alert-close\" title=\"关闭\" aria-label=\"关闭\">&times;</button><div class=\"alert-content\"><p>${escapeHtml(msg)}</p></div></div>`;
+          setSummarizing(shadow,false); setLoading(shadow,false);
+          return;
+        }
+        const title = pdfCard.__pdfName || (currentLangCache==='en'?'PDF Document':'PDF 文档');
+        const url = 'pdf://local';
+        const pagesLabel = (function(){ try{ return formatPdfPagesLabel(pages); }catch{ return ''; } })();
+        const payload = { title, text, url, pageLang: '', markdown: null, pagesLabel };
+        const resp = await chrome.runtime.sendMessage({ type:'PANEL_RUN_FOR_TEXT', tabId, payload });
+        if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+        // hide PDF preview area entirely to surface summary cards
+        try{ hidePdfCardSoft(); }catch{}
+      } else {
+        const resp=await chrome.runtime.sendMessage({type:'PANEL_RUN_FOR_TAB', tabId});
+        if (!resp || resp.ok!==true) throw new Error(resp?.error||'运行失败');
+      }
 
       // After expansion, reveal cards and play pull-in animation
       if (wasEmpty){
@@ -1977,9 +5866,11 @@
           const wrapRect = wrapEl.getBoundingClientRect();
           const appbar = shadow.querySelector('.appbar');
           const footer = shadow.querySelector('.footer');
+          const qaBar  = shadow.getElementById('sx-qa-area');
           const appH = appbar ? appbar.getBoundingClientRect().height : 0;
           const footH = footer ? footer.getBoundingClientRect().height : 0;
-          const target = Math.max(120, Math.round(wrapRect.height - appH - footH));
+          const qaH  = qaBar ? qaBar.getBoundingClientRect().height : 0;
+          const target = Math.max(120, Math.round(wrapRect.height - appH - footH - qaH));
           // prepare container for smooth transition
           container.style.willChange = 'height';
           container.style.contain = 'layout style';
@@ -2021,7 +5912,7 @@
       }catch{}
       await pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
     }catch(e){
-      setLoading(shadow,false);
+      setSummarizing(shadow,false); setLoading(shadow,false);
       const box=shadow.getElementById('sx-summary');
       box.innerHTML = `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>运行失败：${escapeHtml(e?.message||String(e))}</p></div></div>`;
     }
@@ -2037,32 +5928,220 @@
     applyThemeWithOverride(shadow); markThemeButtonsActive(shadow);
 
     await updateUIText();
+    try{ updateRunButtonState(shadow); }catch{}
+    try{ flashPdfIconIfPdfUrl(shadow); }catch{}
     applyTrialLabelToFloatButton(shadow);
+    try{ await updateAdblockIndicator(shadow); }catch{}
+    try{ bindAdblockIndicatorToggle(shadow); }catch{}
 
     await tryLoadPetiteVue();
     if (PV) mountVue();
 
+    let tabId=null; let st=null;
     try{
-      const tabId=await getActiveTabId();
+      tabId=await getActiveTabId();
       if (!tabId){ await setEmpty(shadow); return; }
-      const st=await getState(tabId);
+      st=await getState(tabId);
+      // Pre-mark summarize as triggered if panel state indicates it
+      try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
       if (st.status==='running'){
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
+        setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
       }
       else if (st.status==='partial'){
+        setSummarizing(shadow,true);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
       }
       else if (st.status==='done'){
+        setSummarizing(shadow,false);
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-        setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+        try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
+        setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
       }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
+
+    // After state and cards prepared, restore Q&A UI (visibility, geometry, and bubbles)
+    try{
+      if (!tabId) return;
+      const ui = await loadQAUIState();
+      if (ui && typeof ui === 'object'){
+        const chatCard = shadow.getElementById('sx-chat');
+        const chatList = shadow.getElementById('sx-chat-list');
+        // restore visibility and floating geometry
+        if (ui.visible){
+          // Show chat card and set float mode according to summarize state
+          try{
+            const wrapEl = shadow.getElementById('sx-wrap');
+            chatCard.style.display='';
+            const shouldFloat = (typeof ui.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+            if (shouldFloat){
+              chatCard.classList.add('qa-float');
+              wrapEl?.classList?.add('qa-hover-off');
+              // Ensure close button + resize handle exist (so Close is always visible)
+              try{
+                let tools = chatCard.querySelector('.card-tools');
+                if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; chatCard.appendChild(tools); }
+                let closeBtn = tools.querySelector('.tbtn-close');
+                if (!closeBtn){
+                  const label = currentLangCache==='en' ? 'Close' : '关闭';
+                  closeBtn = document.createElement('button');
+                  closeBtn.className = 'tbtn tbtn-close'; closeBtn.type='button';
+                  closeBtn.textContent = '×'; closeBtn.title = label; closeBtn.setAttribute('aria-label', label);
+                  tools.insertBefore(closeBtn, tools.firstChild || null);
+                  closeBtn.addEventListener('click', ()=>{
+                    try{ chatCard.dispatchEvent(new CustomEvent('sx-minimize-chat', { bubbles:false })); }catch{}
+                  });
+                }
+                let rh = chatCard.querySelector('.qa-resize-handle');
+                if (!rh){ rh = document.createElement('div'); rh.className='qa-resize-handle'; rh.setAttribute('aria-hidden','true'); chatCard.appendChild(rh); }
+              }catch{}
+            } else {
+              chatCard.classList.remove('qa-float');
+              wrapEl?.classList?.remove('qa-hover-off');
+            }
+            chatVisible = true;
+          }catch{}
+          // Apply geometry only in float mode and if snapshot exists
+          const shouldFloat = (typeof ui.float === 'boolean') ? !!ui.float : !!hasSummarizeTriggered;
+          if (shouldFloat && ui.lastGeom){
+            const containerEl = shadow.getElementById('sx-container');
+            const getContainerBounds = ()=>{
+              const contRect = containerEl.getBoundingClientRect();
+              const cs = getComputedStyle(containerEl);
+              const padL = parseInt(cs.paddingLeft)||0;
+              const padR = parseInt(cs.paddingRight)||0;
+              const viewLeft = containerEl.scrollLeft;
+              const viewRight = viewLeft + contRect.width;
+              const SAFE = 10;
+              const innerLeftAbs = viewLeft + padL + SAFE;
+              const innerRightAbs = viewRight - padR - SAFE;
+              const availW = Math.max(0, innerRightAbs - innerLeftAbs);
+              return { contRect, innerLeftAbs, innerRightAbs, availW };
+            };
+            const getQABottomGapLocal = ()=>{ try{ const qaBar = shadow.getElementById('sx-qa-area'); const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60; return (qaH + 19); }catch{ return 72; } };
+            const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
+            const hardMaxW = 1400;
+            const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+            const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
+            chatCard.style.minWidth = '0px';
+            chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
+            const maxHByCont = Math.max(260, Math.min(1100, Math.floor((contRect.height - getQABottomGapLocal()) - 10)));
+            const wantH = Math.max(260, Math.min(1100, Math.round(ui.lastGeom.height || 360)));
+            const h = Math.max(260, Math.min(maxHByCont, wantH));
+            chatCard.style.height = h + 'px'; chatCard.style.setProperty('--qa-h', h + 'px');
+            if (ui.lastGeom.custom){
+              const maxLeft = innerRightAbs - width;
+              const left = Math.max(innerLeftAbs, Math.min(maxLeft, Math.round(ui.lastGeom.left||0)));
+              chatCard.classList.add('qa-custom-pos');
+              chatCard.style.right=''; chatCard.style.bottom='';
+              chatCard.style.left = left + 'px';
+              const topMax = (containerEl.scrollTop + contRect.height) - 10 - h;
+              const topMin = containerEl.scrollTop;
+              const top = Math.max(topMin, Math.min(topMax, Math.round(ui.lastGeom.top||0)));
+              chatCard.style.top = top + 'px';
+            } else {
+              chatCard.classList.remove('qa-custom-pos');
+              const gap = Math.max(10, Math.round(ui.lastGeom.rightGap || 16));
+              chatCard.style.right = gap + 'px';
+              chatCard.style.left = '';
+              chatCard.style.top = '';
+              chatCard.style.bottom = '';
+            }
+            try{ chatCard._qaHasRestored = true; chatCard._qaSizeLocked = true; }catch{}
+          }
+        } else if (ui.minimized){
+          // Show restore affordance unless suppressed for first open after reload
+          if (!__suppressRestoreOnce){
+            try{ const r=shadow.getElementById('sx-qa-restore'); r?.setAttribute('aria-hidden','false'); }catch{}
+          } else { __suppressRestoreOnce = false; }
+        } else if ((Array.isArray(ui.bubbles) && ui.bubbles.length) || (Array.isArray(ui.hist) && ui.hist.length)){
+          // There is chat content but not visible/minimized: surface restore affordance
+          if (!__suppressRestoreOnce){
+            try{ const r=shadow.getElementById('sx-qa-restore'); r?.setAttribute('aria-hidden','false'); }catch{}
+          } else { __suppressRestoreOnce = false; }
+        }
+        // If previous send was still running when user left: drop the latest incomplete Q&A
+        try{
+          if (ui.qaBusy === true){
+            // invalidate any in-flight response
+            try{ qaTxn = Number.isFinite(+ui.qaTxn) ? (+ui.qaTxn + 1) : (qaTxn+1); }catch{}
+            // prune UI bubbles: remove trailing empty AI, then its preceding user
+            if (Array.isArray(ui.bubbles) && ui.bubbles.length){
+              const arr = ui.bubbles.slice(0);
+              if (arr.length && arr[arr.length-1]?.role==='ai' && !arr[arr.length-1]?.html){ arr.pop(); }
+              if (arr.length && arr[arr.length-1]?.role==='user'){ arr.pop(); }
+              ui.bubbles = arr;
+              try{ saveQAUIState({ bubbles: arr, qaBusy:false, qaTxn }); }catch{}
+            } else {
+              try{ saveQAUIState({ qaBusy:false, qaTxn }); }catch{}
+            }
+            // also ensure local flags/input are not blocked
+            qaSending = false; updateQAControls(shadow);
+          }
+        }catch{}
+        // restore bubbles: prefer hist (session or local), fallback to bubbles snapshot
+        try{
+          const buildFrom = (hist)=>{
+            if (!Array.isArray(hist) || !chatList) return false;
+            const built=[]; chatList.innerHTML='';
+            for (const it of hist){
+              if (!it || (it.role!=='user' && it.role!=='assistant')) continue;
+              const role = it.role==='assistant' ? 'ai' : 'user';
+              let html='';
+              if (role==='user') html = escapeHtml(String(it.content||''));
+              else html = stripInlineColor(renderMarkdown(String(it.content||'')))
+                            .replace(/^(?:<br\s*\/?>(?:\s|&nbsp;)*?)+/i,'')
+                            .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?)+$/i,'')
+                            .replace(/(?:<br\s*\/?>(?:\s|&nbsp;)*?){2,}/gi,'<br>');
+              built.push({ role, html });
+              const div=document.createElement('div'); div.className=`chat-bubble ${role}`; div.innerHTML=html; chatList.appendChild(div);
+            }
+            chatBubblesUI=built; try{ saveQAUIState({ bubbles: built }); }catch{}
+            if (ui.visible) chatMode=true;
+            return built.length>0;
+          };
+
+          let restored=false;
+          // 1) Prefer session hist
+          if (Array.isArray(ui.hist) && ui.hist.length){ restored = buildFrom(ui.hist); }
+          // 2) Fallback to local backup by URL
+          if (!restored){ const b = await loadHistoryLocal(); if (b?.hist?.length) restored = buildFrom(b.hist); }
+          // 3) Last resort: bubbles snapshot if present and complete
+          if (!restored && Array.isArray(ui.bubbles) && ui.bubbles.length>0){
+            const miss = ui.bubbles.some(b => b && b.role==='ai' && !(b.html && String(b.html).trim()));
+            if (!miss){
+              chatBubblesUI = ui.bubbles.slice(0); chatList.innerHTML='';
+              for (const it of chatBubblesUI){ const div=document.createElement('div'); div.className=`chat-bubble ${it?.role==='user'?'user':'ai'}`; div.innerHTML=String(it?.html||''); chatList.appendChild(div); }
+              if (ui.visible) chatMode=true; restored=true;
+            }
+          }
+        }catch{}
+        // restore textual history for continuity (prefer session hist, fallback to local backup)
+        try{
+          let histSet = false;
+          if (Array.isArray(ui.hist) && ui.hist.length){
+            while (chatHistory.length) chatHistory.pop();
+            for (const it of ui.hist){ if (it && (it.role==='user' || it.role==='assistant') && typeof it.content==='string'){ chatHistory.push({ role: it.role, content: it.content }); } }
+            histSet = true;
+          }
+          if (!histSet){
+            const b = await loadHistoryLocal();
+            if (b?.hist?.length){
+              while (chatHistory.length) chatHistory.pop();
+              for (const it of b.hist){ if (it && (it.role==='user' || it.role==='assistant') && typeof it.content==='string'){ chatHistory.push({ role: it.role, content: it.content }); } }
+            }
+          }
+        }catch{}
+      }
+    }catch{}
   })();
 
   // ===== 广播同步 =====
@@ -2072,35 +6151,67 @@
       const curId=await getActiveTabId(); if (msg.tabId!==curId) return;
       try{
         const st=await getState(curId);
+        try{ hasSummarizeTriggered = ['running','partial','done'].includes(st?.status); }catch{}
         if (st.status==='running'){
+          // 面板进入运行态时隐藏任何 PDF 错误提示
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
+          setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,true); skeleton(shadow);
+          setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{}
         }
         else if (st.status==='partial'){
+          // 收到部分结果时也确保清理 PDF 错误
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
+          setSummarizing(shadow,true);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,true); await renderCards(st.summary, null);
+          setLoading(shadow,true); await renderCards(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
         }
         else if (st.status==='done'){
+          // 完成时确保不显示任何旧的 PDF 错误
+          try{ const card=shadow.getElementById('sx-pdf'); const els=card?.__pdfElems; if(els?.rangeErr){ els.rangeErr.textContent=''; els.rangeErr.style.display='none'; } if(els?.err){ els.err.textContent=''; els.err.style.display='none'; } }catch{}
+          setSummarizing(shadow,false);
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
-          setLoading(shadow,false); await renderCards(st.summary, st.cleaned); stopPolling();
+          setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
         }
         else if (st.status==='error'){
-          setLoading(shadow,false);
+          setSummarizing(shadow,false); setLoading(shadow,false);
           shadow.getElementById('sx-summary').innerHTML =
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>发生错误，请重试。</p></div></div>`;
           stopPolling();
         }
       }catch{}
     }else if (msg.type==='SX_CLOSE_FLOAT_PANEL'){
+      try{ await chrome.runtime.sendMessage({ type:'QA_UI_SET', ui:{ visible:false } }); }catch{}
       const btn=shadow.getElementById('sx-close');
       if (btn) btn.click(); else { const host=document.getElementById(PANEL_ID); if (host){ host.remove(); window[MARK]=false; } stopPolling(); }
     }
   });
 
-  // ===== 强制深色模式 =====
+  // Lightweight message responder for background ping/show
+  try{
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse)=>{
+      try{
+        if (msg?.type === 'SX_PING_PANEL'){
+          const host = document.getElementById(PANEL_ID);
+          const visible = !!(host && host.style.display !== 'none');
+          sendResponse({ ok:true, present: !!host, visible });
+          return true;
+        }
+        if (msg?.type === 'SX_SHOW_PANEL'){
+          const host = document.getElementById(PANEL_ID);
+          if (host){ host.style.display = ''; try{ host.style.visibility=''; }catch{} }
+          sendResponse({ ok:true, shown: !!host });
+          return true;
+        }
+      }catch(e){ try{ sendResponse({ ok:false, error: String(e) }); }catch{} }
+      return false;
+    });
+  }catch{}
+
+  // ===== 强制深色模式（旧版注入保留为后备） =====
   function applyForceDarkMode(enabled) {
     if (enabled) {
       // 注入强制深色模式CSS
@@ -2170,6 +6281,72 @@
         }
       `;
       document.head.appendChild(style);
+
+      // 站点定制修复 + 通用徽标修复：确保页首黑色字标在深色底上可读
+      try {
+        const host = location.hostname || '';
+        const fixes = [];
+        // 通用：明显的“logo”图片或 alt 包含站点名的图片
+        fixes.push(`
+          /* Generic wordmark/logo lightening on dark background */
+          header img[alt*="logo" i],
+          header img[src*="logo" i],
+          [role="banner"] img[alt*="logo" i],
+          [role="banner"] img[src*="logo" i]{
+            filter: invert(1) brightness(1.15) contrast(1.05) !important;
+          }
+          /* Inline SVGs that use explicit black fills — make them light */
+          header svg [fill="#000" i], header svg [fill="#000000" i],
+          [role="banner"] svg [fill="#000" i], [role="banner"] svg [fill="#000000" i]{
+            fill: #eaeef5 !important;
+          }
+          header svg [stroke="#000" i], [role="banner"] svg [stroke="#000" i]{
+            stroke: #eaeef5 !important;
+          }
+          /* As a fallback, invert large top-of-page SVG/IMG likely to be mastheads */
+          header svg, [role="banner"] svg, header img, [role="banner"] img{
+            /* only large ones will get overridden by the class below */
+          }
+        `);
+        // 纽约时报：页首字标为黑色字形 SVG/PNG
+        if (/nytimes\.com$/i.test(host)) {
+          fixes.push(`
+            /* NYTimes masthead */
+            header svg, header a[href^="/"] svg, [data-testid*="masthead" i] svg{
+              /* do not blanket-invert all icons; restrict by size via :where selector is not arithmetic-capable — we rely on class below */
+            }
+            /* target common containers around the nameplate */
+            header a img[alt*="New York Times" i],
+            header img[alt="The New York Times"],
+            [data-testid*="masthead" i] img,
+            [data-testid*="masthead" i] svg{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+          `);
+        }
+        // 华盛顿邮报：黑色字标 SVG
+        if (/(^|\.)washingtonpost\.com$/i.test(host)) {
+          fixes.push(`
+            /* Washington Post masthead */
+            header svg[aria-label*="Washington" i],
+            header a[aria-label*="Washington" i] svg,
+            header img[alt*="Washington Post" i]{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+            /* common header logo wrappers */
+            header [data-qa*="header-logo" i] svg,
+            header [data-qa*="header-logo" i] img{
+              filter: invert(1) brightness(1.18) contrast(1.05) !important;
+            }
+          `);
+        }
+        if (fixes.length) {
+          const fixStyle = document.createElement('style');
+          fixStyle.id = 'sx-force-dark-fixes';
+          fixStyle.textContent = fixes.join('\n');
+          document.head.appendChild(fixStyle);
+        }
+      } catch {}
 
       // 智能本地加深：仅为明显浅底的容器加暗色基底（避免一刀切破坏）
       try{
@@ -2257,10 +6434,143 @@
       if (existingStyle) {
         existingStyle.remove();
       }
+      try{ const fs = document.getElementById('sx-force-dark-fixes'); fs && fs.remove(); }catch{}
       // 清理智能标记与观察器
       try{ document.querySelectorAll('.sx-dark-bg').forEach(el=>el.classList.remove('sx-dark-bg')); }catch{}
       try{ document.querySelectorAll('.sx-dark-border').forEach(el=>el.classList.remove('sx-dark-border')); }catch{}
       try{ window.__sxForceDarkObserver && window.__sxForceDarkObserver.disconnect(); window.__sxForceDarkObserver=null; }catch{}
+    }
+  }
+
+  // ===== 强制深色模式（优先 Dark Reader，失败回退到旧版注入） =====
+  function applyForceDarkModeSmart(enabled){
+    const tryEnableDarkReader = async () => {
+      try{
+        const libId = 'sx-darkreader-lib';
+        const bridgeId = 'sx-darkreader-bridge';
+        const inject = (src, id) => new Promise((res)=>{
+          try{
+            if (document.getElementById(id)) return res(true);
+            const s = document.createElement('script');
+            s.id = id; s.src = extURL(src); s.async = false; s.onload = () => res(true); s.onerror = () => res(false);
+            (document.documentElement || document.head || document.body).appendChild(s);
+          }catch{ res(false); }
+        });
+        const ok1 = await inject('vendor/darkreader.min.js', libId);
+        if (!ok1) return false;
+        const ok2 = await inject('vendor/sx-dark-bridge.js', bridgeId);
+        if (!ok2) return false;
+        return true;
+      }catch{ return false; }
+    };
+
+    const postToggle = (on) => { try{ window.postMessage({ type: 'SX_FORCE_DARK_TOGGLE', enabled: !!on, options: { brightness: 100, contrast: 95, sepia: 0 } }, '*'); }catch{} };
+    const markHostIgnored = (on)=>{
+      try{
+        const h=document.getElementById('sx-float-panel');
+        if(!h) return;
+        if(on){
+          h.setAttribute('data-darkreader-ignore','');
+          h.classList.add('surfingkeys_hints_host');
+        } else {
+          h.removeAttribute('data-darkreader-ignore');
+          // Keep the class to be safe; removing could cause DR to re-instrument
+          // h.classList.remove('surfingkeys_hints_host');
+        }
+      }catch{}
+    };
+    const enableFallback = () => {
+      markHostIgnored(false);
+      const existingLib = document.getElementById('sx-darkreader-lib'); if (existingLib) existingLib.remove();
+      const existingBridge = document.getElementById('sx-darkreader-bridge'); if (existingBridge) existingBridge.remove();
+      // 调用旧版注入函数作为回退
+      try{ applyForceDarkMode(true); }catch{}
+    };
+    const disableFallback = () => {
+      try{ const s=document.getElementById('sx-force-dark-mode'); s && s.remove(); }catch{}
+      try{ const fs=document.getElementById('sx-force-dark-fixes'); fs && fs.remove(); }catch{}
+    };
+
+    if (enabled) {
+      (async()=>{
+        const ok = await tryEnableDarkReader();
+        if (ok){
+          markHostIgnored(true);
+          disableFallback();
+          try{ applyForceDarkMode(false); }catch{}
+          postToggle(true);
+          // 注入轻量修复样式，弥补个别站点（如 NYTimes、WaPo）字标在暗底不反白的问题
+          try{
+            const host = location.hostname || '';
+            const css = [];
+            css.push(`
+              /* Generic wordmark/logo lightening on dark background (Dark Reader path) */
+              header img[alt*="logo" i], header img[src*="logo" i],
+              [role="banner"] img[alt*="logo" i], [role="banner"] img[src*="logo" i]{
+                filter: invert(1) brightness(1.15) contrast(1.05) !important;
+              }
+              header svg [fill="#000" i], header svg [fill="#000000" i],
+              [role="banner"] svg [fill="#000" i], [role="banner"] svg [fill="#000000" i]{ fill:#eaeef5 !important; }
+              header svg [stroke="#000" i], [role="banner"] svg [stroke="#000" i]{ stroke:#eaeef5 !important; }
+            `);
+            if (/nytimes\.com$/i.test(host)){
+              css.push(`
+                header a img[alt*="New York Times" i], header img[alt="The New York Times"],
+                [data-testid*="masthead" i] img, [data-testid*="masthead" i] svg{
+                  filter: invert(1) brightness(1.18) contrast(1.05) !important;
+                }
+              `);
+            }
+            if (/(^|\.)washingtonpost\.com$/i.test(host)){
+              css.push(`
+                header svg[aria-label*="Washington" i], header a[aria-label*="Washington" i] svg,
+                header img[alt*="Washington Post" i], header [data-qa*="header-logo" i] svg,
+                header [data-qa*="header-logo" i] img{
+                  filter: invert(1) brightness(1.18) contrast(1.05) !important;
+                }
+              `);
+            }
+            // Sina 新闻/看点：正文容器常保留纯白底，Dark Reader 不一定覆盖到，补充背景修正
+            if (/(^|\.)sina\.com\.cn$/i.test(host) || /(^|\.)k\.sina\.com\.cn$/i.test(host)){
+              css.push(`
+                /* Force dark background on common article containers */
+                html, body,
+                #article_content, #article, #artibody,
+                .article, .article-content, .article-content-left,
+                .content, #content, .page, .blk-related{
+                  background-color: #121212 !important;
+                }
+                /* Ensure readable foreground on those containers */
+                #article_content, #article, #artibody,
+                .article, .article-content, .article-content-left,
+                .content, #content, .page, .blk-related{
+                  color: #eaeef5 !important;
+                }
+              `);
+            }
+            const tag = document.createElement('style');
+            tag.id = 'sx-force-dark-fixes';
+            tag.textContent = css.join('\n');
+            document.head.appendChild(tag);
+          }catch{}
+          // 等待桥接标志，失败则回退
+          let tries = 0;
+          const check = ()=>{
+            const flag = document.documentElement.getAttribute('data-sx-dark');
+            if (flag === 'on') return; // 成功
+            if (flag === 'err' || tries>10){ enableFallback(); return; }
+            tries++; setTimeout(check, 60);
+          };
+          setTimeout(check, 100);
+        } else {
+          enableFallback();
+        }
+      })();
+    } else {
+      postToggle(false);
+      markHostIgnored(false);
+      disableFallback();
+      try{ applyForceDarkMode(false); }catch{}
     }
   }
 
@@ -2273,7 +6583,7 @@
       if (forceDarkBtn) {
         forceDarkBtn.classList.toggle('active', forceDarkMode);
       }
-      applyForceDarkMode(forceDarkMode);
+      applyForceDarkModeSmart(forceDarkMode);
     } catch (e) {
       console.warn('Failed to load force dark mode setting:', e);
     }
@@ -2284,6 +6594,7 @@
     chrome.storage.onChanged.addListener((changes, area)=>{
       if (area==='sync' && changes.aiProvider) applyTrialLabelToFloatButton(shadow);
       if (area!=='sync') return;
+      if (changes.adblock_enabled){ try{ updateAdblockIndicator(shadow); }catch{} }
       if (changes.options_theme_override || changes.float_theme_override){
         const next=(changes.options_theme_override?.newValue) ?? (changes.float_theme_override?.newValue);
         if (['auto','light','dark'].includes(next)){
@@ -2296,8 +6607,166 @@
         if (forceDarkBtn) {
           forceDarkBtn.classList.toggle('active', forceDarkMode);
         }
-        applyForceDarkMode(forceDarkMode);
+        applyForceDarkModeSmart(forceDarkMode);
       }
     });
   }catch{}
+
+  // ====== 元素选择器（生成按域名隐藏规则） ======
+  function startElementPicker(){
+    const originalDisplay = host.style.display;
+    host.style.display = 'none';
+    const overlay = document.createElement('div');
+    overlay.id = 'sx-pick-overlay';
+    overlay.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483646;pointer-events:none;';
+    const rect = document.createElement('div');
+    rect.id = 'sx-pick-rect';
+    rect.style.cssText = 'position:fixed;border:2px dashed #2563eb;box-shadow:0 0 0 99999px rgba(37,99,235,.08) inset;pointer-events:none;transition:all .03s;';
+    const tip = document.createElement('div');
+    tip.id = 'sx-pick-tip';
+    tip.style.cssText = 'position:fixed; padding:6px 8px; background:rgba(17,24,39,.9); color:#f8fafc; border-radius:8px; font-size:12px; pointer-events:none; max-width:50vw;';
+    tip.textContent = (currentLangCache==='zh') ? '点击选中元素，按 Esc 退出' : 'Click to select element, press Esc to exit';
+    overlay.appendChild(rect); overlay.appendChild(tip);
+    document.documentElement.appendChild(overlay);
+
+    let curEl = null;
+    let confirming = false;
+    const move = (e) => {
+      if (confirming) return;
+      const x = e.clientX, y = e.clientY;
+      const el = document.elementFromPoint(x,y);
+      if (!el || el === document.documentElement || el === document.body) return;
+      if (host && (el === host || (host.contains && host.contains(el)))) return;
+      curEl = el;
+      const r = el.getBoundingClientRect();
+      rect.style.left = r.left + 'px';
+      rect.style.top = r.top + 'px';
+      rect.style.width = r.width + 'px';
+      rect.style.height = r.height + 'px';
+      // tip position
+      tip.style.left = Math.min(window.innerWidth - 260, Math.max(8, r.left)) + 'px';
+      tip.style.top = Math.max(8, r.top - 32) + 'px';
+    };
+
+    const stopAll = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch{} };
+    const key = (e) => { if (confirming) return; if (e.key === 'Escape') { stopPick(true); stopAll(e);} };
+    const down = (e) => { if (confirming) return; stopAll(e); };
+    const up = (e) => { if (confirming) return; stopAll(e); };
+    const click = async (e) => {
+      if (confirming) return; // let confirm dialog receive click
+      if (!confirming) stopAll(e);
+      if (!curEl) return;
+      try {
+        const selector = buildNiceSelector(curEl);
+        const domain = location.hostname || '';
+        const rule = `${domain}##${selector}`;
+        confirming = true; // suspend event capture while confirming
+        const ok = await confirmPick(rule);
+        if (ok) {
+          try {
+            // Hide all elements matching the generated selector for immediate feedback
+            const nodes = document.querySelectorAll(selector);
+            nodes.forEach(n => { try { n.style.setProperty('display','none','important'); } catch{} });
+          } catch{}
+          try {
+            const { adblock_user_rules_text = '' } = await chrome.storage.sync.get({ adblock_user_rules_text: '' });
+            const lines = new Set((adblock_user_rules_text || '').split(/\r?\n/).map(s=>s.trim()).filter(Boolean));
+            lines.add(rule);
+            await chrome.storage.sync.set({ adblock_user_rules_text: Array.from(lines).join('\n') });
+          } catch {}
+          // Exit picking mode after confirm
+          stopPick(true);
+          return;
+        }
+      } finally {
+        // On cancel: continue picking, restore hint
+        if (document.getElementById('sx-pick-overlay')) {
+          confirming = false;
+          tip.textContent = (currentLangCache==='zh') ? '点击选中元素，按 Esc 退出' : 'Click to select element, press Esc to exit';
+        }
+      }
+    };
+
+    function stopPick(restore){
+      try {
+        window.removeEventListener('mousemove', move, true);
+        window.removeEventListener('keydown', key, true);
+        window.removeEventListener('pointerdown', down, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('click', click, true);
+      } catch {}
+      try { overlay.remove(); } catch {}
+      if (restore) host.style.display = originalDisplay || '';
+    }
+
+    window.addEventListener('mousemove', move, true);
+    window.addEventListener('keydown', key, true);
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('click', click, true);
+  }
+
+  function buildNiceSelector(el){
+    try{
+      const isStableId = (id)=> /^[A-Za-z][A-Za-z0-9_-]{1,63}$/.test(id) && !/(\d{4,}|[A-Fa-f0-9]{6,})/.test(id);
+      const isStableClass = (c)=> /^[a-z][a-z0-9-]{2,32}$/.test(c) && !/(\d{3,}|^css-|^jsx-|^sc-)/.test(c);
+      const classesOf = (node)=> Array.from((node.classList||[])).filter(isStableClass);
+
+      // 1) Prefer stable id on element
+      if (el.id && isStableId(el.id)) return `#${el.id}`;
+      // 2) Prefer stable classes on element (class chain only, for Low strength compatibility)
+      const cls = classesOf(el);
+      if (cls.length > 0) return `.${cls[0]}`;
+      // 3) Walk up to find a stable ancestor class and combine with a stable class on element if any
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        if (p.id && isStableId(p.id)) {
+          // Avoid descendant selectors for Low; fall back to parent id only
+          return `#${p.id}`;
+        }
+        const pc = classesOf(p);
+        if (pc.length > 0) {
+          // Use parent classes only to remain generic
+          return `.${pc[0]}`;
+        }
+        p = p.parentElement;
+      }
+      // 4) If element is a heading, use heading tag as a last resort (Medium strength recommended)
+      const tag = (el.tagName||'').toLowerCase();
+      if (/^h[1-3]$/.test(tag)) return tag;
+      // 5) Fallback to first class-like token from any ancestor (even if not fully stable)
+      p = el.parentElement;
+      while (p && p !== document.body) {
+        const any = Array.from((p.classList||[])).filter(s=>/^[A-Za-z0-9_-]{2,32}$/.test(s));
+        if (any.length) return `.${any[0]}`;
+        p = p.parentElement;
+      }
+      return 'div';
+    }catch{ return 'div'; }
+  }
+
+  async function confirmPick(rule){
+    return new Promise((resolve)=>{
+      try{
+        const wrap = document.createElement('div');
+        wrap.id='sx-pick-confirm';
+        wrap.style.cssText = 'position:fixed;left:50%;top:20px;transform:translateX(-50%);z-index:2147483647;background:#0f172a;color:#f8fafc;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.25)';
+        const msg = document.createElement('div');
+        msg.textContent = (currentLangCache==='zh'?'添加隐藏规则：':'Add hide rule:') + ' ' + rule;
+        const row = document.createElement('div');
+        row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:8px';
+        const ok = document.createElement('button'); ok.textContent = currentLangCache==='zh'?'确认添加':'Confirm';
+        ok.style.cssText='appearance:none;border:1px solid #334155;background:#1b2a4b;color:#e2ebf8;border-radius:8px;padding:6px 10px;cursor:pointer;';
+        const cancel = document.createElement('button'); cancel.textContent = currentLangCache==='zh'?'取消':'Cancel';
+        cancel.style.cssText='appearance:none;border:1px solid #334155;background:#0b1220;color:#e2ebf8;border-radius:8px;padding:6px 10px;cursor:pointer;';
+        ok.addEventListener('click', ()=>{ cleanup(); resolve(true); });
+        cancel.addEventListener('click', ()=>{ cleanup(); resolve(false); });
+        row.appendChild(cancel); row.appendChild(ok);
+        wrap.appendChild(msg); wrap.appendChild(row);
+        document.documentElement.appendChild(wrap);
+        function cleanup(){ try{ wrap.remove(); }catch{} }
+      }catch{ resolve(false); }
+    });
+  }
+
 })();
