@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.5 - 2025-09-23
+
+### English
+- Feature: Added per-page/PDF summary history with automatic recall. The panel now reuses the latest saved summary when reopened and lets you browse, copy, apply, or delete past outputs from a floating “History” popover.
+- UX: Summary card toolbar gains a History button; the history badge styling was refined so the timestamp chip leaves consistent spacing above the card content.
+
+### 中文
+- 新功能：新增按页面/PDF 保存的摘要历史并支持自动回填。重新打开浮窗时会优先恢复最近的摘要，并可通过“历史”弹窗浏览、复制、套用或删除以往结果。
+- 体验优化：摘要卡片工具栏新增历史按钮，同时重新调整历史标签与正文的间距，让“历史 · 刚刚”提示与内容排版更协调。
+
 ## v2.3.4 - 2025-09-22
 
 ### English

@@ -13,8 +13,8 @@
 
 ## English
 
-Current stable: v2.3.4 (main branch)
-Current beta: v2.3.4 (dev/next branch)
+Current stable: v2.3.5 (main branch)
+Current beta: v2.3.5 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -32,6 +32,7 @@ Current beta: v2.3.4 (dev/next branch)
 - 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click  
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
+- 🗂️ Summary History (new): Automatically stores per-page/PDF results, lets you reopen the panel and instantly reuse the latest summary, and browse/apply previous outputs via the in-panel History popover  
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
@@ -148,6 +149,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 🤖 AI 驱动的摘要与翻译：一键生成简洁摘要或翻译  
 - ⚙️ 个性化设置：自定义提示词、模式、快捷键和界面偏好  
 - 📑 浮动面板：无需跳转页面即可查看摘要  
+- 🗂️ 摘要历史（新增）：自动保存每个页面或 PDF 的摘要记录，重新打开浮窗即可恢复最近结果，还可通过面板内的“历史”弹窗浏览、复制、套用以往摘要  
 - 🌙 主题支持：明亮和暗黑模式，保护视力  
 - 🖱️ 右键菜单翻译：在网页中选中文本，右键即可快速调用 AI 翻译
  - 🧾 全文翻译：将整页可见内容按段落翻译，在原文下方以引用块内联展示；可在右键菜单“全文翻译 / 显示原文”间切换  
