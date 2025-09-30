@@ -156,8 +156,8 @@ async function saveSummaryHistory(contexts, payload) {
       }
     };
 
-    const existing = Array.isArray(group.entries) ? group.entries : [];
-    const deduped = existing.filter(e => e.summary !== entry.summary || e.cleaned !== entry.cleaned);
+    const prevEntries = Array.isArray(group.entries) ? group.entries : [];
+    const deduped = prevEntries.filter(e => e.summary !== entry.summary || e.cleaned !== entry.cleaned);
     group.entries = [entry, ...deduped];
     store[key] = group;
   }
