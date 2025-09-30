@@ -38,6 +38,191 @@ async function setQAUI(tabId, ui) {
 }
 
 /* ------------------------------------------------------------------ */
+// 摘要历史存储（按 URL/PDF）
+const SUMMARY_HISTORY_KEY = 'sx_summary_history_v1';
+const SUMMARY_HISTORY_PER_KEY = 5;
+const SUMMARY_HISTORY_GLOBAL_MAX = 80;
+
+function normalizeHistoryUrl(raw = '') {
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    u.hash = '';
+    if (u.pathname && u.pathname !== '/') {
+      u.pathname = u.pathname.replace(/\/+$/g, '');
+      if (!u.pathname) u.pathname = '/';
+    }
+    return u.toString();
+  } catch {
+    return String(raw || '').split('#')[0];
+  }
+}
+
+function buildHistoryKey(context = {}) {
+  const source = context?.source === 'pdf' ? 'pdf' : 'page';
+  if (source === 'pdf') {
+    const url = context?.url || '';
+    if (url && url !== 'pdf://local') {
+      return `pdf|${normalizeHistoryUrl(url).toLowerCase()}`;
+    }
+    const name = (context?.title || '').trim().toLowerCase();
+    return name ? `pdf|local|${name}` : 'pdf|local|untitled';
+  }
+  const norm = normalizeHistoryUrl(context?.url || '').toLowerCase();
+  if (norm) return `page|${norm}`;
+  const title = (context?.title || '').trim().toLowerCase();
+  return title ? `page|title|${title}` : '';
+}
+
+async function readSummaryHistoryStore() {
+  const obj = await chrome.storage.local.get([SUMMARY_HISTORY_KEY]).catch(() => ({}));
+  const store = obj?.[SUMMARY_HISTORY_KEY];
+  return (store && typeof store === 'object') ? store : {};
+}
+
+async function writeSummaryHistoryStore(store) {
+  await chrome.storage.local.set({ [SUMMARY_HISTORY_KEY]: store });
+}
+
+function pruneSummaryHistory(store) {
+  for (const key of Object.keys(store)) {
+    const group = store[key];
+    if (!group || !Array.isArray(group.entries)) {
+      delete store[key];
+      continue;
+    }
+    group.entries = group.entries
+      .filter(e => e && typeof e === 'object')
+      .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+      .slice(0, SUMMARY_HISTORY_PER_KEY);
+    if (!group.entries.length) {
+      delete store[key];
+      continue;
+    }
+    group.updatedAt = group.entries[0]?.ts || Date.now();
+  }
+
+  const flat = [];
+  for (const [key, group] of Object.entries(store)) {
+    for (const entry of group.entries) {
+      flat.push({ key, id: entry.id, ts: entry.ts || 0 });
+    }
+  }
+  if (flat.length <= SUMMARY_HISTORY_GLOBAL_MAX) return;
+
+  flat.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const removeCount = flat.length - SUMMARY_HISTORY_GLOBAL_MAX;
+  for (let i = 0; i < removeCount; i += 1) {
+    const target = flat[i];
+    const group = store[target.key];
+    if (!group) continue;
+    group.entries = group.entries.filter(e => e.id !== target.id);
+    if (!group.entries.length) {
+      delete store[target.key];
+    }
+  }
+}
+
+async function saveSummaryHistory(contexts, payload) {
+  const list = Array.isArray(contexts) ? contexts : [contexts];
+  if (!list.length) return null;
+  const store = await readSummaryHistoryStore();
+  const now = Date.now();
+
+  for (const ctx of list) {
+    const key = buildHistoryKey(ctx);
+    if (!key) continue;
+    const group = store[key] && typeof store[key] === 'object'
+      ? store[key]
+      : { key, source: ctx?.source === 'pdf' ? 'pdf' : 'page', url: '', title: '', entries: [] };
+    group.source = ctx?.source === 'pdf' ? 'pdf' : 'page';
+    if (ctx?.url) group.url = ctx.url;
+    if (ctx?.title) group.title = ctx.title;
+
+    const entry = {
+      id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      ts: now,
+      summary: typeof payload?.summary === 'string' ? payload.summary : String(payload?.summary || ''),
+      cleaned: typeof payload?.cleaned === 'string' ? payload.cleaned : String(payload?.cleaned || ''),
+      quickQuestions: Array.isArray(payload?.quickQuestions)
+        ? payload.quickQuestions.filter(Boolean).map(q => String(q)).slice(0, 6)
+        : [],
+      meta: {
+        ...(payload?.meta && typeof payload.meta === 'object' ? payload.meta : {}),
+        source: ctx?.source === 'pdf' ? 'pdf' : 'page',
+        url: ctx?.url || payload?.meta?.url || '',
+        title: ctx?.title || payload?.meta?.title || '',
+        historyKey: key
+      }
+    };
+
+    const existing = Array.isArray(group.entries) ? group.entries : [];
+    const deduped = existing.filter(e => e.summary !== entry.summary || e.cleaned !== entry.cleaned);
+    group.entries = [entry, ...deduped];
+    store[key] = group;
+  }
+
+  pruneSummaryHistory(store);
+  await writeSummaryHistoryStore(store);
+  return true;
+}
+
+async function getSummaryHistoryForContexts(contexts) {
+  const list = Array.isArray(contexts) ? contexts : [contexts];
+  const store = await readSummaryHistoryStore();
+  const out = [];
+  const seen = new Set();
+  for (const ctx of list) {
+    const key = buildHistoryKey(ctx);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const group = store[key];
+    if (!group || !Array.isArray(group.entries)) {
+      out.push({
+        key,
+        source: ctx?.source === 'pdf' ? 'pdf' : 'page',
+        title: ctx?.title || '',
+        url: ctx?.url || '',
+        entries: []
+      });
+      continue;
+    }
+    out.push({
+      key,
+      source: group.source || (ctx?.source === 'pdf' ? 'pdf' : 'page'),
+      title: group.title || ctx?.title || '',
+      url: group.url || ctx?.url || '',
+      entries: group.entries
+        .map(entry => ({
+          ...entry,
+          quickQuestions: Array.isArray(entry.quickQuestions) ? entry.quickQuestions.slice(0) : [],
+          meta: entry.meta && typeof entry.meta === 'object' ? { ...entry.meta } : {}
+        }))
+        .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+    });
+  }
+  return out;
+}
+
+async function deleteSummaryHistoryEntry(context, entryId) {
+  const key = buildHistoryKey(context);
+  if (!key || !entryId) return false;
+  const store = await readSummaryHistoryStore();
+  const group = store[key];
+  if (!group || !Array.isArray(group.entries)) return false;
+  const next = group.entries.filter(e => e.id !== entryId);
+  if (next.length === group.entries.length) return false;
+  if (next.length) {
+    group.entries = next;
+    store[key] = group;
+  } else {
+    delete store[key];
+  }
+  await writeSummaryHistoryStore(store);
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
 // 兜底注入：大多数页面已通过 manifest.content_scripts 常驻注入
 // 但为防在个别时序/站点下收不到消息，这里保留一次动态注入兜底（仅注入本地文件，合规）。
 async function injectIfNeeded(tabId) {
@@ -221,12 +406,16 @@ async function runForTab(tabId) {
     cleaned: "",
     quickQuestions,
     meta: {
+      source: 'page',
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
       model_summarize: cfg.model_summarize,
       output_lang: finalLang,
       extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode
+      task_mode: cfg.task_mode,
+      url,
+      title,
+      pageLang
     }
   });
 
@@ -272,14 +461,42 @@ async function runForTab(tabId) {
     cleaned: cleanedMarkdown,
     quickQuestions,
     meta: {
+      source: 'page',
       baseURL: cfg.baseURL,
       model_extract: cfg.model_extract,
       model_summarize: cfg.model_summarize,
       output_lang: finalLang,
       extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode
+      task_mode: cfg.task_mode,
+      url,
+      title,
+      pageLang
     }
   });
+
+  try {
+    await saveSummaryHistory(
+      { source: 'page', url, title },
+      {
+        summary: summaryFast,
+        cleaned: cleanedMarkdown,
+        quickQuestions,
+        meta: {
+          baseURL: cfg.baseURL,
+          model_extract: cfg.model_extract,
+          model_summarize: cfg.model_summarize,
+          output_lang: finalLang,
+          extract_mode: cfg.extract_mode,
+          task_mode: cfg.task_mode,
+          url,
+          title,
+          pageLang
+        }
+      }
+    );
+  } catch (e) {
+    console.warn('saveSummaryHistory(page) failed', e);
+  }
 }
 
 // Run pipeline for provided raw text/markdown (e.g., from PDF)
@@ -297,6 +514,9 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       }
     } catch {}
   }
+
+  const tabInfo = await chrome.tabs.get(tabId).catch(() => null);
+  const tabUrl = tabInfo?.url || '';
 
   await setState(tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
 
@@ -372,7 +592,10 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       extract_mode: cfg.extract_mode,
       task_mode: cfg.task_mode,
       source: 'pdf',
-      pagesLabel
+      pagesLabel,
+      url,
+      title,
+      pageLang
     }
   });
 
@@ -423,9 +646,36 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       extract_mode: cfg.extract_mode,
       task_mode: cfg.task_mode,
       source: 'pdf',
-      pagesLabel
+      pagesLabel,
+      url,
+      title,
+      pageLang
     }
   });
+
+  try {
+    const contexts = [{ source: 'pdf', url, title }];
+    if (tabUrl) contexts.push({ source: 'page', url: tabUrl, title });
+    await saveSummaryHistory(contexts, {
+      summary: summaryFast,
+      cleaned: cleanedMarkdown,
+      quickQuestions,
+      meta: {
+        baseURL: cfg.baseURL,
+        model_extract: cfg.model_extract,
+        model_summarize: cfg.model_summarize,
+        output_lang: finalLang,
+        extract_mode: cfg.extract_mode,
+        task_mode: cfg.task_mode,
+        pagesLabel,
+        url,
+        title,
+        pageLang
+      }
+    });
+  } catch (e) {
+    console.warn('saveSummaryHistory(pdf) failed', e);
+  }
 }
 
 /* --------------------------------------------------------------- */
@@ -971,6 +1221,49 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await setQAUI(tabId, ui);
         safeReply({ ok:true });
       } catch(e){ safeReply({ ok:false, error: String(e) }); }
+    })();
+    return true;
+  }
+
+  if (msg?.type === 'SUMMARY_HISTORY_GET') {
+    (async () => {
+      try {
+        const raw = Array.isArray(msg.contexts) && msg.contexts.length ? msg.contexts : (msg.context ? [msg.context] : []);
+        if (!raw.length) { safeReply({ ok: true, data: [] }); return; }
+        const contexts = raw.map(ctx => (ctx && typeof ctx === 'object') ? ctx : {}).filter(ctx => Object.keys(ctx).length);
+        if (!contexts.length) { safeReply({ ok: true, data: [] }); return; }
+        const data = await getSummaryHistoryForContexts(contexts);
+        safeReply({ ok: true, data });
+      } catch (e) {
+        safeReply({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
+  if (msg?.type === 'SUMMARY_HISTORY_DELETE') {
+    (async () => {
+      try {
+        const context = msg.context && typeof msg.context === 'object' ? msg.context : null;
+        if (!context) { safeReply({ ok:false, error:'No context' }); return; }
+        if (msg.clearAll) {
+          const key = buildHistoryKey(context);
+          if (!key) { safeReply({ ok:false, error:'Invalid context' }); return; }
+          const store = await readSummaryHistoryStore();
+          if (store[key]) {
+            delete store[key];
+            await writeSummaryHistoryStore(store);
+          }
+          safeReply({ ok:true });
+          return;
+        }
+        const entryId = typeof msg.entryId === 'string' ? msg.entryId : '';
+        if (!entryId) { safeReply({ ok:false, error:'No entryId' }); return; }
+        const success = await deleteSummaryHistoryEntry(context, entryId);
+        safeReply({ ok: success });
+      } catch (e) {
+        safeReply({ ok:false, error: String(e) });
+      }
     })();
     return true;
   }

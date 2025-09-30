@@ -22,6 +22,14 @@
   if (window[MARK]) return;
   window[MARK] = true;
 
+  // ===== 摘要历史（缓存于前端，按需拉取）=====
+  let summaryHistoryCache = [];
+  let summaryHistoryLoaded = false;
+  let summaryHistoryActive = null; // { entry, group }
+  let summaryHistoryPopover = null;
+  let summaryHistoryOutsideHandler = null;
+  let summaryHistoryAutoApplied = false;
+
   // ===== Utils =====
   const escapeHtml = (str) =>
     String(str || '').replace(/[&<>"']/g,(s)=>({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
@@ -129,6 +137,367 @@
       .replace(/(<div class=\"alert\"[^>]*>.*?<\/div>)(?:\s*<br\s*\/?>\s*)+/gis, '$1');
     return html;
   }
+
+  function formatHistoryTime(ts){
+    const lang = currentLangCache === 'en' ? 'en' : 'zh';
+    if (!ts || Number.isNaN(ts)) return lang === 'en' ? 'unknown' : '时间未知';
+    const diff = Date.now() - ts;
+    const minute = 60000;
+    const hour = 3600000;
+    const day = 86400000;
+    if (diff < minute) return lang === 'en' ? 'just now' : '刚刚';
+    if (diff < hour){
+      const m = Math.max(1, Math.round(diff / minute));
+      return lang === 'en' ? `${m} min ago` : `${m} 分钟前`;
+    }
+    if (diff < day){
+      const h = Math.max(1, Math.round(diff / hour));
+      return lang === 'en' ? `${h} hr ago` : `${h} 小时前`;
+    }
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    if (lang === 'en') return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  }
+
+  function buildHistoryContexts(shadow){
+    const contexts = [];
+    try {
+      const pageUrl = location.href;
+      const pageTitle = document.title || '';
+      contexts.push({ source: 'page', url: pageUrl, title: pageTitle });
+    } catch {}
+    try {
+      const pdfCard = shadow?.getElementById?.('sx-pdf');
+      const pdfTitle = pdfCard?.__pdfName;
+      if (pdfTitle) contexts.push({ source: 'pdf', url: 'pdf://local', title: pdfTitle });
+    } catch {}
+    return contexts;
+  }
+
+  async function refreshSummaryHistory(shadow, options = {}){
+    const force = !!options.force;
+    if (summaryHistoryLoaded && !force) return summaryHistoryCache;
+    const contexts = buildHistoryContexts(shadow);
+    if (!contexts.length){
+      summaryHistoryCache = [];
+      summaryHistoryLoaded = true;
+      return summaryHistoryCache;
+    }
+    let data = [];
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: 'SUMMARY_HISTORY_GET', contexts });
+      if (resp?.ok && Array.isArray(resp.data)) data = resp.data;
+    } catch (e) {
+      console.warn('fetch history failed', e);
+    }
+    summaryHistoryCache = data
+      .map(group => ({
+        ...group,
+        entries: Array.isArray(group.entries)
+          ? group.entries.map(entry => ({ ...entry, _groupKey: group.key }))
+          : []
+      }))
+      .filter(group => group.entries.length);
+    summaryHistoryLoaded = true;
+    return summaryHistoryCache;
+  }
+
+  function flattenSummaryHistory(){
+    const out = [];
+    for (const group of summaryHistoryCache){
+      if (!group || !Array.isArray(group.entries)) continue;
+      for (const entry of group.entries){
+        out.push({ group, entry });
+      }
+    }
+    out.sort((a,b)=> (b.entry?.ts || 0) - (a.entry?.ts || 0));
+    return out;
+  }
+
+  function clearHistoryBadge(shadow){
+    try{
+      const card = shadow.getElementById('sx-summary');
+      if (card) card.classList.remove('has-history');
+      const badge = card?.querySelector('.history-tag');
+      if (badge) badge.remove();
+    }catch{}
+  }
+
+  function markHistoryBadge(shadow, entry){
+    try{
+      const card = shadow.getElementById('sx-summary');
+      if (!card) return;
+      card.classList.add('has-history');
+      const text = currentLangCache === 'en'
+        ? `History · ${formatHistoryTime(entry?.ts)}`
+        : `历史 · ${formatHistoryTime(entry?.ts)}`;
+      let badge = card.querySelector('.history-tag');
+      if (!badge){
+        badge = document.createElement('div');
+        badge.className = 'history-tag';
+        card.appendChild(badge);
+      }
+      badge.textContent = text;
+    }catch{}
+  }
+
+  function updateHistoryPopoverActiveState(){
+    if (!summaryHistoryPopover) return;
+    const activeId = summaryHistoryActive?.entry?.id;
+    const activeKey = summaryHistoryActive?.group?.key;
+    summaryHistoryPopover.querySelectorAll('.history-item').forEach(item => {
+      const same = item.dataset.entryId === activeId && item.dataset.groupKey === activeKey;
+      item.classList.toggle('active', !!same);
+    });
+  }
+
+  async function applyHistoryEntry(shadow, bundle, options = {}){
+    if (!bundle || !bundle.entry) return false;
+    const entry = bundle.entry;
+    const group = bundle.group || {};
+    summaryHistoryActive = { entry, group };
+    clearHistoryBadge(shadow);
+    try { setSummaryTitleBySource(entry.meta || {}); } catch {}
+    try { setCleanedTitleBySource(entry.meta || {}); } catch {}
+    try {
+      const wrap = shadow.getElementById('sx-wrap');
+      wrap?.classList?.remove('fx-intro');
+      wrap?.classList?.remove('is-empty');
+    } catch {}
+    hasSummarizeTriggered = true;
+    lastSummarySource = entry?.meta?.source || group?.source || 'page';
+    setSummarizing(shadow, false);
+    setLoading(shadow, false);
+    await renderCards(entry.summary, entry.cleaned);
+    try { ensureShareButton(shadow); } catch {}
+    try { ensureHistoryButton(shadow); } catch {}
+    try { ensureQuickAsk(shadow, Array.isArray(entry.quickQuestions) ? entry.quickQuestions : []); } catch {}
+    markHistoryBadge(shadow, entry);
+    updateHistoryPopoverActiveState();
+    return true;
+  }
+
+  function closeSummaryHistoryPopover(){
+    if (summaryHistoryPopover){
+      try { summaryHistoryPopover.remove(); } catch {}
+      summaryHistoryPopover = null;
+    }
+    if (summaryHistoryOutsideHandler){
+      const { pointer, key } = summaryHistoryOutsideHandler;
+      try { shadow.removeEventListener('mousedown', pointer, true); } catch {}
+      try { shadow.removeEventListener('keydown', key); } catch {}
+      summaryHistoryOutsideHandler = null;
+    }
+  }
+
+  function historyContextFromGroup(group){
+    if (!group) return null;
+    return { source: group.source, url: group.url, title: group.title };
+  }
+
+  async function deleteHistoryOnBackground(bundle, opts = {}){
+    const context = historyContextFromGroup(bundle?.group);
+    if (!context) return false;
+    const payload = { type: 'SUMMARY_HISTORY_DELETE', context };
+    if (opts.clearAll) payload.clearAll = true;
+    else if (bundle?.entry?.id) payload.entryId = bundle.entry.id;
+    else return false;
+    try { const resp = await chrome.runtime.sendMessage(payload); return !!resp?.ok; } catch { return false; }
+  }
+
+  async function handleHistoryDelete(shadow, bundle){
+    const ok = await deleteHistoryOnBackground(bundle);
+    if (!ok) return false;
+    if (summaryHistoryActive && summaryHistoryActive.entry?.id === bundle?.entry?.id && summaryHistoryActive.group?.key === bundle?.group?.key){
+      summaryHistoryActive = null;
+      clearHistoryBadge(shadow);
+    }
+    summaryHistoryLoaded = false;
+    await refreshSummaryHistory(shadow, { force: true });
+    renderSummaryHistoryPopover(shadow);
+    return true;
+  }
+
+  async function handleHistoryCopy(entry){
+    try {
+      await navigator.clipboard.writeText(String(entry.summary || ''));
+      return true;
+    } catch (e) {
+      console.warn('copy history summary failed', e);
+      return false;
+    }
+  }
+
+  function renderSummaryHistoryPopover(shadow){
+    closeSummaryHistoryPopover();
+    const card = shadow.getElementById('sx-summary');
+    if (!card) return;
+    const pop = document.createElement('div');
+    pop.className = 'history-pop';
+    const header = document.createElement('h4');
+    header.textContent = currentLangCache === 'en' ? 'History' : '历史记录';
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'border:none;background:transparent;font-size:18px;line-height:1;cursor:pointer;color:currentColor;padding:0 4px;';
+    closeBtn.addEventListener('click', () => toggleSummaryHistory(shadow, false));
+    header.appendChild(closeBtn);
+    pop.appendChild(header);
+
+    const entries = flattenSummaryHistory();
+    if (!entries.length){
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = currentLangCache === 'en' ? 'No saved history yet.' : '暂无历史记录。';
+      pop.appendChild(empty);
+    } else {
+      for (const bundle of entries){
+        const { entry, group } = bundle;
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.dataset.entryId = entry?.id || '';
+        item.dataset.groupKey = group?.key || '';
+
+        const title = document.createElement('div');
+        title.className = 'history-title';
+        const label = group?.source === 'pdf'
+          ? (group?.title || (currentLangCache === 'en' ? 'PDF summary' : 'PDF 摘要'))
+          : (group?.title || (currentLangCache === 'en' ? 'This page' : '当前页面'));
+        title.textContent = label;
+        item.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'history-meta';
+        const src = document.createElement('span');
+        src.textContent = group?.source === 'pdf' ? (currentLangCache === 'en' ? 'PDF' : 'PDF') : (currentLangCache === 'en' ? 'Page' : '页面');
+        meta.appendChild(src);
+        const time = document.createElement('span');
+        time.textContent = formatHistoryTime(entry?.ts);
+        meta.appendChild(time);
+        if (entry?.meta?.pagesLabel){
+          const span = document.createElement('span');
+          span.textContent = entry.meta.pagesLabel;
+          meta.appendChild(span);
+        }
+        if (entry?.meta?.output_lang){
+          const span = document.createElement('span');
+          span.textContent = entry.meta.output_lang.toUpperCase();
+          meta.appendChild(span);
+        }
+        if (entry?.meta?.model_summarize){
+          const span = document.createElement('span');
+          span.textContent = entry.meta.model_summarize;
+          meta.appendChild(span);
+        }
+        item.appendChild(meta);
+
+        if (entry?.summary){
+          const preview = document.createElement('div');
+          preview.className = 'history-preview';
+          const text = String(entry.summary).split(/\n+/)[0] || entry.summary;
+          preview.textContent = text.length > 140 ? `${text.slice(0, 140)}…` : text;
+          item.appendChild(preview);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'history-actions';
+
+        const useBtn = document.createElement('button');
+        useBtn.type = 'button';
+        useBtn.textContent = currentLangCache === 'en' ? 'Apply' : '使用';
+        useBtn.addEventListener('click', async () => {
+          await applyHistoryEntry(shadow, bundle);
+          closeSummaryHistoryPopover();
+        });
+        actions.appendChild(useBtn);
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.textContent = currentLangCache === 'en' ? 'Copy' : '复制';
+        copyBtn.addEventListener('click', async () => {
+          const ok = await handleHistoryCopy(entry);
+          if (ok){
+            copyBtn.setAttribute('aria-pressed','true');
+            setTimeout(()=>copyBtn.removeAttribute('aria-pressed'), 600);
+          }
+        });
+        actions.appendChild(copyBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'danger';
+        delBtn.textContent = currentLangCache === 'en' ? 'Delete' : '删除';
+        delBtn.addEventListener('click', async () => {
+          delBtn.disabled = true;
+          await handleHistoryDelete(shadow, bundle);
+        });
+        actions.appendChild(delBtn);
+
+        item.appendChild(actions);
+        pop.appendChild(item);
+      }
+    }
+
+    card.appendChild(pop);
+    summaryHistoryPopover = pop;
+
+    const pointerHandler = (ev) => {
+      const toggleBtn = shadow.getElementById('sx-summary')?.querySelector('[data-history-toggle="1"]');
+      if (toggleBtn && (toggleBtn === ev.target || toggleBtn.contains(ev.target))) return;
+      if (summaryHistoryPopover && summaryHistoryPopover.contains(ev.target)) return;
+      closeSummaryHistoryPopover();
+    };
+    const keyHandler = (ev) => {
+      if (ev.key === 'Escape') {
+        ev.stopPropagation();
+        closeSummaryHistoryPopover();
+      }
+    };
+    shadow.addEventListener('mousedown', pointerHandler, true);
+    shadow.addEventListener('keydown', keyHandler);
+    summaryHistoryOutsideHandler = { pointer: pointerHandler, key: keyHandler };
+    updateHistoryPopoverActiveState();
+  }
+
+  async function toggleSummaryHistory(shadow, force){
+    if (force === false){ closeSummaryHistoryPopover(); return; }
+    if (summaryHistoryPopover && force !== true){ closeSummaryHistoryPopover(); return; }
+    await refreshSummaryHistory(shadow, { force: force === true });
+    if (!summaryHistoryCache.length){
+      closeSummaryHistoryPopover();
+      const card = shadow.getElementById('sx-summary');
+      if (!card) return;
+      const pop = document.createElement('div');
+      pop.className = 'history-pop';
+      const msg = document.createElement('div');
+      msg.className = 'history-empty';
+      msg.textContent = currentLangCache === 'en' ? 'No saved history yet.' : '暂无历史记录。';
+      pop.appendChild(msg);
+      card.appendChild(pop);
+      summaryHistoryPopover = pop;
+      setTimeout(closeSummaryHistoryPopover, 1600);
+      return;
+    }
+    renderSummaryHistoryPopover(shadow);
+  }
+async function maybeRestoreHistory(shadow, state){
+    try{
+      if (summaryHistoryAutoApplied) return false;
+      const status = state?.status;
+      if (status === 'done' || status === 'partial' || status === 'running') return false;
+      await refreshSummaryHistory(shadow);
+      const entries = flattenSummaryHistory();
+      if (!entries.length) return false;
+      const applied = await applyHistoryEntry(shadow, entries[0]);
+      if (applied) summaryHistoryAutoApplied = true;
+      return applied;
+    }catch(e){
+      console.warn('restore history failed', e);
+      return false;
+    }
+  }
+
 
   // ===== Share Card (canvas to clipboard) =====
   async function generateShareImageFromSummary(shadow){
@@ -1204,13 +1573,174 @@
         color: #1e3a8a; 
         font-weight: 800;
       }
+      .tbtn-history{
+        background: #eef2ff;
+        border-color: #d4ddff;
+        color: #3730a3;
+        font-weight: 700;
+      }
+      :host([data-theme="dark"]) .tbtn-history{
+        background: rgba(99,102,241,.24);
+        border-color: rgba(99,102,241,.48);
+        color: #c7d2ff;
+      }
       .tbtn .icon{ width:16px; height:16px; display:inline-block; }
       .tbtn .icon-share{ stroke: currentColor; fill: none; stroke-width: 2; }
+      .tbtn .icon-history{ stroke: currentColor; fill: none; stroke-width: 1.8; }
       .tbtn-share:hover{ background:#dbeafe; border-color:#b7d0ff; color:#1e40af; box-shadow: 0 2px 10px rgba(37,99,235,.18); }
       .tbtn-share:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(37,99,235,.32); }
+      .tbtn-history:hover{ background:#e0e7ff; border-color:#c1ccff; color:#312e81; box-shadow: 0 2px 10px rgba(79,70,229,.18); }
+      .tbtn-history:focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(99,102,241,.32); }
       .tbtn:hover{ background:#fbfdff; border-color:#d9e6ff; }
       .tbtn:active{ transform: translateY(1px); }
       .tbtn[aria-pressed="true"]{ background:#eef5ff; border-color:#cadeff; }
+
+      .history-tag{
+        position:absolute;
+        left:16px;
+        top:52px;
+        padding:2px 10px;
+        border-radius:999px;
+        background: rgba(59,130,246,.12);
+        color:#1d4ed8;
+        font-size:11px;
+        font-weight:600;
+        letter-spacing:.2px;
+      }
+      :host([data-theme="dark"]) .history-tag{
+        background: rgba(99,102,241,.28);
+        color:#c7d2ff;
+      }
+      .card.card-head.has-history .md{ margin-top:30px; }
+      .history-pop{
+        position:absolute;
+        top:56px;
+        right:12px;
+        width:280px;
+        max-height:360px;
+        overflow:auto;
+        padding:14px;
+        border-radius:14px;
+        background: var(--surface);
+        border:1px solid var(--border);
+        box-shadow: 0 18px 36px rgba(15,23,42,.20);
+        z-index: 60;
+      }
+      :host([data-theme="dark"]) .history-pop{
+        background: rgba(15,23,42,.88);
+        border-color: rgba(148,163,184,.35);
+        box-shadow: 0 18px 36px rgba(9,13,23,.55);
+      }
+      .history-pop h4{
+        margin:0 0 10px;
+        font-size:13px;
+        font-weight:700;
+        color: var(--muted);
+        display:flex;
+        align-items:center;
+        justify-content: space-between;
+      }
+      .history-empty{
+        font-size:13px;
+        color: var(--muted);
+        padding:8px 0;
+        text-align:center;
+      }
+      .history-item{
+        border-radius:12px;
+        border:1px solid rgba(148,163,184,.28);
+        padding:10px 12px;
+        margin-bottom:10px;
+        background: rgba(148,163,184,.08);
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+      }
+      .history-item:last-child{ margin-bottom:0; }
+      .history-item.active{
+        border-color: rgba(59,130,246,.55);
+        background: rgba(59,130,246,.18);
+      }
+      :host([data-theme="dark"]) .history-item{
+        background: rgba(30,41,59,.52);
+        border-color: rgba(148,163,184,.45);
+      }
+      :host([data-theme="dark"]) .history-item.active{
+        border-color: rgba(99,102,241,.65);
+        background: rgba(99,102,241,.32);
+      }
+      .history-title{
+        font-size:13px;
+        font-weight:700;
+        color: var(--text);
+      }
+      .history-time{
+        font-size:12px;
+        color: var(--muted);
+      }
+      .history-meta{
+        font-size:12px;
+        color: var(--muted);
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+      }
+      .history-meta span{
+        background: rgba(148,163,184,.18);
+        padding:2px 6px;
+        border-radius:6px;
+      }
+      :host([data-theme="dark"]) .history-meta span{
+        background: rgba(99,102,241,.24);
+        color:#dbeafe;
+      }
+      .history-actions{ display:flex; gap:8px; }
+      .history-actions button{
+        flex:1;
+        border-radius:8px;
+        border:1px solid rgba(148,163,184,.45);
+        background: rgba(255,255,255,.7);
+        padding:6px 8px;
+        font-size:12px;
+        cursor:pointer;
+        color:#1f2937;
+        font-weight:600;
+      }
+      .history-actions button:hover{ background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.45); }
+      :host([data-theme="dark"]) .history-actions button{
+        background: rgba(30,41,59,.72);
+        border-color: rgba(148,163,184,.45);
+        color:#e2e8f0;
+      }
+      :host([data-theme="dark"]) .history-actions button:hover{
+        background: rgba(37,99,235,.32);
+        border-color: rgba(37,99,235,.52);
+      }
+      .history-actions button.danger{
+        color:#b91c1c;
+        border-color: rgba(248,113,113,.45);
+        background: rgba(254,226,226,.8);
+      }
+      .history-actions button.danger:hover{
+        background: rgba(248,113,113,.22);
+        border-color: rgba(248,113,113,.55);
+      }
+      :host([data-theme="dark"]) .history-actions button.danger{
+        color:#fecaca;
+        background: rgba(185,28,28,.35);
+        border-color: rgba(248,113,113,.48);
+      }
+      :host([data-theme="dark"]) .history-actions button.danger:hover{
+        background: rgba(248,113,113,.45);
+        border-color: rgba(248,113,113,.65);
+      }
+      .history-preview{
+        font-size:12px;
+        color: var(--text);
+        opacity:.88;
+        max-height:72px;
+        overflow:hidden;
+      }
 
       .read-progress{ position:absolute; left:0; right:0; top:44px; height:3px; background:transparent; }
       .read-progress > span{ display:block; height:3px; width:0%; background: linear-gradient(90deg, rgba(34,197,94,.12), rgba(34,197,94,.85)); transition: width .12s linear; }
@@ -1860,6 +2390,13 @@
                 <path d="M8 8l4-4 4 4"/>
               </svg>
             </button>
+            <button class="tbtn tbtn-history" @click="history" :title="tt.history" aria-label="{{ tt.history }}">
+              <svg class="icon icon-history" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 8v5l3 1"/>
+                <path d="M21 12a9 9 0 1 1-9-9"/>
+                <path d="M5 4v4H1"/>
+              </svg>
+            </button>
             <button class="tbtn" @click="copy" :title="tt.copy">{{ tt.copy }}</button>
             <button class="tbtn" @click="toggle" :aria-pressed="collapsed? 'true':'false'" :title="collapsed? tt.expand: tt.collapse">
               {{ collapsed? tt.expand: tt.collapse }}
@@ -1879,6 +2416,7 @@
       tt: {
         get copy(){ return currentLangCache==='en' ? 'Copy' : '复制'; },
         get share(){ return currentLangCache==='en' ? 'Share' : '分享'; },
+        get history(){ return currentLangCache==='en' ? 'History' : '历史'; },
         get collapse(){ return currentLangCache==='en' ? 'Collapse' : '收起'; },
         get expand(){ return currentLangCache==='en' ? 'Expand' : '展开'; },
         get collapsed(){ return currentLangCache==='en' ? 'Collapsed' : '已收起'; },
@@ -1977,6 +2515,9 @@
             card.appendChild(hint); setTimeout(()=>{ try{ hint.remove(); }catch{} }, 1400);
           }catch{}
         }
+      },
+      history(){
+        toggleSummaryHistory(shadow);
       },
       async copy(){
         try{
@@ -4558,6 +5099,9 @@
     }
   }
   async function setEmpty(shadow){
+    clearHistoryBadge(shadow);
+    summaryHistoryActive = null;
+    summaryHistoryAutoApplied = false;
     // Do not render empty cards; keep background only
     try{
       if (vmSummary && vmCleaned){ vmSummary.html = ''; vmCleaned.html = ''; }
@@ -4571,9 +5115,44 @@
     // Observe changes & update arrow position under the run button center
     try{ bindArrowResizeObservers(); updateEmptyArrowPosition(); }catch{}
   }
-  async function renderCards(summaryMarkdown, cleanedMarkdown){
+  function ensureHistoryButton(shadow){
+    try{
+      const card = shadow.getElementById('sx-summary');
+      if (!card) return;
+      let tools = card.querySelector('.card-tools');
+      if (!tools){ tools = document.createElement('div'); tools.className='card-tools'; card.appendChild(tools); }
+      let btn = tools.querySelector('.tbtn-history');
+      const label = currentLangCache==='en' ? 'History' : '历史';
+      const svg = `<svg class="icon icon-history" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 1"/><path d="M21 12a9 9 0 1 1-9-9"/><path d="M5 4v4H1"/></svg>`;
+      if (!btn){
+        btn = document.createElement('button');
+        btn.className = 'tbtn tbtn-history';
+        btn.type = 'button';
+        btn.dataset.historyToggle = '1';
+        btn.innerHTML = svg;
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+        tools.insertBefore(btn, tools.firstChild || null);
+        btn.addEventListener('click', () => { toggleSummaryHistory(shadow); });
+      } else {
+        btn.innerHTML = svg;
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+        btn.dataset.historyToggle = '1';
+      }
+    }catch{}
+  }
+
+async function renderCards(summaryMarkdown, cleanedMarkdown){
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
-    if (vmSummary) vmSummary.html = sumHTML; else { const root=shadow.getElementById('sx-summary'); root.innerHTML = sumHTML; try{ ensureShareButton(shadow); }catch{} }
+    if (vmSummary) {
+      vmSummary.html = sumHTML;
+    } else {
+      const root = shadow.getElementById('sx-summary');
+      root.innerHTML = sumHTML;
+      try{ ensureHistoryButton(shadow); }catch{}
+      try{ ensureShareButton(shadow); }catch{}
+    }
     if (cleanedMarkdown===null){
       if (vmCleaned) vmCleaned.html = `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
       else shadow.getElementById('sx-cleaned').innerHTML = `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
@@ -4696,6 +5275,11 @@
   }
   function setSummarizing(shadow, on){ 
     summarizing = !!on; 
+    if (summarizing){
+      summaryHistoryActive = null;
+      clearHistoryBadge(shadow);
+      closeSummaryHistoryPopover();
+    }
     updateQAControls(shadow);
     // Disable/enable indicator buttons during processing
     updateIndicatorButtons(shadow, !on);
@@ -5629,6 +6213,10 @@
   // ===== Run 按钮 =====
   shadow.getElementById('sx-run').addEventListener('click', async ()=>{
     try{
+      closeSummaryHistoryPopover();
+      clearHistoryBadge(shadow);
+      summaryHistoryAutoApplied = false;
+      summaryHistoryLoaded = false;
       // Mark that summarize has been triggered to switch future Q&A into floating mode
       hasSummarizeTriggered = true;
       setSummarizing(shadow, true);
@@ -5950,6 +6538,7 @@
         const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         setLoading(shadow,true); skeleton(shadow); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
+        summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
       }
       else if (st.status==='partial'){
         setSummarizing(shadow,true);
@@ -5957,6 +6546,7 @@
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setLoading(shadow,true); await renderCards(st.summary, null); pollUntilDone(shadow, tabId, (s,c)=>renderCards(s,c));
+        summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
       }
       else if (st.status==='done'){
         setSummarizing(shadow,false);
@@ -5964,9 +6554,12 @@
         if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
         try{ setSummaryTitleBySource(st.meta||{}); setCleanedTitleBySource(st.meta||{}); }catch{}
         setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
+        summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
       }
       else { await setEmpty(shadow); }
     }catch{ await setEmpty(shadow); }
+
+    try{ await maybeRestoreHistory(shadow, st); }catch{}
 
     // After state and cards prepared, restore Q&A UI (visibility, geometry, and bubbles)
     try{
@@ -6159,6 +6752,7 @@
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); skeleton(shadow); try{ ensureQuickAsk(shadow, []); }catch{}
+          summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
         }
         else if (st.status==='partial'){
           // 收到部分结果时也确保清理 PDF 错误
@@ -6167,6 +6761,7 @@
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,true); await renderCards(st.summary, null); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{}
+          summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
         }
         else if (st.status==='done'){
           // 完成时确保不显示任何旧的 PDF 错误
@@ -6175,6 +6770,7 @@
           const w=shadow.getElementById('sx-wrap'); w?.classList?.remove('fx-intro');
           if (!w?.classList?.contains('expanding')) w?.classList?.remove('is-empty');
           setLoading(shadow,false); await renderCards(st.summary, st.cleaned); try{ ensureQuickAsk(shadow, st.quickQuestions); }catch{} stopPolling();
+          summaryHistoryLoaded = false; summaryHistoryAutoApplied = false;
         }
         else if (st.status==='error'){
           setSummarizing(shadow,false); setLoading(shadow,false);
