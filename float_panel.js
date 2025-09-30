@@ -365,6 +365,7 @@
           ? (group?.title || (currentLangCache === 'en' ? 'PDF summary' : 'PDF 摘要'))
           : (group?.title || (currentLangCache === 'en' ? 'This page' : '当前页面'));
         title.textContent = label;
+        title.title = label;
         item.appendChild(title);
 
         const meta = document.createElement('div');
@@ -1673,6 +1674,11 @@ async function maybeRestoreHistory(shadow, state){
         font-size:13px;
         font-weight:700;
         color: var(--text);
+        max-width: 100%;
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
       .history-time{
         font-size:12px;
