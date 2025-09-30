@@ -554,6 +554,7 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
 
   const tabInfo = await chrome.tabs.get(tabId).catch(() => null);
   const tabUrl = tabInfo?.url || '';
+  const tabTitle = tabInfo?.title || '';
 
   await setState(tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
 
@@ -692,7 +693,7 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
 
   try {
     const contexts = [{ source: 'pdf', url, title }];
-    if (tabUrl) contexts.push({ source: 'page', url: tabUrl, title });
+    if (tabUrl) contexts.push({ source: 'page', url: tabUrl, title: tabTitle });
     await saveSummaryHistory(contexts, {
       summary: summaryFast,
       cleaned: cleanedMarkdown,
