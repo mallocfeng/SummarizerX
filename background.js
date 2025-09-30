@@ -132,20 +132,12 @@ async function saveSummaryHistory(contexts, payload) {
   for (const ctx of list) {
     const key = buildHistoryKey(ctx);
     if (!key) continue;
-    const source = ctx?.source === 'pdf' ? 'pdf' : 'page';
-    const existing = store[key];
-    const group = existing && typeof existing === 'object'
-      ? existing
-      : { key, source, url: ctx?.url || '', title: ctx?.title || '', entries: [] };
-    if (!group.source) group.source = source;
-
-    if (source === 'pdf') {
-      if (ctx?.url) group.url = ctx.url;
-      if (ctx?.title) group.title = ctx.title;
-    } else {
-      if (ctx?.url && !group.url) group.url = ctx.url;
-      if (ctx?.title && !group.title) group.title = ctx.title;
-    }
+    const group = store[key] && typeof store[key] === 'object'
+      ? store[key]
+      : { key, source: ctx?.source === 'pdf' ? 'pdf' : 'page', url: '', title: '', entries: [] };
+    group.source = ctx?.source === 'pdf' ? 'pdf' : 'page';
+    if (ctx?.url) group.url = ctx.url;
+    if (ctx?.title) group.title = ctx.title;
 
     const entry = {
       id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -158,8 +150,8 @@ async function saveSummaryHistory(contexts, payload) {
       meta: {
         ...(payload?.meta && typeof payload.meta === 'object' ? payload.meta : {}),
         source: ctx?.source === 'pdf' ? 'pdf' : 'page',
-        url: ctx?.url || payload?.meta?.url || group.url || '',
-        title: ctx?.title || group.title || payload?.meta?.title || '',
+        url: ctx?.url || payload?.meta?.url || '',
+        title: ctx?.title || payload?.meta?.title || '',
         historyKey: key
       }
     };
@@ -180,7 +172,6 @@ async function getSummaryHistoryForContexts(contexts) {
   const store = await readSummaryHistoryStore();
   const out = [];
   const seen = new Set();
-  let dirty = false;
   for (const ctx of list) {
     const key = buildHistoryKey(ctx);
     if (!key || seen.has(key)) continue;
@@ -196,35 +187,10 @@ async function getSummaryHistoryForContexts(contexts) {
       });
       continue;
     }
-
-    const resolveTitle = () => {
-      try {
-        const entries = Array.isArray(group.entries) ? group.entries : [];
-        if (group.source === 'page') {
-          for (let i = entries.length - 1; i >= 0; i -= 1) {
-            const meta = entries[i]?.meta;
-            if (meta && meta.source === 'page' && meta.title) return meta.title;
-          }
-        }
-        if (group.title) return group.title;
-        for (let i = entries.length - 1; i >= 0; i -= 1) {
-          const meta = entries[i]?.meta;
-          if (meta && meta.title) return meta.title;
-        }
-      } catch {}
-      return ctx?.title || '';
-    };
-    const resolvedTitle = resolveTitle();
-    if (resolvedTitle && resolvedTitle !== group.title) {
-      group.title = resolvedTitle;
-      store[key] = group;
-      dirty = true;
-    }
-
     out.push({
       key,
       source: group.source || (ctx?.source === 'pdf' ? 'pdf' : 'page'),
-      title: resolvedTitle,
+      title: group.title || ctx?.title || '',
       url: group.url || ctx?.url || '',
       entries: group.entries
         .map(entry => ({
@@ -234,9 +200,6 @@ async function getSummaryHistoryForContexts(contexts) {
         }))
         .sort((a, b) => (b.ts || 0) - (a.ts || 0))
     });
-  }
-  if (dirty) {
-    await writeSummaryHistoryStore(store);
   }
   return out;
 }
@@ -552,10 +515,6 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     } catch {}
   }
 
-  const tabInfo = await chrome.tabs.get(tabId).catch(() => null);
-  const tabUrl = tabInfo?.url || '';
-  const tabTitle = tabInfo?.title || '';
-
   await setState(tabId, { status: "running", meta: { source: 'pdf', pagesLabel } });
 
   const finalLang = resolveFinalLang(cfg.output_lang || "", pageLang, text || "");
@@ -693,7 +652,6 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
 
   try {
     const contexts = [{ source: 'pdf', url, title }];
-    if (tabUrl) contexts.push({ source: 'page', url: tabUrl, title: tabTitle });
     await saveSummaryHistory(contexts, {
       summary: summaryFast,
       cleaned: cleanedMarkdown,
