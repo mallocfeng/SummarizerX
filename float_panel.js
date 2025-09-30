@@ -3234,7 +3234,56 @@ async function maybeRestoreHistory(shadow, state){
 
             // Render current reader DOM to image via SVG foreignObject → canvas
             const mdEl = sh.getElementById('sx-reader-md'); if (!mdEl) throw new Error('no content');
+
+            let exportMode = 'original';
+            try{
+              const translatedBlocks = Array.from(mdEl.querySelectorAll('.blk .tran')).filter(el => {
+                const txt = el && typeof el.textContent === 'string' ? el.textContent.trim() : '';
+                return !!txt;
+              });
+              if (translatedBlocks.length){
+                const currentView = mdEl.getAttribute('data-force-view') || 'translated';
+                const defaultMode = currentView === 'original' ? 'bilingual' : 'translation';
+                const choice = await promptReaderExportMode(defaultMode);
+                if (choice === 'cancel') { exportBtn.disabled = false; exportBtn.classList.remove('busy'); return; }
+                exportMode = (choice === 'translation') ? 'translation' : 'bilingual';
+              }
+            }catch{}
+
             const clone = mdEl.cloneNode(true);
+            try{
+              if (exportMode === 'translation'){
+                clone.removeAttribute('data-force-view');
+                Array.from(clone.querySelectorAll('.blk')).forEach(blk => {
+                  try{
+                    const tran = blk.querySelector('.tran');
+                    const txt = tran ? (tran.textContent || '').trim() : '';
+                    if (txt){
+                      blk.classList.add('translated');
+                      tran.style.display = 'block';
+                      Array.from(blk.querySelectorAll('.orig')).forEach(el => { try{ el.remove(); }catch{} });
+                    } else {
+                      blk.classList.remove('translated');
+                      tran?.remove();
+                    }
+                  }catch{}
+                });
+              } else if (exportMode === 'bilingual'){
+                clone.removeAttribute('data-force-view');
+                Array.from(clone.querySelectorAll('.blk')).forEach(blk => {
+                  try{
+                    const tran = blk.querySelector('.tran');
+                    const txt = tran ? (tran.textContent || '').trim() : '';
+                    if (txt){
+                      blk.classList.add('translated');
+                      tran.style.display = 'block';
+                    } else {
+                      tran?.remove();
+                    }
+                  }catch{}
+                });
+              }
+            }catch{}
             // Strip hyperlinks and normalize whitespace to avoid isolated lines around linked words
             try{
               const stripHyperlinks = (root)=>{
@@ -7345,6 +7394,117 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
       }
       return 'div';
     }catch{ return 'div'; }
+  }
+
+  async function promptReaderExportMode(defaultMode){
+    return new Promise((resolve)=>{
+      try{
+        const overlay = document.createElement('div');
+        overlay.id = 'sx-reader-export-mode';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;';
+
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const card = document.createElement('div');
+        card.setAttribute('role','dialog');
+        card.setAttribute('aria-modal','true');
+        card.style.cssText = 'max-width:380px;width:100%;border-radius:14px;padding:20px 22px;box-shadow:0 24px 48px rgba(15,23,42,.35);display:flex;flex-direction:column;gap:16px;font-family:inherit;';
+        if (prefersDark){
+          card.style.background = 'rgba(15,23,42,.96)';
+          card.style.color = '#e2e8f0';
+          card.style.border = '1px solid rgba(148,163,184,.32)';
+        } else {
+          card.style.background = '#ffffff';
+          card.style.color = '#0f172a';
+          card.style.border = '1px solid rgba(15,23,42,.08)';
+        }
+
+        const title = document.createElement('div');
+        title.style.fontSize = '16px';
+        title.style.fontWeight = '700';
+        title.textContent = currentLangCache==='en' ? 'Export translated content' : '导出译文内容';
+        card.appendChild(title);
+
+        const desc = document.createElement('div');
+        desc.style.fontSize = '13px';
+        desc.style.lineHeight = '1.7';
+        desc.textContent = currentLangCache==='en'
+          ? 'This reader view includes translated text. Choose how you want to export the PDF:'
+          : '当前阅读模式包含译文，请选择导出 PDF 的方式：';
+        card.appendChild(desc);
+
+        const buttons = document.createElement('div');
+        buttons.style.display = 'flex';
+        buttons.style.flexDirection = 'column';
+        buttons.style.gap = '10px';
+
+        const makeBtn = (label, value, accent)=>{
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          btn.style.padding = '10px 12px';
+          btn.style.borderRadius = '10px';
+          btn.style.fontSize = '13px';
+          btn.style.fontWeight = '600';
+          btn.style.cursor = 'pointer';
+          btn.style.border = '1px solid rgba(148,163,184,.35)';
+          btn.style.background = prefersDark ? 'rgba(30,41,59,.82)' : '#f8fafc';
+          btn.style.color = card.style.color;
+          if (accent){
+            if (prefersDark){
+              btn.style.border = '1px solid rgba(165,180,252,.45)';
+              btn.style.background = 'rgba(99,102,241,.32)';
+              btn.style.color = '#eef2ff';
+            } else {
+              btn.style.border = '1px solid rgba(99,102,241,.32)';
+              btn.style.background = 'rgba(129,140,248,.15)';
+              btn.style.color = '#312e81';
+            }
+          }
+          btn.addEventListener('click', ()=> cleanup(value));
+          btn.addEventListener('keydown', (ev)=>{
+            if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); cleanup(value); }
+          });
+          buttons.appendChild(btn);
+          return btn;
+        };
+
+        const bilingualText = currentLangCache==='en' ? 'Bilingual (original + translation)' : '双语对照（原文 + 译文）';
+        const translatedText = currentLangCache==='en' ? 'Translation only' : '仅保留译文';
+        const cancelText = currentLangCache==='en' ? 'Cancel' : '取消';
+
+        const primaryMode = defaultMode === 'translation' ? 'translation' : 'bilingual';
+        const bilingualBtn = makeBtn(bilingualText, 'bilingual', primaryMode === 'bilingual');
+        const translationBtn = makeBtn(translatedText, 'translation', primaryMode === 'translation');
+        const cancelBtn = makeBtn(cancelText, 'cancel', false);
+        cancelBtn.style.background = 'transparent';
+        cancelBtn.style.border = 'none';
+        cancelBtn.style.color = prefersDark ? '#cbd5f5' : '#475569';
+        cancelBtn.style.textAlign = 'center';
+
+        card.appendChild(buttons);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        const cleanup = (result)=>{
+          try{ document.removeEventListener('keydown', onKey); }catch{}
+          try{ overlay.remove(); }catch{}
+          resolve(result);
+        };
+
+        const onKey = (ev)=>{ if (ev.key === 'Escape'){ ev.preventDefault(); cleanup('cancel'); } };
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('click', (ev)=>{ if (ev.target === overlay) cleanup('cancel'); });
+
+        setTimeout(()=>{
+          try{
+            (primaryMode === 'translation' ? translationBtn : bilingualBtn).focus();
+          }catch{}
+        }, 0);
+      }catch(err){
+        console.warn('promptReaderExportMode failed:', err);
+        resolve('bilingual');
+      }
+    });
   }
 
   async function confirmPick(rule){
