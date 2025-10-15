@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.3.6 - 2025-09-24
+
+### English
+- Feature: Added cross-device settings snapshots that persist AI provider/API keys, language, prompts, and ad-filter preferences through `chrome.storage.sync`, plus a local cache for fast reads.
+- Behavior: When synced settings enable Ad Filtering with lists selected, the background worker now auto-downloads the corresponding rules on each device so list choices stay in lockstep.
+- UX: Removed the forced page scroll used to trigger lazy loaders while running “Extract & Summarize”, eliminating the brief jump some pages exhibited at kickoff.
+
+### 中文
+- 新功能：引入跨设备设置快照，通过 `chrome.storage.sync` 同步 AI 平台/API Key、语言、提示词、广告过滤等配置，并在本地存一份缓存加速读取。
+- 行为优化：同步到启用广告过滤且勾选列表的配置后，后台会在各设备上自动下载对应规则，保持列表选择一致。
+- 体验：移除先前触发懒加载的强制滚动，解决“提取并摘要”启动时页面轻微跳动的问题。
+
 ## v2.3.5 - 2025-09-23
 
 ### English

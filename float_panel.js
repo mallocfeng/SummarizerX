@@ -95,7 +95,7 @@
         const safe = /^(https?:|data:|blob:|\/\/|\/|\.|#)/i.test(s) ? s : '';
         const a = (alt||'').trim();
         if (!safe) return '';
-        return `<img src="${safe}" alt="${a}" loading="lazy">`;
+        return `<img src="${safe}" alt="${a}">`;
       }catch{ return ''; }
     });
 

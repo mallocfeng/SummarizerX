@@ -1,5 +1,7 @@
 // settings.js —— 统一默认值、平台预设与读取逻辑（Options/Background可共用）
 
+import { FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
+
 export const DEFAULTS = {
   // 首次安装默认就是“试用”
   aiProvider: "trial",
@@ -93,4 +95,133 @@ export async function getSettings() {
     system_prompt_preset: d.system_prompt_preset || DEFAULTS.system_prompt_preset,
     system_prompt_custom: d.system_prompt_custom || DEFAULTS.system_prompt_custom
   };
+}
+
+export const SETTINGS_SNAPSHOT_KEYS = [
+  "aiProvider",
+  "apiKey",
+  "apiKey_openai",
+  "apiKey_deepseek",
+  "apiKey_custom",
+  "apiKey_trial",
+  "baseURL",
+  "model_extract",
+  "model_summarize",
+  "output_lang",
+  "extract_mode",
+  "system_prompt_preset",
+  "system_prompt_custom",
+  "trial_consent",
+  "adblock_enabled",
+  "adblock_strength",
+  "adblock_selected",
+  "adblock_block_popups",
+  "nyt_block_family_popup",
+  "adblock_user_rules_text",
+  "adblock_custom_lists",
+  "ui_language"
+];
+
+const SNAPSHOT_DEFAULTS = {
+  aiProvider: DEFAULTS.aiProvider,
+  apiKey: "",
+  apiKey_openai: "",
+  apiKey_deepseek: "",
+  apiKey_custom: "",
+  apiKey_trial: "trial",
+  baseURL: DEFAULTS.baseURL,
+  model_extract: DEFAULTS.model_extract,
+  model_summarize: DEFAULTS.model_summarize,
+  output_lang: DEFAULTS.output_lang,
+  extract_mode: DEFAULTS.extract_mode,
+  system_prompt_preset: DEFAULTS.system_prompt_preset,
+  system_prompt_custom: DEFAULTS.system_prompt_custom,
+  trial_consent: false,
+  adblock_enabled: false,
+  adblock_strength: FILTER_DEFAULT_STRENGTH,
+  adblock_selected: [],
+  adblock_block_popups: false,
+  nyt_block_family_popup: false,
+  adblock_user_rules_text: "",
+  adblock_custom_lists: [],
+  ui_language: "zh"
+};
+
+const SAFE_STRING = (value, fallback = "") =>
+  (typeof value === "string") ? value : fallback;
+
+export function normalizeSettingsSnapshot(raw = {}) {
+  const source = raw || {};
+  const out = { ...SNAPSHOT_DEFAULTS };
+
+  out.aiProvider = SAFE_STRING(source.aiProvider, SNAPSHOT_DEFAULTS.aiProvider) || SNAPSHOT_DEFAULTS.aiProvider;
+  out.apiKey = SAFE_STRING(source.apiKey, "");
+  out.apiKey_openai = SAFE_STRING(source.apiKey_openai, "");
+  out.apiKey_deepseek = SAFE_STRING(source.apiKey_deepseek, "");
+  out.apiKey_custom = SAFE_STRING(source.apiKey_custom, "");
+  out.apiKey_trial = SAFE_STRING(source.apiKey_trial, SNAPSHOT_DEFAULTS.apiKey_trial) || SNAPSHOT_DEFAULTS.apiKey_trial;
+
+  out.baseURL = SAFE_STRING(source.baseURL, SNAPSHOT_DEFAULTS.baseURL) || SNAPSHOT_DEFAULTS.baseURL;
+  out.model_extract = SAFE_STRING(source.model_extract, SNAPSHOT_DEFAULTS.model_extract) || SNAPSHOT_DEFAULTS.model_extract;
+  out.model_summarize = SAFE_STRING(source.model_summarize, SNAPSHOT_DEFAULTS.model_summarize) || SNAPSHOT_DEFAULTS.model_summarize;
+  out.output_lang = SAFE_STRING(source.output_lang, SNAPSHOT_DEFAULTS.output_lang);
+  out.extract_mode = SAFE_STRING(source.extract_mode, SNAPSHOT_DEFAULTS.extract_mode) || SNAPSHOT_DEFAULTS.extract_mode;
+  out.system_prompt_preset = SAFE_STRING(source.system_prompt_preset, SNAPSHOT_DEFAULTS.system_prompt_preset) || SNAPSHOT_DEFAULTS.system_prompt_preset;
+  out.system_prompt_custom = SAFE_STRING(source.system_prompt_custom, SNAPSHOT_DEFAULTS.system_prompt_custom);
+
+  out.trial_consent = !!source.trial_consent;
+
+  out.adblock_enabled = !!source.adblock_enabled;
+  out.adblock_strength = SAFE_STRING(source.adblock_strength, SNAPSHOT_DEFAULTS.adblock_strength) || SNAPSHOT_DEFAULTS.adblock_strength;
+  out.adblock_selected = Array.isArray(source.adblock_selected)
+    ? Array.from(new Set(source.adblock_selected.map((x) => SAFE_STRING(x, "").trim()).filter(Boolean)))
+    : [];
+  out.adblock_block_popups = !!source.adblock_block_popups;
+  out.nyt_block_family_popup = !!source.nyt_block_family_popup;
+  out.adblock_user_rules_text = SAFE_STRING(source.adblock_user_rules_text, "");
+
+  if (Array.isArray(source.adblock_custom_lists)) {
+    const dedupe = new Set();
+    const cleaned = [];
+    for (const item of source.adblock_custom_lists) {
+      if (!item || typeof item !== "object") continue;
+      const id = SAFE_STRING(item.id, "").trim();
+      if (!id) continue;
+      const name = SAFE_STRING(item.name, id);
+      const url = SAFE_STRING(item.url, "");
+      const key = `${id}::${url}`;
+      if (dedupe.has(key)) continue;
+      dedupe.add(key);
+      const entry = { id };
+      if (name && name !== id) entry.name = name;
+      if (url) entry.url = url;
+      cleaned.push(entry);
+    }
+    out.adblock_custom_lists = cleaned;
+  } else {
+    out.adblock_custom_lists = [];
+  }
+
+  out.ui_language = SAFE_STRING(source.ui_language, SNAPSHOT_DEFAULTS.ui_language) || SNAPSHOT_DEFAULTS.ui_language;
+
+  return out;
+}
+
+export async function persistSettingsSnapshot(override = {}) {
+  try {
+    const current = await chrome.storage.sync.get(SETTINGS_SNAPSHOT_KEYS);
+    const merged = { ...current, ...override };
+    const data = normalizeSettingsSnapshot(merged);
+    const snapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      data
+    };
+    await chrome.storage.sync.set({ sx_settings_snapshot_v1: snapshot });
+    try { await chrome.storage.local.set({ sx_settings_snapshot_v1: snapshot }); } catch {}
+    return snapshot;
+  } catch (e) {
+    console.warn("persistSettingsSnapshot failed", e);
+    return null;
+  }
 }

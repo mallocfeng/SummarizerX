@@ -1,5 +1,5 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
-import { DEFAULTS, PROVIDER_PRESETS, getSettings } from "./settings.js";
+import { DEFAULTS, PROVIDER_PRESETS, getSettings, persistSettingsSnapshot } from "./settings.js";
 import { getCurrentLanguage, t, tSync, updatePageLanguage } from "./i18n.js";
 import { FILTER_LISTS, splitLists, FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
 
@@ -453,6 +453,7 @@ async function saveSettings() {
   if (providerKeyName) payload[providerKeyName] = payload.apiKey;
 
   await chrome.storage.sync.set(payload);
+  await persistSettingsSnapshot(payload);
 
   // 更新快照
   providerSnapshots[aiProvider] = {

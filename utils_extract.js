@@ -69,14 +69,9 @@
       });
     }catch{}
     try{
-      // 4) Minimal auto-scroll to trigger IntersectionObserver-based loaders
-      const doc = document.scrollingElement || document.documentElement;
-      const y = (window.scrollY||doc.scrollTop||0);
-      const max = Math.max(0, doc.scrollHeight - window.innerHeight);
-      const mid = Math.min(max, (y+window.innerHeight*1.2)|0);
-      window.scrollTo(0, mid);
-      await new Promise(r=>setTimeout(r, 180));
-      window.scrollTo(0, y);
+      // 4) Gentle nudge for scroll-based listeners without moving the viewport
+      window.dispatchEvent(new Event('scroll'));
+      document.dispatchEvent(new Event('scroll'));
     }catch{}
   }
   // Prefer Mozilla Readability when available

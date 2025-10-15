@@ -13,8 +13,8 @@
 
 ## English
 
-Current stable: v2.3.5 (main branch)
-Current beta: v2.3.5 (dev/next branch)
+Current stable: v2.3.6 (main branch)
+Current beta: v2.3.6 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -34,6 +34,7 @@ Current beta: v2.3.5 (dev/next branch)
 - 📑 Floating Panel: View summaries without leaving the current page  
 - 🗂️ Summary History (new): Automatically stores per-page/PDF results, lets you reopen the panel and instantly reuse the latest summary, and browse/apply previous outputs via the in-panel History popover  
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
+- ☁️ Cross-Device Settings Sync: Saves language, AI provider/API keys, prompts, and ad-filter toggles via `chrome.storage.sync`; checked ad lists auto-download after syncing so each machine stays up to date  
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
  - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
  - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly

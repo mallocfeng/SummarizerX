@@ -2,7 +2,7 @@
 // 取消 sidepanel，改为页面悬浮面板；保留最小权限（activeTab 动态注入）
 
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
-import { getSettings } from "./settings.js";
+import { getSettings, persistSettingsSnapshot, SETTINGS_SNAPSHOT_KEYS } from "./settings.js";
 import { FILTER_LISTS } from "./adblock_lists.js";
 
 
@@ -17,6 +17,20 @@ const SYSTEM_PRESETS = {
 const S = chrome.storage.session;
 const STATE_KEY = (tabId) => `panel_state_v3:${tabId}`;
 const QA_UI_KEY = (tabId) => `qa_ui_v1:${tabId}`;
+
+const SETTINGS_SNAPSHOT_KEY_SET = new Set(SETTINGS_SNAPSHOT_KEYS);
+let settingsSnapshotTimer = null;
+function requestSettingsSnapshotPersist(reason = "") {
+  if (settingsSnapshotTimer) clearTimeout(settingsSnapshotTimer);
+  settingsSnapshotTimer = setTimeout(async () => {
+    settingsSnapshotTimer = null;
+    try {
+      await persistSettingsSnapshot();
+    } catch (e) {
+      console.warn("persistSettingsSnapshot failed", reason || "", e);
+    }
+  }, 200);
+}
 
 async function getState(tabId) {
   const d = await S.get([STATE_KEY(tabId)]);
@@ -1374,6 +1388,19 @@ try {
     if (changes.adblock_enabled || changes.adblock_selected) {
       scheduleAdblockUpdate('storage_changed');
     }
+    if (Object.keys(changes).some((key) => SETTINGS_SNAPSHOT_KEY_SET.has(key))) {
+      requestSettingsSnapshotPersist('storage_changed');
+    }
+    if (changes.sx_settings_snapshot_v1) {
+      const snapshot = changes.sx_settings_snapshot_v1.newValue;
+      if (snapshot) {
+        try { await chrome.storage.local.set({ sx_settings_snapshot_v1: snapshot }); } catch {}
+        const data = snapshot?.data;
+        if (data && data.adblock_enabled && Array.isArray(data.adblock_selected) && data.adblock_selected.length) {
+          scheduleAdblockUpdate('snapshot_sync');
+        }
+      }
+    }
   });
 } catch {}
 
@@ -1382,6 +1409,19 @@ try {
   try {
     const { adblock_enabled = false } = await chrome.storage.sync.get({ adblock_enabled: false });
     if (adblock_enabled) scheduleAdblockUpdate('startup');
+  } catch {}
+})();
+
+(async () => {
+  try {
+    const { sx_settings_snapshot_v1: snapshot } = await chrome.storage.sync.get(['sx_settings_snapshot_v1']);
+    if (snapshot) {
+      try { await chrome.storage.local.set({ sx_settings_snapshot_v1: snapshot }); } catch {}
+      const data = snapshot?.data;
+      if (data && data.adblock_enabled && Array.isArray(data.adblock_selected) && data.adblock_selected.length) {
+        scheduleAdblockUpdate('snapshot_bootstrap');
+      }
+    }
   } catch {}
 })();
 
