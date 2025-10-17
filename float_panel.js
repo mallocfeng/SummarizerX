@@ -1222,7 +1222,7 @@ async function maybeRestoreHistory(shadow, state){
         /* approximate Chrome desktop surface corner; may be adjusted per-platform */
         --chrome-radius: 12px;
         --btn-min-h: 36px;
-        --arrow-nudge: 8px; /* move empty arrow slightly upward */
+        --arrow-nudge: 4px; /* move empty hint slightly lower */
         --shadow-1: 0 1px 2px rgba(16,24,40,.06);
         --shadow-2: 0 4px 12px rgba(16,24,40,.10);
 
@@ -1435,11 +1435,11 @@ async function maybeRestoreHistory(shadow, state){
       .container{ flex:1 1 auto; padding:0 12px 8px; overflow:auto; overflow-x:hidden; transition: height .6s cubic-bezier(.2,.7,.3,1); position:relative; overscroll-behavior: contain; }
       .container .section:last-child{ margin-bottom:8px; }
       .container .section:first-child{ margin-top:0; }
-      /* Empty state: hide cards; keep frosted background only between bars and compress middle to 66px */
+      /* Empty state: hide cards; keep frosted background only between bars and compress middle to 132px */
       .wrap.is-empty #sx-summary,
       .wrap.is-empty #sx-cleaned,
       .wrap.is-empty #sx-pdf{ display:none !important; }
-      .wrap.is-empty .container{ flex:0 0 auto; height:66px; overflow:hidden; padding-top:0; padding-bottom:0; }
+      .wrap.is-empty .container{ flex:0 0 auto; height:132px; overflow:hidden; padding-top:0; padding-bottom:0; }
       .wrap.is-empty .section{ margin:0 !important; }
       /* While expanding, allow the middle to grow smoothly */
       .wrap.is-empty.expanding .container{ height: var(--sx-target, 2000px); }
@@ -1454,25 +1454,103 @@ async function maybeRestoreHistory(shadow, state){
         border-bottom: 1px solid var(--border);
         position: relative;
       }
-      /* Center illus (down arrow) shown only in folded state */
-      .empty-illus{ display:none; position:absolute; left:50%; top:50%; transform: translate(-50%, calc(-50% - var(--arrow-nudge)));
-        width:28px; height:28px; border-radius:8px; opacity:.96; color: var(--primary);
-        background: transparent; border:none; box-shadow:none; pointer-events:none;
-        transition: opacity .25s ease, transform .25s ease; animation: bounceY 2.2s ease-in-out infinite; }
-      :host([data-theme="dark"]) .empty-illus{ color: var(--primary-600); }
-      .empty-illus::before{
-        content:""; display:block; width:100%; height:100%;
-        background: currentColor;
+      /* Center empty hint shown only in folded state */
+      .empty-illus{
+        display:none;
+        position:absolute;
+        left:50%;
+        top:50%;
+        transform: translate(-50%, calc(-50% - var(--arrow-nudge)));
+        pointer-events:none;
+        text-align:left;
+        transition: opacity .25s ease, transform .25s ease;
+      }
+      .wrap.is-empty .empty-illus{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        padding:12px 15px 12px 14px;
+        min-width:200px;
+        width: min(320px, calc(100% - 24px));
+        max-width:320px;
+        background: linear-gradient(135deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.86) 100%);
+        border-radius:14px;
+        border:1px solid var(--border);
+        box-shadow: 0 8px 20px rgba(15,23,42,.12);
+        color: var(--text);
+        font-size:12px;
+        line-height:1.5;
+      }
+      :host([data-theme="dark"]) .wrap.is-empty .empty-illus{
+        background: linear-gradient(135deg, rgba(30,41,59,.92) 0%, rgba(15,23,42,.88) 100%);
+        border-color: rgba(148,163,184,.38);
+        box-shadow: 0 10px 26px rgba(0,0,0,.36);
+        color: rgba(226,232,240,.94);
+      }
+      .wrap.is-empty.expanding .empty-illus{ opacity:0; transform: translate(-50%, -60%); }
+      .wrap.dragging .empty-illus{ animation: none; }
+      @media (prefers-reduced-motion: reduce){ .empty-illus{ animation: none; } }
+      .empty-illus .tip-body{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        align-items:flex-start;
+        flex:1 1 auto;
+        min-width:0;
+      }
+      .empty-illus .tip-tag{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        padding:2px 9px;
+        font-size:10.2px;
+        font-weight:600;
+        letter-spacing:.24px;
+        text-transform:uppercase;
+        color: var(--primary-600);
+        background: rgba(59,130,246,.16);
+        border-radius:999px;
+      }
+      :host([data-theme="dark"]) .empty-illus .tip-tag{
+        color:#bfdbfe;
+        background: rgba(59,130,246,.24);
+      }
+      .empty-illus .tip-line{
+        display:block;
+        color: inherit;
+        white-space: normal;
+        word-break: break-word;
+        margin-left:4px;
+      }
+      .empty-illus .tip-line.tip-main{
+        font-size:12px;
+        font-weight:600;
+      }
+      .empty-illus .tip-line.tip-sub{
+        font-size:11px;
+        opacity:.9;
+      }
+      .empty-illus .tip-arrow{
+        flex:0 0 auto;
+        width:24px;
+        height:24px;
+        border-radius:8px;
+        background: var(--primary);
+        animation: tipArrowFloat 2s ease-in-out infinite;
         -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
         mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000"><path d="M12 16.5c-.38 0-.74-.14-1.02-.4l-5.5-5.2a1.4 1.4 0 0 1 0-2.02 1.54 1.54 0 0 1 2.1 0L12 12.9l4.42-4.02a1.54 1.54 0 0 1 2.1 0 1.4 1.4 0 0 1 0 2.02l-5.5 5.2c-.28.26-.64.4-1.02.4z"/></svg>') center/contain no-repeat;
         transform: rotate(180deg);
       }
-      .empty-illus::after{ content:""; display:none; }
-      .wrap.is-empty .empty-illus{ display:grid; place-items:center; }
-      .wrap.is-empty.expanding .empty-illus{ opacity:0; transform: translate(-50%, -60%); }
-      .wrap.dragging .empty-illus{ animation: none; }
-      @keyframes bounceY{ 0%,100%{ transform: translate(-50%, calc(-50% - var(--arrow-nudge))); } 50%{ transform: translate(-50%, calc(-50% - var(--arrow-nudge) + 4px)); } }
-      @media (prefers-reduced-motion: reduce){ .empty-illus{ animation: none; } }
+      :host([data-theme="dark"]) .empty-illus .tip-arrow{
+        background: var(--primary-600);
+      }
+      @keyframes tipArrowFloat{
+        0%,100%{ transform: translateY(0) rotate(180deg); }
+        50%{ transform: translateY(2px) rotate(180deg); }
+      }
+      @media (prefers-reduced-motion: reduce){
+        .empty-illus .tip-arrow{ animation: none; }
+      }
       /* Only show the left divider within the middle container; hide global one */
       .wrap.is-empty{ border-left:none !important; box-shadow:none !important; }
       .wrap.is-empty .container::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:1px; background: var(--border); }
@@ -2722,9 +2800,20 @@ async function maybeRestoreHistory(shadow, state){
       const br = btn.getBoundingClientRect();
       const cr = container.getBoundingClientRect();
       if (!br.width || !cr.width) return;
-      const centerX = br.left + br.width/2;
-      const leftInContainer = Math.max(0, Math.min(cr.width, centerX - cr.left));
-      arrow.style.left = Math.round(leftInContainer) + 'px';
+      const centerX = br.left + br.width / 2;
+      const width = arrow.offsetWidth || 0;
+      const icon = arrow.querySelector('.tip-arrow');
+      if (!width || !icon){
+        const fallback = Math.max(0, Math.min(cr.width, centerX - cr.left));
+        arrow.style.left = `${Math.round(fallback)}px`;
+        return;
+      }
+      const styles = window.getComputedStyle(arrow);
+      const padRight = parseFloat(styles.paddingRight || '0') || 0;
+      const iconWidth = icon.offsetWidth || 0;
+      const target = centerX - cr.left + padRight + iconWidth / 2 - width / 2;
+      const bounded = Math.max(0, Math.min(cr.width, target));
+      arrow.style.left = `${Math.round(bounded)}px`;
       // keep vertical center via top:50% in CSS
     }catch{}
   }
@@ -4423,6 +4512,7 @@ async function maybeRestoreHistory(shadow, state){
       try { const b=shadow.getElementById('sx-qa-send'); if(b) b.textContent=t_qa_send; } catch {}
       try { const u=shadow.getElementById('sx-qa-url'); if(u){ u.textContent=location.href; u.title=location.href; } } catch {}
     }catch(e){ console.warn('Failed to update UI text:', e); }
+    try{ renderEmptyTip(shadow); }catch{}
     try{ updateEmptyArrowPosition(); }catch{}
     try{ ensureShareButton(shadow); }catch{}
   }
@@ -4595,6 +4685,7 @@ async function maybeRestoreHistory(shadow, state){
       const wrapEl = shadow.getElementById('sx-wrap');
       const container = shadow.getElementById('sx-container');
       if (!wrapEl || !container) return;
+      try{ renderEmptyTip(shadow); }catch{}
       // Prepare for smooth collapse: lock current height as start value
       const curH = container.getBoundingClientRect().height;
       wrapEl.classList.add('is-empty');
@@ -4602,10 +4693,10 @@ async function maybeRestoreHistory(shadow, state){
       container.style.willChange = 'height';
       container.style.contain = 'layout style';
       container.style.setProperty('--sx-target', Math.max(0, Math.round(curH)) + 'px');
-      // next frame: set target to collapsed height (66px defined in CSS)
+      // next frame: set target to collapsed height (132px defined in CSS)
       requestAnimationFrame(()=>{
         try{
-          container.style.setProperty('--sx-target', '66px');
+          container.style.setProperty('--sx-target', '132px');
           const finish = ()=>{
             try{
               wrapEl.classList.remove('expanding');
@@ -5160,6 +5251,29 @@ async function maybeRestoreHistory(shadow, state){
       vanillaSkeleton(shadow);
     }
   }
+  function renderEmptyTip(shadow){
+    try{
+      const tip = shadow.getElementById('sx-empty-arrow');
+      if (!tip) return;
+      const useEn = currentLangCache === 'en';
+      const tag = useEn ? 'Translation Tip' : '翻译提示';
+      const main = useEn
+        ? 'Use the context menu to translate the full page or only what you highlight.'
+        : '右键菜单可直接翻译全文，或选中文本后翻译选区。';
+      const sub = useEn
+        ? 'Highlight text and right-click to translate instantly.'
+        : '选中文本后右键即可快速翻译。';
+      tip.innerHTML = `
+        <div class="tip-body">
+          <span class="tip-tag">${tag}</span>
+          <span class="tip-line tip-main">${main}</span>
+          <span class="tip-line tip-sub">${sub}</span>
+        </div>
+        <span class="tip-arrow" aria-hidden="true"></span>
+      `;
+      tip.setAttribute('aria-label', `${tag} ${main}`);
+    }catch{}
+  }
   async function setEmpty(shadow){
     clearHistoryBadge(shadow);
     summaryHistoryActive = null;
@@ -5172,6 +5286,7 @@ async function maybeRestoreHistory(shadow, state){
         shadow.getElementById('sx-cleaned').innerHTML = '';
       }
     }catch{}
+    try{ renderEmptyTip(shadow); }catch{}
     // Mark intro + empty for high-transparency frosted backdrop and no resize
     try{ const wrap=shadow.getElementById('sx-wrap'); wrap?.classList?.add('fx-intro'); wrap?.classList?.add('is-empty'); }catch{}
     // Observe changes & update arrow position under the run button center

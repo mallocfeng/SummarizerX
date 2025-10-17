@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v2.3.6 (main branch)
-Current beta: v2.3.7 (dev/next branch)
+Current beta: v2.3.8 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 

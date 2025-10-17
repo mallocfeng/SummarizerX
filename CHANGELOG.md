@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.3.8 - 2025-09-26
+
+### English
+- UX: Refined the sidepanel empty-state hint with clearer copy about using the context menu for full-page or selection translation, tightened spacing, and ensured the floating arrow sits correctly under the run button.
+
+### 中文
+- 体验：优化侧边栏空状态提示，明确说明可通过右键菜单翻译全文或选区，同时调整间距与箭头定位，让提示在默认高度下完整呈现。
+
 ## v2.3.7 - 2025-09-25
 
 ### English
