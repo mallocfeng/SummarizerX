@@ -1,5 +1,5 @@
 // options.js —— 设置页（System Prompt、眼睛显示 Key、保存在最下）
-import { DEFAULTS, PROVIDER_PRESETS, getSettings, persistSettingsSnapshot } from "./settings.js";
+import { DEFAULTS, PROVIDER_PRESETS, getSettings, persistSettingsSnapshot, buildAzureChatCompletionsURL } from "./settings.js";
 import { getCurrentLanguage, t, tSync, updatePageLanguage } from "./i18n.js";
 import { FILTER_LISTS, splitLists, FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
 
@@ -8,6 +8,19 @@ const $ = (id) => document.getElementById(id);
 const GUIDE_URL = chrome.runtime.getURL('help_buy_api.html');
 const GUIDE_OPENAI  = `${GUIDE_URL}#openai`;
 const GUIDE_DEEPSEEK = `${GUIDE_URL}#deepseek`;
+const GUIDE_ANTHROPIC = `${GUIDE_URL}#anthropic`;
+const GUIDE_GEMINI = `${GUIDE_URL}#gemini`;
+const GUIDE_AZURE = `${GUIDE_URL}#azure`;
+
+const ANTHROPIC_VERSION = '2023-06-01';
+
+const PROVIDER_GUIDE_LINKS = {
+  openai: 'link-buy-openai',
+  deepseek: 'link-buy-deepseek',
+  anthropic: 'link-buy-anthropic',
+  gemini: 'link-buy-gemini',
+  azure: 'link-buy-azure'
+};
 
 // 说明：PRESETS 已由 PRESET_TEXT 统一管理；移除重复未使用的 PRESETS 常量
 
@@ -197,10 +210,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.textContent = `v${version}`;
     el.title = version_name || version;
   }
-  const $openaiGuide = document.getElementById('link-buy-openai');
-  const $deepseekGuide = document.getElementById('link-buy-deepseek');
-  if ($openaiGuide)  $openaiGuide.href  = GUIDE_OPENAI;
-  if ($deepseekGuide) $deepseekGuide.href = GUIDE_DEEPSEEK;
+  const guideHrefMap = {
+    'link-buy-openai': GUIDE_OPENAI,
+    'link-buy-deepseek': GUIDE_DEEPSEEK,
+    'link-buy-anthropic': GUIDE_ANTHROPIC,
+    'link-buy-gemini': GUIDE_GEMINI,
+    'link-buy-azure': GUIDE_AZURE
+  };
+  Object.entries(guideHrefMap).forEach(([id, url]) => {
+    const node = document.getElementById(id);
+    if (node) node.href = url;
+  });
 
   // 初始化主题三态切换（自动/浅色/深色）
   initOptionsThemeToggle();
@@ -287,14 +307,8 @@ function initTabsFloatHover(){
 }
 
 function reflectGuideLink(){
-  const p = $("aiProvider").value;
-  const o = document.getElementById('link-buy-openai');
-  const d = document.getElementById('link-buy-deepseek');
-  if (!o || !d) return;
-  if (p === "openai") { o.style.display = "inline"; d.style.display = "none"; }
-  else if (p === "deepseek") { o.style.display = "none"; d.style.display = "inline"; }
-  else if (p === "trial") { o.style.display = "none"; d.style.display = "none"; }
-  else { o.style.display = "inline"; d.style.display = "inline"; }
+  const provider = $("aiProvider").value || DEFAULTS.aiProvider;
+  updateBuyHelp(provider);
 }
 
 // —— 只用 Markdown 的硬约束尾注（禁止 HTML 和内联样式）
@@ -473,40 +487,144 @@ async function saveSettings() {
  * API Key 测试
  * ========================= */
 async function testApiKey() {
-  const cleanupSlash = (s="") => s.replace(/\/+$/,"");
+  const cleanupSlash = (s = "") => s.replace(/\/+$/, "");
+  const ensureHttp = (url = "") => (/^https?:/i.test(url) ? url : `https://${url}`);
   try {
-    const provider = $("aiProvider").value;
-    const key = $("apiKey").value.trim() || (provider === "trial" ? "trial" : "");
-    const base = cleanupSlash($("baseURL").value.trim() || DEFAULTS.baseURL);
-    const model = $("model_summarize").value.trim() || DEFAULTS.model_summarize;
-    if (!key && provider !== "trial") throw new Error(await t("settings.noApiKey"));
+    const provider = $("aiProvider").value || DEFAULTS.aiProvider;
+    if (provider === "trial") {
+      await setStatus("settings.testSkipped");
+      try { window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail: { ok: true } })); } catch {}
+      return;
+    }
+    const key = $("apiKey").value.trim();
+    if (!key) throw new Error(await t("settings.noApiKey"));
+    const preset = PROVIDER_PRESETS[provider] || {};
+    const baseInput = cleanupSlash($("baseURL").value.trim() || preset.baseURL || DEFAULTS.baseURL);
+    const base = ensureHttp(baseInput);
+    const model = $("model_summarize").value.trim() || preset.model_summarize || DEFAULTS.model_summarize;
     await setStatus("settings.testing");
 
-    const resp1 = await fetch(`${base}/models`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${key}` }
-    });
-    if (resp1.ok) { await setStatus("settings.testSuccess"); return; }
+    let resultTag = "chat";
+    if (provider === "anthropic") {
+      await testAnthropic(base, key, model);
+    } else if (provider === "gemini") {
+      await testGemini(base, key, model);
+    } else if (provider === "azure") {
+      await testAzure(base, key, model);
+    } else {
+      resultTag = await testOpenAICompat(base, key, model);
+    }
 
-    const payload = { model, messages: [{ role: "user", content: "ping" }], temperature: 0 };
-    const resp2 = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization": `Bearer ${key}` },
-      body: JSON.stringify(payload)
-    });
-    if (resp2.ok) { await setStatus("settings.testSuccessChat"); return; }
-
-    const t1 = await safeReadText(resp1);
-    const t2 = await safeReadText(resp2);
-    throw new Error(`两种探测均失败。\n/models => ${resp1.status} ${t1}\n/chat/completions => ${resp2.status} ${t2}`);
+    if (resultTag === "models") await setStatus("settings.testSuccess");
+    else await setStatus("settings.testSuccessChat");
+    try { window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail: { ok: true } })); } catch {}
   } catch (e) {
     const errorText = await t("settings.testFailed");
     setStatus(errorText + (e?.message || String(e)));
-    try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail:{ ok:false } })); }catch{}
-    return;
+    try { window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail: { ok: false } })); } catch {}
   }
-  try{ window.dispatchEvent(new CustomEvent('SX_OPT_TEST_END', { detail:{ ok:true } })); }catch{}
 }
+
+async function testOpenAICompat(base, key, model) {
+  const baseClean = base.replace(/\/$/, "");
+  const resp1 = await fetch(`${baseClean}/models`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${key}` }
+  });
+  if (resp1.ok) return "models";
+
+  const payload = { model, messages: [{ role: "user", content: "ping" }], temperature: 0 };
+  const resp2 = await fetch(`${baseClean}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+    body: JSON.stringify(payload)
+  });
+  if (resp2.ok) return "chat";
+
+  const t1 = await safeReadText(resp1);
+  const t2 = await safeReadText(resp2);
+  throw new Error(`两种探测均失败。
+/models => ${resp1.status} ${t1}
+/chat/completions => ${resp2.status} ${t2}`);
+}
+
+async function testAnthropic(base, key, model) {
+  const root = base.replace(/\/$/, "");
+  const endpoint = /\/messages(?:$|\?)/.test(root) ? root : `${root}/messages`;
+  const payload = {
+    model: model || "claude-3-haiku-20240307",
+    max_tokens: 30,
+    temperature: 0,
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "ping" }]
+      }
+    ]
+  };
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": ANTHROPIC_VERSION
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const tx = await safeReadText(res);
+    throw new Error(`Anthropic ${res.status} ${tx}`);
+  }
+  return "chat";
+}
+
+async function testGemini(base, key, model) {
+  const rootValue = base || "https://generativelanguage.googleapis.com/v1beta";
+  const root = rootValue.replace(/\/$/, "");
+  const endpoint = `${root}/models/${model || "gemini-1.5-flash-latest"}:generateContent`;
+  const url = new URL(endpoint);
+  url.searchParams.set("key", key);
+  const payload = {
+    contents: [{ role: "user", parts: [{ text: "ping" }] }],
+    generationConfig: { temperature: 0 }
+  };
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": key
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const tx = await safeReadText(res);
+    throw new Error(`Gemini ${res.status} ${tx}`);
+  }
+  return "chat";
+}
+
+async function testAzure(base, key, model) {
+  const endpoint = buildAzureChatCompletionsURL(base, model || "default");
+  if (!endpoint) throw new Error("Azure Base URL 无效");
+  const payload = {
+    messages: [{ role: "user", content: "ping" }],
+    temperature: 0
+  };
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": key
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const tx = await safeReadText(res);
+    throw new Error(`Azure ${res.status} ${tx}`);
+  }
+  return "chat";
+}
+
 async function safeReadText(res) { try { return await res.text(); } catch { return "(no body)"; } }
 function toggleApiKeyVisibility() { const input = $("apiKey"); input.type = input.type === "password" ? "text" : "password"; }
 // 恢复原始点击逻辑（不依赖 SXUI）
@@ -533,22 +651,7 @@ async function onProviderChange() {
     $("model_summarize").value = p.model_summarize;
     $("extract_mode").value = "fast";
     await setTrialLock(true);
-  } else if (provider === "openai" || provider === "deepseek") {
-    const restored = applySnapshot(provider);
-    if (!restored) {
-      const p = PROVIDER_PRESETS[provider];
-      $("baseURL").value = p.baseURL;
-      $("model_extract").value = p.model_extract;
-      $("model_summarize").value = p.model_summarize;
-      $("extract_mode").value = providerSnapshots[provider]?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
-    }
-    // 回填平台专用 key（若之前保存过）
-    const keyName = PROVIDER_PRESETS[provider].apiKeyKey;
-    const kv = await chrome.storage.sync.get([keyName]);
-    $("apiKey").value = (providerSnapshots[provider]?.apiKey) || kv[keyName] || "";
-    await setTrialLock(false);
-  } else {
-    // custom
+  } else if (provider === "custom") {
     const restored = applySnapshot("custom");
     if (!restored) {
       // 不动用户现有输入，若想初始化可按需填默认
@@ -556,6 +659,21 @@ async function onProviderChange() {
       $("model_extract").value = $("model_extract").value || DEFAULTS.model_extract;
       $("model_summarize").value = $("model_summarize").value || DEFAULTS.model_summarize;
       $("extract_mode").value = providerSnapshots.custom?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
+    }
+    await setTrialLock(false);
+  } else {
+    const restored = applySnapshot(provider);
+    const preset = PROVIDER_PRESETS[provider] || {};
+    if (!restored) {
+      $("baseURL").value = preset.baseURL || $("baseURL").value || DEFAULTS.baseURL;
+      $("model_extract").value = preset.model_extract || $("model_extract").value || DEFAULTS.model_extract;
+      $("model_summarize").value = preset.model_summarize || $("model_summarize").value || DEFAULTS.model_summarize;
+      $("extract_mode").value = providerSnapshots[provider]?.extract_mode || $("extract_mode").value || DEFAULTS.extract_mode;
+    }
+    const keyName = preset.apiKeyKey;
+    if (keyName) {
+      const kv = await chrome.storage.sync.get([keyName]);
+      $("apiKey").value = (providerSnapshots[provider]?.apiKey) || kv[keyName] || "";
     }
     await setTrialLock(false);
   }
@@ -694,19 +812,38 @@ function fitDockPadding() {
 }
 
 function updateBuyHelp(provider) {
-  const open = document.getElementById('link-buy-openai');
-  const deep = document.getElementById('link-buy-deepseek');
-  const sep  = document.getElementById('buy-help-sep');
-  if (!open || !deep || !sep) return;
+  const wrap = document.querySelector('.buy-help-inline');
+  if (!wrap) return;
+  const linksWrap = wrap.querySelector('.buy-help-links');
+  if (!linksWrap) return;
+  const links = Array.from(linksWrap.querySelectorAll('[data-provider]'));
+  const separators = Array.from(linksWrap.querySelectorAll('.sep'));
 
-  open.href = GUIDE_OPENAI;
-  deep.href = GUIDE_DEEPSEEK;
+  const showAll = provider === 'custom' || provider === '';
 
-  if (provider === 'trial') { open.style.display='none'; deep.style.display='none'; sep.style.display='none'; return; }
-  if (provider === 'custom') { open.style.display='inline'; deep.style.display='inline'; sep.style.display='inline'; }
-  else if (provider === 'openai') { open.style.display='inline'; deep.style.display='none'; sep.style.display='none'; }
-  else if (provider === 'deepseek') { open.style.display='none'; deep.style.display='inline'; sep.style.display='none'; }
-  else { open.style.display='inline'; deep.style.display='inline'; sep.style.display='inline'; }
+  links.forEach((link) => {
+    const shouldShow = showAll || link.dataset.provider === provider;
+    link.style.display = shouldShow ? 'inline' : 'none';
+    link.classList.toggle('active', !showAll && shouldShow);
+  });
+
+  let visible = links.filter((link) => link.style.display !== 'none');
+  if (provider === 'trial' || visible.length === 0) {
+    // fallback：若未命中任何链接则全部展示，Trial 会由 toggleBuyHelpInline 隐藏整段
+    links.forEach((link) => {
+      link.style.display = 'inline';
+      link.classList.remove('active');
+    });
+    visible = links.slice();
+  }
+
+  separators.forEach((sep) => { sep.style.display = 'none'; });
+  visible.forEach((link, index) => {
+    const prev = link.previousElementSibling;
+    if (prev && prev.classList.contains('sep')) {
+      prev.style.display = index === 0 ? 'none' : 'inline';
+    }
+  });
 }
 
 // ========== 国际化功能 ==========
@@ -753,10 +890,16 @@ async function updateUIText() {
   updateElementText('trial-option', await t('settings.trial'));
   updateElementText('openai-option', await t('settings.openai'));
   updateElementText('deepseek-option', await t('settings.deepseek'));
+  updateElementText('anthropic-option', await t('settings.anthropic'));
+  updateElementText('gemini-option', await t('settings.gemini'));
+  updateElementText('azure-option', await t('settings.azure'));
   updateElementText('custom-option', await t('settings.custom'));
   updateElementText('buy-help-text', await t('settings.buyHelp'));
   updateElementText('link-buy-openai', await t('settings.openaiGuide'));
   updateElementText('link-buy-deepseek', await t('settings.deepseekGuide'));
+  updateElementText('link-buy-anthropic', await t('settings.anthropicGuide'));
+  updateElementText('link-buy-gemini', await t('settings.geminiGuide'));
+  updateElementText('link-buy-azure', await t('settings.azureGuide'));
   updateElementText('platform-hint', await t('settings.hint'));
   updateElementText('trial-consent-text', await t('settings.trialConsentText'));
   

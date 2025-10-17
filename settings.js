@@ -2,6 +2,8 @@
 
 import { FILTER_DEFAULT_STRENGTH } from "./adblock_lists.js";
 
+export const AZURE_DEFAULT_API_VERSION = "2024-02-15-preview";
+
 export const DEFAULTS = {
   // 首次安装默认就是“试用”
   aiProvider: "trial",
@@ -28,6 +30,24 @@ export const PROVIDER_PRESETS = {
     model_summarize: "deepseek-chat",
     apiKeyKey: "apiKey_deepseek"
   },
+  anthropic: {
+    baseURL: "https://api.anthropic.com/v1",
+    model_extract: "claude-3-haiku-20240307",
+    model_summarize: "claude-3-5-sonnet-20240620",
+    apiKeyKey: "apiKey_anthropic"
+  },
+  gemini: {
+    baseURL: "https://generativelanguage.googleapis.com/v1beta",
+    model_extract: "gemini-1.5-flash-latest",
+    model_summarize: "gemini-1.5-pro-latest",
+    apiKeyKey: "apiKey_gemini"
+  },
+  azure: {
+    baseURL: "https://YOUR_RESOURCE_NAME.openai.azure.com",
+    model_extract: "extract-deployment",
+    model_summarize: "summary-deployment",
+    apiKeyKey: "apiKey_azure"
+  },
   trial: {
     baseURL: "https://mallocfeng1982.win/v1",
     model_extract: "deepseek-chat",
@@ -50,7 +70,7 @@ export const PROVIDER_PRESETS = {
 export async function getSettings() {
   const d = await chrome.storage.sync.get([
     "aiProvider",
-    "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_custom", "apiKey_trial",
+    "apiKey", "apiKey_openai", "apiKey_deepseek", "apiKey_anthropic", "apiKey_gemini", "apiKey_azure", "apiKey_custom", "apiKey_trial",
     "baseURL", "model_extract", "model_summarize",
     "output_lang", "extract_mode",
     "system_prompt_preset", "system_prompt_custom"
@@ -102,6 +122,9 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   "apiKey",
   "apiKey_openai",
   "apiKey_deepseek",
+  "apiKey_anthropic",
+  "apiKey_gemini",
+  "apiKey_azure",
   "apiKey_custom",
   "apiKey_trial",
   "baseURL",
@@ -127,6 +150,9 @@ const SNAPSHOT_DEFAULTS = {
   apiKey: "",
   apiKey_openai: "",
   apiKey_deepseek: "",
+  apiKey_anthropic: "",
+  apiKey_gemini: "",
+  apiKey_azure: "",
   apiKey_custom: "",
   apiKey_trial: "trial",
   baseURL: DEFAULTS.baseURL,
@@ -158,6 +184,9 @@ export function normalizeSettingsSnapshot(raw = {}) {
   out.apiKey = SAFE_STRING(source.apiKey, "");
   out.apiKey_openai = SAFE_STRING(source.apiKey_openai, "");
   out.apiKey_deepseek = SAFE_STRING(source.apiKey_deepseek, "");
+  out.apiKey_anthropic = SAFE_STRING(source.apiKey_anthropic, "");
+  out.apiKey_gemini = SAFE_STRING(source.apiKey_gemini, "");
+  out.apiKey_azure = SAFE_STRING(source.apiKey_azure, "");
   out.apiKey_custom = SAFE_STRING(source.apiKey_custom, "");
   out.apiKey_trial = SAFE_STRING(source.apiKey_trial, SNAPSHOT_DEFAULTS.apiKey_trial) || SNAPSHOT_DEFAULTS.apiKey_trial;
 
@@ -224,4 +253,23 @@ export async function persistSettingsSnapshot(override = {}) {
     console.warn("persistSettingsSnapshot failed", e);
     return null;
   }
+}
+
+export function buildAzureChatCompletionsURL(baseURL, deployment, version = AZURE_DEFAULT_API_VERSION) {
+  const trimmed = String(baseURL || "").trim();
+  if (!trimmed) return "";
+  const hasChat = /\/chat\/completions/i.test(trimmed);
+  if (hasChat) return trimmed;
+
+  const [root, query] = trimmed.split(/\?/);
+  const versionInQuery = query && /api-version=/i.test(query);
+  const basePath = /\/openai\/deployments\//i.test(root)
+    ? root.replace(/\/$/, "")
+    : `${root.replace(/\/$/, "")}/openai/deployments/${encodeURIComponent(deployment || "default")}`;
+  const params = new URLSearchParams(query || "");
+  if (!versionInQuery) {
+    params.set("api-version", version || AZURE_DEFAULT_API_VERSION);
+  }
+  const queryString = params.toString();
+  return queryString ? `${basePath}/chat/completions?${queryString}` : `${basePath}/chat/completions`;
 }

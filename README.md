@@ -14,7 +14,7 @@
 ## English
 
 Current stable: v2.3.6 (main branch)
-Current beta: v2.3.6 (dev/next branch)
+Current beta: v2.3.7 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -29,7 +29,7 @@ Current beta: v2.3.6 (dev/next branch)
   - Real-time validation with clear error messages
   - Integrated PDF.js for robust rendering and text extraction
   - Export Reader Mode to crisp A4 PDFs with robust CJK line wrapping (Chinese 40 chars/line, 90% width guard)
-- 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click  
+- 🤖 AI-Powered Summarization & Translation: Generate concise summaries or translations in one click — with built-in presets for OpenAI, DeepSeek, Anthropic Claude, Google Gemini, Azure OpenAI, or any custom-compatible endpoint  
 - ⚙️ Customizable Settings: Adjust prompts, modes, shortcuts, and UI preferences  
 - 📑 Floating Panel: View summaries without leaving the current page  
 - 🗂️ Summary History (new): Automatically stores per-page/PDF results, lets you reopen the panel and instantly reuse the latest summary, and browse/apply previous outputs via the in-panel History popover  

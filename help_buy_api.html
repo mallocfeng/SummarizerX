@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>如何购买与获取 API：OpenAI & DeepSeek（超详细小白指南）</title>
+<title>如何购买与获取 API：OpenAI / DeepSeek / Anthropic / Google Gemini / Azure</title>
 <style>
   :root{
     --bg:#f6f8ff; --card:#ffffff; --text:#0f172a; --sub:#475569;
@@ -36,9 +36,12 @@
   .card h2{ margin:0 0 8px; font-size:18px }
   .card p.lead{ margin:0 0 10px; color:var(--sub) }
 
-  /* ✅ 默认给两块区域轻微底色区分 */
+  /* ✅ 默认给各区域轻微底色区分 */
   #openai{ background:#f7fbff; border-color:#dbe8ff; }
   #deepseek{ background:#fffaf5; border-color:#ffe5c7; }
+  #anthropic{ background:#f9f5ff; border-color:#e9ddff; }
+  #gemini{ background:#f0f9ff; border-color:#cfe9ff; }
+  #azure{ background:#f5f9ff; border-color:#d4e8ff; }
 
   /* ✅ 命中锚点时高亮（点击顶部标签后更醒目） */
   .card:target{
@@ -47,6 +50,9 @@
   }
   #openai:target{ background:#eef6ff; border-color:#cfe0ff; }
   #deepseek:target{ background:#fff4ec; border-color:#ffd7ba; }
+  #anthropic:target{ background:#f3eaff; border-color:#d9cfff; }
+  #gemini:target{ background:#e5f4ff; border-color:#bcdffd; }
+  #azure:target{ background:#e8f3ff; border-color:#c7e0ff; }
 
   .steps{ margin:8px 0 0; padding:0; list-style:none; counter-reset: s; }
   .steps li{
@@ -98,15 +104,17 @@
 <body>
   <div class="wrap">
     <section class="hero" id="top">
-      <h1>如何购买/开通 API（OpenAI & DeepSeek）</h1>
+      <h1>如何购买/开通 API（OpenAI · DeepSeek · Anthropic · Google Gemini · Azure）</h1>
       <p>完全小白也能看懂：准备什么 → 去哪里 → 按什么顺序点 → 拿到 API Key → 放到 SummarizerX / 麦乐可 AI 摘要阅读器 里使用。</p>
       <ul class="inline-list">
         <li class="tag">🧾 按步骤做即可</li>
         <li class="tag">🔐 API Key 就像密码</li>
         <li class="tag">💳 支付方式：国际信用/借记卡等</li>
-        <!-- ✅ 新增两个跳转标签 -->
         <li class="tag"><a href="#openai">📘 我想买 OpenAI</a></li>
         <li class="tag"><a href="#deepseek">🟠 我想买 DeepSeek</a></li>
+        <li class="tag"><a href="#anthropic">🟣 我想用 Anthropic Claude</a></li>
+        <li class="tag"><a href="#gemini">🔵 我想用 Google Gemini</a></li>
+        <li class="tag"><a href="#azure">🟡 我想用 Azure OpenAI</a></li>
       </ul>
     </section>
 
@@ -173,22 +181,121 @@
         </details>
         <p class="mini"><a href="#top">↑ 返回顶部</a></p>
       </section>
+
+      <section class="card" id="anthropic">
+        <h2>三、Anthropic Claude</h2>
+        <p class="lead">目标：开通计费并生成 <code>API Key</code></p>
+        <ol class="steps">
+          <li>
+            访问 <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">Anthropic Console</a>，注册/登录账号。
+          </li>
+          <li>
+            在 <span class="kbd">Billing</span> 中绑定支付方式或激活额度（部分地区提供预付费 Gift Balance）。
+          </li>
+          <li>
+            打开 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">API Keys</a> → 点击 <span class="kbd">Create Key</span> → 命名并复制保存。
+            <div class="note mini">提示：密钥只显示一次，记得保存到密码管理器或安全文档。</div>
+          </li>
+          <li>
+            在扩展设置中选择 <span class="kbd">Anthropic Claude</span> → 粘贴 Key → 根据需要调整模型（默认提供 Claude 3 Haiku & Sonnet）。
+          </li>
+        </ol>
+        <details class="note" style="margin-top:10px;">
+          <summary><strong>可选：10 秒自测（命令行）</strong></summary>
+<pre><code>curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: YOUR_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-3-haiku-20240307",
+    "max_tokens": 30,
+    "messages": [
+      {"role": "user", "content": [{"type": "text", "text": "Hello"}]}
+    ]
+  }'</code></pre>
+        </details>
+        <p class="mini"><a href="#top">↑ 返回顶部</a></p>
+      </section>
+
+      <section class="card" id="gemini">
+        <h2>四、Google Gemini</h2>
+        <p class="lead">目标：在 Google AI Studio 创建 <code>API Key</code></p>
+        <ol class="steps">
+          <li>
+            登录 <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer">Google AI Studio</a>（需可用的 Google 账号，首次使用需同意条款）。
+          </li>
+          <li>
+            在左侧导航选择 <span class="kbd">API Keys</span> → 点击 <span class="kbd">Create API key</span> → 复制保存。
+          </li>
+          <li>
+            在扩展设置中选择 <span class="kbd">Google Gemini</span> → 粘贴 Key → 设置模型（默认是 <code>gemini-1.5-flash-latest</code> / <code>gemini-1.5-pro-latest</code>）。
+          </li>
+        </ol>
+        <details class="note" style="margin-top:10px;">
+          <summary><strong>可选：10 秒自测（命令行）</strong></summary>
+<pre><code>curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{"text": "Hello"}]
+    }]
+  }'</code></pre>
+        </details>
+        <p class="mini"><a href="#top">↑ 返回顶部</a></p>
+      </section>
+
+      <section class="card" id="azure">
+        <h2>五、Azure OpenAI Service</h2>
+        <p class="lead">目标：在 Azure Portal 创建 OpenAI 资源、部署模型并获取 <code>API Key</code></p>
+        <ol class="steps">
+          <li>
+            登入 <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer">Azure Portal</a> → 搜索并创建 <span class="kbd">Azure OpenAI</span> 资源（需要已获批的订阅）。
+          </li>
+          <li>
+            在资源页的 <span class="kbd">Model deployments</span> 中部署想用的模型（例如 gpt-4o-mini），记下 <strong>部署名称</strong>。
+          </li>
+          <li>
+            打开 <span class="kbd">Keys and Endpoint</span> → 复制 <span class="kbd">Key</span> 和 <span class="kbd">Endpoint</span>。
+          </li>
+          <li>
+            在扩展设置中选择 <span class="kbd">Azure OpenAI Service</span>：
+            <div class="note mini">
+              <ul class="tip-list">
+                <li><strong>Base URL</strong> 填 <code>https://YOUR_RESOURCE_NAME.openai.azure.com</code></li>
+                <li><strong>清洗/摘要模型</strong> 输入对应的“部署名称”（如 <code>extract-deployment</code>）</li>
+                <li>保存后即可调用，默认 API 版本为 <code>2024-02-15-preview</code>；如需其他版本，可在 Base URL 末尾加上 <code>?api-version=...</code></li>
+              </ul>
+            </div>
+          </li>
+        </ol>
+        <details class="note" style="margin-top:10px;">
+          <summary><strong>可选：10 秒自测（命令行）</strong></summary>
+<pre><code>curl "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/DEPLOYMENT/chat/completions?api-version=2024-02-15-preview" \
+  -H "api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'</code></pre>
+        </details>
+        <p class="mini"><a href="#top">↑ 返回顶部</a></p>
+      </section>
     </div>
 
     <!-- 放到扩展里的说明 -->
     <section class="card" style="margin-top:14px;">
-      <h2 id="summarizerx">三、把 Key 放进「SummarizerX / 麦乐可 AI 摘要阅读器」</h2>
+      <h2 id="summarizerx">六、把 Key 放进「SummarizerX / 麦乐可 AI 摘要阅读器」</h2>
       <ol class="steps">
-        <li>打开扩展设置 → 「AI 服务提供商」选择 OpenAI 或 DeepSeek（两者都可以保存，随时切换）。</li>
-        <li>将对应的 Key 粘贴到输入框 → 保存。</li>
-        <li>首次请求会很快返回「摘要」，稍后自动补全「可读正文」。若响应慢，多半是 Key 配额或网络的问题。</li>
+        <li>打开扩展设置 → 「AI 服务提供商」选择 OpenAI / DeepSeek / Anthropic Claude / Google Gemini / Azure OpenAI / 自定义。</li>
+        <li>为所选平台填写 <span class="kbd">Base URL</span>、模型（或 Azure 的部署名称）并粘贴对应的 API Key → 保存。</li>
+        <li>首次请求会先返回「摘要」、随后自动补全「可读正文」。若响应缓慢，多半是 Key 配额或网络的问题。</li>
       </ol>
-      <div class="note ok mini">提示：扩展支持同时保存两个 Key，后续切换无需重复输入。</div>
+      <div class="note ok mini">提示：扩展会分别记住每个平台的配置，可在设置中随时切换，无需重复输入。</div>
     </section>
 
     <!-- 常见问题 -->
     <section class="card qna" style="margin-top:14px;">
-      <h2 id="faq">四、常见问题（FAQ）</h2>
+      <h2 id="faq">七、常见问题（FAQ）</h2>
 
       <details open>
         <summary>Key 是什么？丢了怎么办？</summary>
@@ -198,7 +305,7 @@
       <details>
         <summary>提示 “insufficient_quota / billing_not_active” 怎么办？</summary>
         <ul class="tip-list">
-          <li>确认已经完成计费开通（OpenAI 需绑定支付方式；DeepSeek 可能需要充余额）。</li>
+          <li>确认已经完成计费开通（OpenAI/Anthropic/Azure 需绑定信用卡；DeepSeek 可能需要充余额；Google Gemini 需在 AI Studio 中启用 API）。</li>
           <li>检查是否消费超限或余额不足，必要时提升额度/继续充值。</li>
         </ul>
       </details>

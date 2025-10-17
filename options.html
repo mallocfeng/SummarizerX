@@ -56,14 +56,25 @@
           <option value="trial" id="trial-option">试用（推荐体验）</option> <!-- ← 新增这一行放最上，UI 默认显示它 -->
           <option value="openai" id="openai-option">OpenAI（默认）</option>
           <option value="deepseek" id="deepseek-option">DeepSeek</option>
+          <option value="anthropic" id="anthropic-option">Anthropic Claude</option>
+          <option value="gemini" id="gemini-option">Google Gemini</option>
+          <option value="azure" id="azure-option">Azure OpenAI Service</option>
           <option value="custom" id="custom-option">自定义</option>
         </select>
         <!-- 购买指南（紧跟在下拉框后，右侧留白展示） -->
         <span class="buy-help-inline">
           <span id="buy-help-text">不会买？查看：</span>
-          <a id="link-buy-openai" href="#" target="_blank" rel="noopener">OpenAI 指南</a>
-          <span id="buy-help-sep"> · </span>
-          <a id="link-buy-deepseek" href="#" target="_blank" rel="noopener">DeepSeek 指南</a>
+          <span class="buy-help-links">
+            <a id="link-buy-openai" data-provider="openai" href="#" target="_blank" rel="noopener">OpenAI 指南</a>
+            <span class="sep"> · </span>
+            <a id="link-buy-deepseek" data-provider="deepseek" href="#" target="_blank" rel="noopener">DeepSeek 指南</a>
+            <span class="sep"> · </span>
+            <a id="link-buy-anthropic" data-provider="anthropic" href="#" target="_blank" rel="noopener">Anthropic 指南</a>
+            <span class="sep"> · </span>
+            <a id="link-buy-gemini" data-provider="gemini" href="#" target="_blank" rel="noopener">Google Gemini 指南</a>
+            <span class="sep"> · </span>
+            <a id="link-buy-azure" data-provider="azure" href="#" target="_blank" rel="noopener">Azure OpenAI 指南</a>
+          </span>
         </span>
         <!-- Trial consent (only visible in trial mode) -->
         <div class="field" id="trial-consent-wrap" style="margin-top:8px;">

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.7 - 2025-09-25
+
+### English
+- Feature: Added first-class presets for Anthropic Claude, Google Gemini, and Azure OpenAI alongside existing OpenAI/DeepSeek/custom options, including tailored API-key testing and helper guides.
+- UX: Settings picker now highlights the active provider guide and buy links for all supported platforms.
+
+### 中文
+- 新功能：新增 Anthropic Claude、Google Gemini、Azure OpenAI 的预设支持，连同原有的 OpenAI/DeepSeek/自定义，可直接填写并测试 API Key。
+- 体验：设置页会根据所选平台突出对应的购买/开通指引链接，方便快速跳转。
+
 ## v2.3.6 - 2025-09-24
 
 ### English

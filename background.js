@@ -2,7 +2,7 @@
 // 取消 sidepanel，改为页面悬浮面板；保留最小权限（activeTab 动态注入）
 
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
-import { getSettings, persistSettingsSnapshot, SETTINGS_SNAPSHOT_KEYS } from "./settings.js";
+import { getSettings, persistSettingsSnapshot, SETTINGS_SNAPSHOT_KEYS, buildAzureChatCompletionsURL } from "./settings.js";
 import { FILTER_LISTS } from "./adblock_lists.js";
 
 
@@ -301,17 +301,132 @@ function enforceUserLang(text, finalLang, isTrans) {
   return text + tail;
 }
 
-async function chatCompletion({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+const ANTHROPIC_VERSION = "2023-06-01";
+
+function buildChatMessages(system, prompt) {
+  if (!prompt) return [];
+  const messages = [];
+  if (system) messages.push({ role: "system", content: system });
+  messages.push({ role: "user", content: prompt });
+  return messages;
+}
+
+async function chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+  if (!apiKey) throw new Error("API Key 未设置");
   const url = `${baseURL.replace(/\/$/, "")}/chat/completions`;
-  const body = { model, temperature, messages: [system ? { role: "system", content: system } : null, { role: "user", content: prompt }].filter(Boolean) };
+  const body = {
+    model,
+    temperature,
+    messages: buildChatMessages(system, prompt)
+  };
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type":"application/json", "Authorization": `Bearer ${apiKey}` },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   const json = await res.json();
   return json.choices?.[0]?.message?.content || "";
+}
+
+async function chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+  if (!apiKey) throw new Error("Anthropic API Key 未设置");
+  const url = `${baseURL.replace(/\/$/, "")}/messages`;
+  const body = {
+    model,
+    max_tokens: 2048,
+    temperature,
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: prompt }]
+      }
+    ]
+  };
+  if (system) body.system = system;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": ANTHROPIC_VERSION
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  const parts = Array.isArray(json?.content)
+    ? json.content.map((part) => part?.text || "").filter(Boolean)
+    : [];
+  return parts.join("\n").trim();
+}
+
+async function chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+  if (!apiKey) throw new Error("Gemini API Key 未设置");
+  const root = baseURL.replace(/\/$/, "");
+  const endpoint = `${root}/models/${model || "gemini-1.5-flash-latest"}:generateContent`;
+  const urlObj = new URL(endpoint);
+  if (apiKey) urlObj.searchParams.set("key", apiKey);
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: { temperature }
+  };
+  if (system) {
+    body.systemInstruction = { role: "system", parts: [{ text: system }] };
+  }
+  const res = await fetch(urlObj.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  const parts = json?.candidates?.[0]?.content?.parts || [];
+  return parts.map((part) => part?.text || "").join("").trim();
+}
+
+async function chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+  if (!apiKey) throw new Error("Azure API Key 未设置");
+  const url = buildAzureChatCompletionsURL(baseURL, model || "default");
+  if (!url) throw new Error("Azure Base URL 无效");
+  const body = {
+    messages: buildChatMessages(system, prompt),
+    temperature
+  };
+  if (model) body.model = model;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": apiKey
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Azure ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content || "";
+}
+
+async function chatCompletion({ provider = "openai", baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+  const trimmedProvider = (provider || "openai").toLowerCase();
+  switch (trimmedProvider) {
+    case "anthropic":
+      return chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature });
+    case "gemini":
+      return chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature });
+    case "azure":
+      return chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature });
+    default:
+      return chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature });
+  }
 }
 
 /* ============ 文本→极简 Markdown 段落 ============ */
@@ -381,8 +496,9 @@ async function runForTab(tabId) {
   summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
 
   const summaryFast = await chatCompletion({
-    baseURL: cfg.baseURL,      // trial 情况下，这里已经是你的代理地址（由 settings.js 提供）
-    apiKey:  cfg.apiKey || "trial", // trial 没 key 用 “trial” 兜底；正常模式用用户 key
+    provider: cfg.aiProvider,
+    baseURL: cfg.baseURL,
+    apiKey:  cfg.apiKey,
     model:   cfg.model_summarize,
     system:  sysForSummary,
     prompt:  summaryPrompt,
@@ -400,8 +516,9 @@ async function runForTab(tabId) {
       false
     );
     const qsOut = await chatCompletion({
+      provider: cfg.aiProvider,
       baseURL: cfg.baseURL,
-      apiKey: cfg.apiKey || 'trial',
+      apiKey: cfg.apiKey,
       model: cfg.model_summarize,
       system: sysForSummary,
       prompt: qsPrompt,
@@ -460,8 +577,9 @@ async function runForTab(tabId) {
     ].join("\n");
     const promptClean = `Title: ${title || "(none)"}\nURL: ${url}\n\nRaw content (possibly noisy):\n${clipped}\n\nReturn ONLY the cleaned main body as Markdown.`;
     cleanedMarkdown = await chatCompletion({
+      provider: cfg.aiProvider,
       baseURL: cfg.baseURL,
-      apiKey:  cfg.apiKey || "trial",
+      apiKey:  cfg.apiKey,
       model:   cfg.model_extract,
       system:  sysClean,
       prompt:  promptClean,
@@ -558,8 +676,9 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     `Content:\n${quickMd.slice(0, 18000)}`;
   summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
   const summaryFast = await chatCompletion({
+    provider: cfg.aiProvider,
     baseURL: cfg.baseURL,
-    apiKey: cfg.apiKey || "trial",
+    apiKey: cfg.apiKey,
     model: cfg.model_summarize,
     system: sysForSummary,
     prompt: summaryPrompt,
@@ -576,8 +695,9 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
       false
     );
     const qsOut = await chatCompletion({
+      provider: cfg.aiProvider,
       baseURL: cfg.baseURL,
-      apiKey: cfg.apiKey || 'trial',
+      apiKey: cfg.apiKey,
       model: cfg.model_summarize,
       system: sysForSummary,
       prompt: qsPrompt,
@@ -635,8 +755,9 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     ].join("\n");
     const promptClean = `Title: ${title || "(none)"}\nURL: ${url || "pdf://local"}\n\nRaw content (possibly noisy):\n${clipped}\n\nReturn ONLY the cleaned main body as Markdown.`;
     cleanedMarkdown = await chatCompletion({
+      provider: cfg.aiProvider,
       baseURL: cfg.baseURL,
-      apiKey:  cfg.apiKey || "trial",
+      apiKey:  cfg.apiKey,
       model:   cfg.model_extract,
       system:  sysClean,
       prompt:  promptClean,
@@ -1771,8 +1892,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { await setQAUI(tabId, { qaBusy: true }); } catch {}
 
         const answer = await chatCompletion({
+          provider: cfg.aiProvider,
           baseURL: cfg.baseURL,
-          apiKey: cfg.apiKey || 'trial',
+          apiKey: cfg.apiKey,
           model: cfg.model_summarize,
           system: sys,
           prompt,
@@ -1826,8 +1948,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         ].join('\n');
         const prompt = `Translate the following Markdown block into ${targetName}. Return ONLY the translated Markdown for this block.\n\n<<<BLOCK>>>\n${rawText}\n<<<END>>>`;
         const txt0 = await chatCompletion({
+          provider: cfg.aiProvider,
           baseURL: cfg.baseURL,
-          apiKey: cfg.apiKey || 'trial',
+          apiKey: cfg.apiKey,
           model: cfg.model_summarize,
           system: sys,
           prompt,
@@ -1875,15 +1998,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // 实际的翻译实现：读取设置，选模型/基址/Key，然后 Chat Completions
 async function doTranslate(text) {
-  const all = await chrome.storage.sync.get(null);
-
-  // 平台与凭据
-  const provider = all.aiProvider || 'trial';
-  const key = provider === 'trial'
-    ? 'trial'
-    : (all.apiKey || all.openai_api_key || all.deepseek_api_key || '');
-  const base = (all.baseURL || 'https://api.openai.com/v1').replace(/\/+$/,'');
-  const model = all.model_summarize || 'gpt-4o-mini';
+  const cfg = await getSettings();
+  if (!cfg.apiKey && cfg.aiProvider !== 'trial') throw new Error('请先在设置页填写并保存 API Key');
 
   const target = await getTargetLang(); // 'zh' | 'en'
   const strictRules = [
@@ -1894,25 +2010,27 @@ async function doTranslate(text) {
     '- Preserve original paragraph breaks; do not merge or split.',
     '- Do not use code fences or HTML.',
     '- Translate faithfully; do not omit or add content.'
-  ].join('\n');
-  const instruction = (target === 'en')
-    ? 'Translate the following into English.'
-    : '将以下内容翻译为简体中文。';
-  const prompt = `${instruction}\n${strictRules}\n\nSOURCE:\n${text}`;
+  ].join('
+');
+  const system = (target === 'en')
+    ? 'You are a professional translator. Return pure English text without extra commentary.'
+    : '你是一名专业翻译，请仅输出简体中文译文，不要添加其他说明。';
+  const prompt = `${(target === 'en') ? 'Translate the following into English.' : '请翻译为简体中文。'}
+${strictRules}
 
-  const body = { model, messages: [{ role: 'user', content: prompt }], temperature: 0 };
+SOURCE:
+${text}`;
 
-  const resp = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify(body)
+  const output = await chatCompletion({
+    provider: cfg.aiProvider,
+    baseURL: cfg.baseURL,
+    apiKey: cfg.apiKey,
+    model: cfg.model_summarize,
+    system,
+    prompt,
+    temperature: 0
   });
-  if (!resp.ok) {
-    const tx = await safeReadText(resp);
-    throw new Error(`HTTP ${resp.status} ${tx}`);
-  }
-  const json = await resp.json();
-  return json?.choices?.[0]?.message?.content?.trim() || '(Empty)';
+  return (output || '').trim() || '(Empty)';
 }
 
 async function safeReadText(res){ try { return await res.text(); } catch { return ''; } }

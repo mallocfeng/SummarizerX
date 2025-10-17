@@ -488,7 +488,9 @@ select.ctrl.short{ max-width: 220px; height: 34px; line-height: 34px; padding: 0
 
 /* Purchase inline */
 .buy-help-inline{ display:inline-block; margin-left:8px; font-size:12px; color:#6b7280; vertical-align:middle; white-space:nowrap; }
+.buy-help-inline .sep{ color: inherit; margin: 0 2px; display: inline; }
 .buy-help-inline a{ color: var(--link); text-decoration: underline; text-underline-offset: 2px; margin: 0 2px; }
+.buy-help-inline a.active{ font-weight: 600; }
 .buy-help-inline a:hover{ filter: brightness(0.95); }
 @media (max-width: 800px){ .buy-help-inline{ display:block; margin:6px 0 0; white-space: normal; } }
 

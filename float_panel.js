@@ -3849,17 +3849,24 @@ async function maybeRestoreHistory(shadow, state){
         const zh = {
           openai: '使用设置中的 ChatGPT 进行翻译',
           deepseek: '使用设置中的 DeepSeek 进行翻译',
+          anthropic: '使用设置中的 Anthropic Claude 进行翻译',
+          gemini: '使用设置中的 Google Gemini 进行翻译',
+          azure: '使用设置中的 Azure OpenAI 进行翻译',
           trial: '使用试用服务进行翻译',
           custom: '使用自定义服务进行翻译'
         };
         const en = {
           openai: 'Use Settings: ChatGPT',
           deepseek: 'Use Settings: DeepSeek',
+          anthropic: 'Use Settings: Anthropic Claude',
+          gemini: 'Use Settings: Google Gemini',
+          azure: 'Use Settings: Azure OpenAI',
           trial: 'Use Settings: Trial',
           custom: 'Use Settings: Custom'
         };
         const map = (currentLangCache==='en') ? en : zh;
-        const k = (ai==='openai'||ai==='deepseek'||ai==='trial'||ai==='custom') ? ai : 'trial';
+        const allowed = ['openai','deepseek','anthropic','gemini','azure','trial','custom'];
+        const k = allowed.includes(ai) ? ai : 'trial';
         return map[k];
       }
       let providerMode = 'free';
