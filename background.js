@@ -2010,16 +2010,14 @@ async function doTranslate(text) {
     '- Preserve original paragraph breaks; do not merge or split.',
     '- Do not use code fences or HTML.',
     '- Translate faithfully; do not omit or add content.'
-  ].join('
-');
+  ].join('\n');
   const system = (target === 'en')
     ? 'You are a professional translator. Return pure English text without extra commentary.'
     : '你是一名专业翻译，请仅输出简体中文译文，不要添加其他说明。';
-  const prompt = `${(target === 'en') ? 'Translate the following into English.' : '请翻译为简体中文。'}
-${strictRules}
-
-SOURCE:
-${text}`;
+  const instruction = (target === 'en')
+    ? 'Translate the following into English.'
+    : '请翻译为简体中文。';
+  const prompt = `${instruction}\n${strictRules}\n\nSOURCE:\n${text}`;
 
   const output = await chatCompletion({
     provider: cfg.aiProvider,
