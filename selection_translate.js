@@ -57,6 +57,92 @@
     el.setAttribute('data-theme', t); // 冗余标记，增强选择器稳定性
   }
 
+  async function getTranslateTargetLang(){
+    try{
+      const { output_lang = 'zh' } = await chrome.storage.sync.get({ output_lang: 'zh' });
+      const v = String(output_lang || '').trim().toLowerCase();
+      if (['en','en-us','english','英语','英語'].includes(v)) return 'en';
+      return 'zh';
+    }catch{ return 'zh'; }
+  }
+
+  function looksLikeEnglish(text = ''){
+    const cleaned = String(text || '').replace(/[\s0-9.,;:!?'"()\-_/\\]+/g, '');
+    if (!cleaned) return false;
+    const latin = (cleaned.match(/[A-Za-z]/g) || []).length;
+    const cjk = (cleaned.match(/[\u4E00-\u9FFF]/g) || []).length;
+    if (cjk > 0) return false;
+    const ratio = latin / cleaned.length;
+    return latin >= 3 && ratio >= 0.6;
+  }
+
+  function shouldEnableSpeakButton(originalText, targetLang){
+    return targetLang === 'zh' && looksLikeEnglish(originalText);
+  }
+
+  function stopSpeech(){
+    try{ window.speechSynthesis?.cancel(); }catch{}
+    if (speakBtn){
+      speakBtn.classList.remove('playing');
+      speakBtn.setAttribute('aria-pressed','false');
+    }
+    isSpeaking = false;
+  }
+
+  function playSpeech(text){
+    if (!text || !window.speechSynthesis) return;
+    stopSpeech();
+    const utter = new SpeechSynthesisUtterance(text);
+    const voices = (() => {
+      try { return window.speechSynthesis.getVoices?.() || []; } catch { return []; }
+    })();
+    const prefer = voices.find(v => /en[-_]?US/i.test(v.lang))
+                  || voices.find(v => /^en/i.test(v.lang));
+    if (prefer) utter.voice = prefer;
+    else utter.lang = 'en-US';
+    utter.rate = 1;
+    utter.pitch = 1;
+    utter.onstart = () => {
+      isSpeaking = true;
+      if (speakBtn){
+        speakBtn.classList.add('playing');
+        speakBtn.setAttribute('aria-pressed','true');
+      }
+    };
+    const clear = () => {
+      isSpeaking = false;
+      if (speakBtn){
+        speakBtn.classList.remove('playing');
+        speakBtn.setAttribute('aria-pressed','false');
+      }
+    };
+    utter.onend = clear;
+    utter.onerror = clear;
+    try{ window.speechSynthesis.speak(utter); }catch{ clear(); }
+  }
+
+  function configureSpeakButton(show, text){
+    if (!speakBtn) return;
+    if (!show){
+      speakBtn.style.display = 'none';
+      speakBtn.dataset.original = '';
+      speakBtn.classList.remove('playing');
+      speakBtn.setAttribute('aria-pressed','false');
+      currentOriginalText = '';
+      stopSpeech();
+      return;
+    }
+    if (!('speechSynthesis' in window)){
+      speakBtn.style.display = 'none';
+      return;
+    }
+    currentOriginalText = text || '';
+    speakBtn.dataset.original = currentOriginalText;
+    speakBtn.style.display = '';
+    speakBtn.classList.remove('playing');
+    speakBtn.setAttribute('aria-pressed','false');
+  }
+
   // ===== 内联译文块样式（随主题联动） =====
   function styleInlineQuoteForTheme(q, theme){
     const isDark = theme === 'dark';
@@ -161,8 +247,10 @@
   }
 
   /* ===================== UI 构建 ===================== */
-  let host, wrap, contentEl, closeBtn, spinner, shadowRootEl, copyBtn;
+  let host, wrap, contentEl, closeBtn, spinner, shadowRootEl, copyBtn, speakBtn;
   let resizeHandle;
+  let currentOriginalText = '';
+  let isSpeaking = false;
 
   function ensureUI() {
     if (host) return;
@@ -309,6 +397,24 @@
           transition: all .2s ease;
           box-shadow: 0 1px 3px rgba(0,0,0,.2);
         }
+        .tbtn.speak{
+          min-width: 22px;
+          height: 22px;
+          padding: 0 3px;
+        }
+        .tbtn.speak svg{
+          width: 14px; height: 14px; display:block;
+        }
+        .tbtn.speak.playing{
+          background: rgba(234,179,8,.25);
+          border-color: rgba(234,179,8,.45);
+          box-shadow: 0 1px 4px rgba(234,179,8,.35);
+        }
+        .bubble.light .tbtn.speak.playing{
+          background: rgba(234,179,8,.22);
+          border-color: rgba(234,179,8,.5);
+          box-shadow: 0 1px 4px rgba(234,179,8,.3);
+        }
         /* Round, smaller variant for A-/A+ */
         #sx-font-inc, #sx-font-dec{
           min-width: 20px; width: 20px; height: 20px; padding: 0;
@@ -426,6 +532,13 @@
             <button class="tbtn" id="sx-font-dec" title="A-">−</button>
             <button class="tbtn" id="sx-font-inc" title="A+">＋</button>
             <button class="tbtn" id="sx-copy" title="Copy result">Copy</button>
+            <button class="tbtn speak" id="sx-speak" title="Speak original" aria-pressed="false" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 9v6h3l4 4V5L7 9z"></path>
+                <path d="M16 9a4 4 0 0 1 0 6"></path>
+                <path d="M18.5 7a7 7 0 0 1 0 10"></path>
+              </svg>
+            </button>
             <button class="close" id="sx-close" aria-label="Close">✕</button>
           </div>
         </div>
@@ -439,6 +552,7 @@
     contentEl = shadow.getElementById('sx-content');
     closeBtn = shadow.getElementById('sx-close');
     copyBtn  = shadow.getElementById('sx-copy');
+    speakBtn = shadow.getElementById('sx-speak');
     const fontIncBtn = shadow.getElementById('sx-font-inc');
     const fontDecBtn = shadow.getElementById('sx-font-dec');
     resizeHandle = shadow.getElementById('sx-resize');
@@ -479,6 +593,23 @@
       } else {
         copyBtn.textContent = 'Copied';
         setTimeout(()=> (copyBtn.textContent = 'Copy'), 800);
+      }
+    });
+    speakBtn?.addEventListener('click', async () => {
+      if (!currentOriginalText) return;
+      if (!('speechSynthesis' in window)) {
+        const i18n = await loadI18n();
+        const lang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+        const msg = lang === 'zh'
+          ? '当前浏览器不支持朗读功能。'
+          : 'Speech synthesis is not supported in this browser.';
+        try { alert(msg); } catch {}
+        return;
+      }
+      if (isSpeaking) {
+        stopSpeech();
+      } else {
+        playSpeech(currentOriginalText);
       }
     });
 
@@ -606,6 +737,7 @@
   function removeUI() {
     // Disable keep-alive so explicit close actually removes the bubble
     window.__sxTranslateKeepAlive = false;
+    stopSpeech();
     if (keepAliveMO) { try{ keepAliveMO.disconnect(); }catch{} keepAliveMO = null; }
     if (!host) return;
     try {
@@ -617,7 +749,8 @@
     const teardown = () => {
       try{ host.remove(); }catch{}
       __sxUserMovedBubble = false;
-      host = wrap = contentEl = closeBtn = spinner = shadowRootEl = copyBtn = null;
+      host = wrap = contentEl = closeBtn = spinner = shadowRootEl = copyBtn = speakBtn = null;
+      currentOriginalText = '';
     };
     try { setTimeout(teardown, 520); } catch { teardown(); }
   }
@@ -630,6 +763,7 @@
     try {
       const title = shadow.getElementById('sx-title');
       const copyBtn = shadow.getElementById('sx-copy');
+      const speakBtn = shadow.getElementById('sx-speak');
       const closeBtn = shadow.getElementById('sx-close');
       const fontIncBtn = shadow.getElementById('sx-font-inc');
       const fontDecBtn = shadow.getElementById('sx-font-dec');
@@ -646,6 +780,12 @@
       if (copyBtn) {
         copyBtn.textContent = await i18n.t('floatPanel.copy');
         copyBtn.title = await i18n.t('floatPanel.copy');
+      }
+      if (speakBtn) {
+        const lang = await i18n.getCurrentLanguage();
+        const label = lang === 'zh' ? '朗读原文' : 'Speak original';
+        speakBtn.title = label;
+        speakBtn.setAttribute('aria-label', label);
       }
       
       if (closeBtn) {
@@ -731,11 +871,14 @@
       const sel = window.getSelection();
       const text = sel ? String(sel.toString()).trim() : '';
       if (!text) return;
+      const originalText = text;
+      const targetLang = await getTranslateTargetLang();
 
       // ✅ 开始翻译前先关闭 floatpanel，避免遮挡
       await closeFloatPanelIfAny();
 
       ensureUI();
+      configureSpeakButton(false);
 
       // 应用主题（严格跟随设置；仅当两者都无值时才跟随系统）
       applyBubbleTheme(wrap, await resolveBubbleTheme());
@@ -806,9 +949,11 @@
 
       // 仅当用户未拖动时，做一次微调（防止气泡溢出视窗）
       adjustIfOverflowing();
+      configureSpeakButton(shouldEnableSpeakButton(originalText, targetLang), originalText);
     } catch (e) {
       try { if (contentEl) contentEl.textContent = `⚠️ ${e?.message || e}`; } catch {}
       spinner?.remove(); spinner = null;
+      configureSpeakButton(false);
     }
   }
 

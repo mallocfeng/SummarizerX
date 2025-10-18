@@ -1,5 +1,15 @@
 # Changelog
 
+# v2.3.9 - 2025-09-27
+
+### English
+- UX: Added a speech button to the selection translation bubble that appears when translating English into Chinese, letting you play the original text via the browser's speech synthesis without extra permissions.
+- Polish: Tuned language detection and bubble layout so the speak control only shows when useful and aligns with neighbouring buttons.
+
+### 中文
+- 体验：在选区翻译面板中新增朗读按钮，当英文翻译成中文时可直接调用浏览器语音朗读原文，无需额外权限。
+- 优化：调整语言判定与浮窗排版，仅在合适场景显示朗读按钮，并让图标与周围控件对齐。
+
 ## v2.3.8 - 2025-09-26
 
 ### English
