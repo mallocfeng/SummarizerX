@@ -1830,7 +1830,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'SX_TRANSLATE_REQUEST') {
     (async () => {
       try {
-        const res = await doTranslate(msg.text);
+        const targetLang = typeof msg?.targetLang === 'string' ? msg.targetLang.trim().toLowerCase() : '';
+        const res = await doTranslate(msg.text, { targetLang });
         sendResponse({ ok: true, result: res });
       } catch (e) {
         sendResponse({ ok: false, error: e?.message || String(e) });
@@ -1997,11 +1998,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // 实际的翻译实现：读取设置，选模型/基址/Key，然后 Chat Completions
-async function doTranslate(text) {
+async function doTranslate(text, options = {}) {
   const cfg = await getSettings();
   if (!cfg.apiKey && cfg.aiProvider !== 'trial') throw new Error('请先在设置页填写并保存 API Key');
 
-  const target = await getTargetLang(); // 'zh' | 'en'
+  let target = '';
+  const override = typeof options?.targetLang === 'string' ? options.targetLang.trim().toLowerCase() : '';
+  if (override === 'en' || override === 'zh') target = override;
+  if (!target) target = await getTargetLang(); // 'zh' | 'en'
   const strictRules = [
     'RULES:',
     '- Output PLAIN TEXT only. No Markdown, no quotes, no brackets, no lists.',

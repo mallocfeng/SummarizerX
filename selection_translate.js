@@ -1264,4 +1264,297 @@
       try { await chrome.runtime.sendMessage({ type: 'SX_INLINE_TRANSLATED_CHANGED', inline: false }); } catch {}
     }catch(e){ console.warn('Restore full page failed:', e); }
   }
+
+  /* ===================== 文本框“三连空格”自动翻译（→ 英文） ===================== */
+  const TYPING_TEXT_INPUT_TYPES = new Set(['', 'text', 'search', 'url', 'email', 'tel', 'number']);
+  let typingWatcherBound = false;
+  const typingSpaceState = { target: null, count: 0 };
+  let typingUILang = 'zh';
+  let typingLangResolved = false;
+
+  function isInsideSXUI(el){
+    if (!el || typeof el.closest !== 'function') return false;
+    return !!(el.closest('#sx-translate-host') || el.closest('#sx-float-panel') || el.closest('[data-sx-sticky]'));
+  }
+
+  function resolveTypingField(node){
+    if (!node) return null;
+    let el = node;
+    try {
+      if (el.nodeType === Node.TEXT_NODE) el = el.parentElement;
+    } catch {}
+    if (!(el instanceof Element)) return null;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el;
+    if (el.isContentEditable) return el;
+    if (typeof el.closest === 'function') {
+      const editable = el.closest('[contenteditable]:not([contenteditable="false"])');
+      if (editable) return editable;
+    }
+    return null;
+  }
+
+  function isEligibleTypingField(el){
+    if (!el || !(el instanceof Element)) return false;
+    if (isInsideSXUI(el)) return false;
+    if (el instanceof HTMLTextAreaElement) return !el.disabled && !el.readOnly;
+    if (el instanceof HTMLInputElement) {
+      const type = String(el.type || '').toLowerCase();
+      if (!TYPING_TEXT_INPUT_TYPES.has(type)) return false;
+      if (type === 'password') return false;
+      return !el.disabled && !el.readOnly;
+    }
+    if (el.isContentEditable){
+      const attr = el.getAttribute('contenteditable');
+      if (attr === 'false') return false;
+      return true;
+    }
+    return false;
+  }
+
+  function readFieldValue(el){
+    if (!el) return '';
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value || '';
+    if (el.isContentEditable) return el.innerText || el.textContent || '';
+    return '';
+  }
+
+  function writeFieldValue(el, text){
+    if (!el) return;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.value = text;
+    } else if (el.isContentEditable) {
+      el.textContent = text;
+    }
+    try {
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch {}
+  }
+
+  function placeCaretAtEnd(el){
+    if (!el) return;
+    try { el.focus(); } catch {}
+    try {
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        const len = el.value.length;
+        if (typeof el.setSelectionRange === 'function') el.setSelectionRange(len, len);
+      } else if (el.isContentEditable) {
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } catch {}
+  }
+
+  function ensureTypingSpinnerStyles(){
+    if (document.getElementById('sx-type-translate-style')) return;
+    const st = document.createElement('style');
+    st.id = 'sx-type-translate-style';
+    st.textContent = `
+      @keyframes sx-type-spin { to { transform: rotate(360deg); } }
+      .sx-type-spinner{
+        position: fixed;
+        z-index: 2147483647;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        pointer-events: none;
+        min-width: 90px;
+        background: var(--sx-type-bg, rgba(15,23,42,.9));
+        color: var(--sx-type-fg, #f8fafc);
+        box-shadow: var(--sx-type-shadow, 0 4px 14px rgba(15,23,42,.35));
+      }
+      .sx-type-spinner .dot{
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        border: 2px solid var(--sx-type-dot, rgba(248,250,252,.35));
+        border-top-color: var(--sx-type-dot-active, #38bdf8);
+        animation: sx-type-spin .85s linear infinite;
+      }
+      .sx-type-spinner.dark{
+        --sx-type-bg: rgba(15,23,42,.9);
+        --sx-type-fg: #f8fafc;
+        --sx-type-shadow: 0 4px 14px rgba(15,23,42,.35);
+        --sx-type-dot: rgba(248,250,252,.35);
+        --sx-type-dot-active: #38bdf8;
+      }
+      .sx-type-spinner.light{
+        --sx-type-bg: rgba(248,250,252,.95);
+        --sx-type-fg: #0f172a;
+        --sx-type-shadow: 0 6px 18px rgba(15,23,42,.15);
+        --sx-type-dot: rgba(15,23,42,.25);
+        --sx-type-dot-active: #2563eb;
+      }
+      .sx-type-spinner.error{
+        background: rgba(220,38,38,.92);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(220,38,38,.35);
+      }
+      .sx-type-spinner.error .dot{
+        border: 2px solid rgba(255,255,255,.5);
+        border-top-color: #fff;
+      }
+      .sx-type-spinner .label{
+        white-space: nowrap;
+      }
+    `;
+    try {
+      (document.head || document.documentElement).appendChild(st);
+    } catch { document.documentElement.appendChild(st); }
+  }
+
+  async function resolveTypingLang(){
+    if (typingLangResolved) return typingUILang;
+    typingLangResolved = true;
+    try {
+      const i18n = await loadI18n();
+      typingUILang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+      typingUILang = (typingUILang === 'en') ? 'en' : 'zh';
+    } catch { typingUILang = 'zh'; }
+    return typingUILang;
+  }
+
+  function createTypingSpinner(target){
+    ensureTypingSpinnerStyles();
+    const wrap = document.createElement('div');
+    wrap.className = 'sx-type-spinner';
+    wrap.setAttribute('role', 'status');
+    wrap.setAttribute('aria-live', 'polite');
+    wrap.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="label">Translating…</span>`;
+    document.body.appendChild(wrap);
+    const labelEl = wrap.querySelector('.label');
+
+    const applyTheme = (theme) => {
+      const mode = theme === 'dark' ? 'dark' : 'light';
+      wrap.classList.remove('dark','light');
+      wrap.classList.add(mode);
+    };
+    try {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(prefersDark ? 'dark' : 'light');
+    } catch { applyTheme('dark'); }
+    resolveBubbleTheme().then(applyTheme).catch(()=>{});
+
+    const position = () => {
+      try{
+        const rect = target.getBoundingClientRect();
+        const width = wrap.offsetWidth || 90;
+        const top = Math.max(8, Math.min(window.innerHeight - 28, rect.top + 6));
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width - 6));
+        wrap.style.top = `${top}px`;
+        wrap.style.left = `${left}px`;
+      }catch{}
+    };
+    position();
+    const onRelayout = () => position();
+    window.addEventListener('scroll', onRelayout, true);
+    window.addEventListener('resize', onRelayout);
+
+    resolveTypingLang().then((lang)=>{
+      if (!labelEl) return;
+      labelEl.textContent = lang === 'en' ? 'Translating…' : '翻译中…';
+    }).catch(()=>{});
+
+    let destroyed = false;
+    return {
+      setLabel(text, isError){
+        if (labelEl) labelEl.textContent = text;
+        if (isError) wrap.classList.add('error'); else wrap.classList.remove('error');
+      },
+      destroy(delay = 0){
+        if (destroyed) return;
+        destroyed = true;
+        const removeSelf = () => {
+          window.removeEventListener('scroll', onRelayout, true);
+          window.removeEventListener('resize', onRelayout);
+          try { wrap.remove(); } catch {}
+        };
+        if (delay > 0) setTimeout(removeSelf, delay);
+        else removeSelf();
+      }
+    };
+  }
+
+  async function triggerTypingTranslate(field){
+    if (!field || !(field instanceof Element)) return;
+    if (field.dataset?.sxTypingTranslating === '1') return;
+    const snapshot = readFieldValue(field);
+    const text = snapshot.trim();
+    if (!text) return;
+    field.dataset.sxTypingTranslating = '1';
+    const spinner = createTypingSpinner(field);
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: 'SX_TRANSLATE_REQUEST', text, targetLang: 'en' });
+      if (!resp?.ok) throw new Error(resp?.error || 'Translate failed');
+      const result = String(resp.result || '').trim();
+      writeFieldValue(field, result);
+      placeCaretAtEnd(field);
+      spinner?.destroy();
+    } catch (e) {
+      console.warn('Triple-space translate failed:', e);
+      const lang = await resolveTypingLang();
+      spinner?.setLabel(lang === 'en' ? 'Failed' : '翻译失败', true);
+      spinner?.destroy(1300);
+    } finally {
+      delete field.dataset.sxTypingTranslating;
+    }
+  }
+
+  function resetTypingState(target){
+    if (!target || typingSpaceState.target === target) {
+      typingSpaceState.target = null;
+      typingSpaceState.count = 0;
+    }
+  }
+
+  function handleTypingKeydown(ev){
+    if (ev.defaultPrevented) return;
+    if (ev.isComposing) return;
+    if (ev.__sxTypingHandled) return;
+    try { ev.__sxTypingHandled = true; } catch {}
+    const field = resolveTypingField(ev.target);
+    if (!field || !isEligibleTypingField(field)) {
+      resetTypingState(field || null);
+      return;
+    }
+    const el = field;
+    if (el.dataset?.sxTypingTranslating === '1') return;
+    if (typingSpaceState.target !== el) {
+      typingSpaceState.target = el;
+      typingSpaceState.count = 0;
+    }
+    const isSpaceKey = ev.key === ' ' || ev.code === 'Space' || ev.key === 'Spacebar';
+    if (isSpaceKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      typingSpaceState.count++;
+      if (typingSpaceState.count >= 3) {
+        ev.preventDefault();
+        typingSpaceState.count = 0;
+        const text = readFieldValue(el).trim();
+        if (text) triggerTypingTranslate(el);
+      }
+    } else if (!['Shift', 'CapsLock'].includes(ev.key)) {
+      typingSpaceState.count = 0;
+    }
+  }
+
+  function setupTypingWatcher(){
+    if (typingWatcherBound) return;
+    typingWatcherBound = true;
+    document.addEventListener('keydown', handleTypingKeydown, true);
+    window.addEventListener('keydown', handleTypingKeydown, true);
+    document.addEventListener('blur', (ev)=>{
+      const field = resolveTypingField(ev?.target);
+      if (field && field === typingSpaceState.target) resetTypingState(field);
+    }, true);
+  }
+
+  setupTypingWatcher();
 })();
