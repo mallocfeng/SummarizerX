@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.3.11 - 2025-11-11
+
+### English
+- Feature: Added a “triple-space” typing shortcut—press the spacebar three times in any editable field to instantly translate your draft to English via the configured AI backend, complete with a sticky spinner badge and caret restore.
+- UX: Inline translation quote blocks now surface a speaker icon (matching the selection bubble control) whenever English text is translated to Chinese, letting you hear the original via speech synthesis without re-opening the floating panel.
+- Polish: The typing spinner inherits the user’s light/dark theme, and failures now show the exact error returned by the backend so you can quickly fix missing API keys or quota issues.
+
+### 中文
+- 新功能：在任意输入框/可编辑区域输入内容后连按三次空格，即可调用当前 AI 设置自动翻译成英文，过程中会显示跟随视图的悬浮指示并恢复光标位置。
+- 体验：全文对照的每段译文与选区浮窗一致，在英文译中文时会出现朗读图标，可直接朗读原文，无需重新打开浮窗。
+- 优化：三连空格的提示气泡会跟随亮/暗皮肤变化，翻译失败会展示具体报错信息，方便快速排查 API Key 或额度问题。
+
 # v2.3.9 - 2025-09-27
 
 ### English

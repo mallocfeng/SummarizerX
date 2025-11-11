@@ -13,8 +13,8 @@
 
 ## English
 
-Current stable: v2.3.6 (main branch)
-Current beta: v2.3.9 (dev/next branch)
+Current stable: v2.3.11 (main branch)
+Current beta: v2.3.11 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -36,11 +36,13 @@ Current beta: v2.3.9 (dev/next branch)
 - 🌙 Theming Support: Light and dark modes for comfortable reading  
 - ☁️ Cross-Device Settings Sync: Saves language, AI provider/API keys, prompts, and ad-filter toggles via `chrome.storage.sync`; checked ad lists auto-download after syncing so each machine stays up to date  
 - 🖱️ Context Menu Translate: Right-click on selected text and instantly translate it with AI
- - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
- - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
- - 🔁 Reader Translate (new): In Reader Mode, click “Translate Original” to progressively translate paragraph by paragraph. Choose translation backend from a dropdown: Free service (Cloudflare Worker + Gemini 2.5‑flash) or your Settings provider (ChatGPT/OpenAI, DeepSeek, Trial, Custom). It caches completed blocks and lets you toggle Show Original/Show Translation. An in-button progress bar shows progress and adapts to light/dark.
+- 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
+- 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
+- 🔁 Reader Translate (new): In Reader Mode, click “Translate Original” to progressively translate paragraph by paragraph. Choose translation backend from a dropdown: Free service (Cloudflare Worker + Gemini 2.5‑flash) or your Settings provider (ChatGPT/OpenAI, DeepSeek, Trial, Custom). It caches completed blocks and lets you toggle Show Original/Show Translation. An in-button progress bar shows progress and adapts to light/dark.
 - 💬 Page Q&A Chat (beta): Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
 - 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
+- 🔊 Inline Speech Playback: When translating English → Chinese (selection bubble or full-page blocks), tap the speaker icon to hear the original text via browser speech synthesis—no extra permissions required.
+- ⌨️ Triple-Space Typing Translate (beta): Type in any text field, press space three times, and we translate your draft into English using your configured AI backend. A themed spinner badge shows progress and surfaces errors inline.
 - ⚡ Vue.js Integration: Modern reactive UI with improved performance and user experience
 - 🎯 Smart Layout Alignment: Intelligent positioning for full-page translations that adapts to complex website layouts (CSS Grid, responsive design)
 - 🌙 Force Dark Mode: Toggle to force dark mode on any webpage with optimized text colors for better readability (now powered by Dark Reader’s dynamic engine; see Credits)
