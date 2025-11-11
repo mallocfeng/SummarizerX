@@ -82,14 +82,18 @@
 
   function stopSpeech(){
     try{ window.speechSynthesis?.cancel(); }catch{}
-    if (speakBtn){
+    if (activeSpeakButton){
+      activeSpeakButton.classList.remove('playing');
+      activeSpeakButton.setAttribute('aria-pressed','false');
+      activeSpeakButton = null;
+    } else if (speakBtn){
       speakBtn.classList.remove('playing');
       speakBtn.setAttribute('aria-pressed','false');
     }
     isSpeaking = false;
   }
 
-  function playSpeech(text){
+  function playSpeech(text, buttonEl = null){
     if (!text || !window.speechSynthesis) return;
     stopSpeech();
     const utter = new SpeechSynthesisUtterance(text);
@@ -104,16 +108,19 @@
     utter.pitch = 1;
     utter.onstart = () => {
       isSpeaking = true;
-      if (speakBtn){
-        speakBtn.classList.add('playing');
-        speakBtn.setAttribute('aria-pressed','true');
+      const btn = buttonEl || speakBtn || null;
+      activeSpeakButton = btn;
+      if (btn){
+        btn.classList.add('playing');
+        btn.setAttribute('aria-pressed','true');
       }
     };
     const clear = () => {
       isSpeaking = false;
-      if (speakBtn){
-        speakBtn.classList.remove('playing');
-        speakBtn.setAttribute('aria-pressed','false');
+      if (activeSpeakButton){
+        activeSpeakButton.classList.remove('playing');
+        activeSpeakButton.setAttribute('aria-pressed','false');
+        activeSpeakButton = null;
       }
     };
     utter.onend = clear;
@@ -141,6 +148,17 @@
     speakBtn.style.display = '';
     speakBtn.classList.remove('playing');
     speakBtn.setAttribute('aria-pressed','false');
+  }
+
+  async function ensureSpeechSupported(){
+    if ('speechSynthesis' in window) return true;
+    const i18n = await loadI18n();
+    const lang = i18n ? await i18n.getCurrentLanguage() : 'zh';
+    const msg = lang === 'zh'
+      ? '当前浏览器不支持朗读功能。'
+      : 'Speech synthesis is not supported in this browser.';
+    try { alert(msg); } catch {}
+    return false;
   }
 
   // ===== 内联译文块样式（随主题联动） =====
@@ -251,6 +269,7 @@
   let resizeHandle;
   let currentOriginalText = '';
   let isSpeaking = false;
+  let activeSpeakButton = null;
 
   function ensureUI() {
     if (host) return;
@@ -597,19 +616,11 @@
     });
     speakBtn?.addEventListener('click', async () => {
       if (!currentOriginalText) return;
-      if (!('speechSynthesis' in window)) {
-        const i18n = await loadI18n();
-        const lang = i18n ? await i18n.getCurrentLanguage() : 'zh';
-        const msg = lang === 'zh'
-          ? '当前浏览器不支持朗读功能。'
-          : 'Speech synthesis is not supported in this browser.';
-        try { alert(msg); } catch {}
-        return;
-      }
-      if (isSpeaking) {
+      if (!await ensureSpeechSupported()) return;
+      if (isSpeaking && activeSpeakButton === speakBtn) {
         stopSpeech();
       } else {
-        playSpeech(currentOriginalText);
+        playSpeech(currentOriginalText, speakBtn);
       }
     });
 
@@ -993,9 +1004,20 @@
         }
         .sx-it-zoom button:hover{ background: #fff; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
         .sx-it-zoom button:active{ transform: translateY(0); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+        .sx-it-zoom button svg{ width:14px; height:14px; display:block; }
+        .sx-it-zoom button.playing{
+          background: rgba(234,179,8,.25);
+          border-color: rgba(234,179,8,.45);
+          box-shadow: 0 1px 4px rgba(234,179,8,.3);
+        }
         @media (prefers-color-scheme: dark){
           .sx-it-zoom button{ background: rgba(30,41,59,.78); color:#e5e7eb; border-color: rgba(148,163,184,.35); }
           .sx-it-zoom button:hover{ background: rgba(30,41,59,.86); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+          .sx-it-zoom button.playing{
+            background: rgba(234,179,8,.28);
+            border-color: rgba(234,179,8,.55);
+            box-shadow: 0 1px 4px rgba(234,179,8,.35);
+          }
         }
       `;
       document.head.appendChild(st);
@@ -1006,6 +1028,8 @@
       const myRun = ++__sxFullTranslateRunId;
       ensureInlineTranslateStyles();
       bindInlineThemeWatchersOnce();
+      stopSpeech();
+      const targetLang = await getTranslateTargetLang();
       // 简单分块策略：收集主要可见段落与显著标题
       const blocks = [];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
@@ -1152,33 +1176,56 @@
         textEl.className = 'sx-it-text';
         textEl.textContent = translated;
         q.appendChild(textEl);
-        // If paragraph is long enough (>=20 CJK or >=20 latin alphanum), add per-paragraph zoom controls
+        // Add per-paragraph controls (zoom for long blocks, speaker for EN->ZH even if short)
         try{
           const cjkCount = (translated.match(/[\u4E00-\u9FFF]/g) || []).length;
           const latinCount = (translated.match(/[A-Za-z0-9]/g) || []).length;
-          if (cjkCount >= 20 || latinCount >= 20){
-            const zoomBox = document.createElement('div');
-            zoomBox.className = 'sx-it-zoom';
-            const minus = document.createElement('button'); minus.type='button'; minus.title='缩小'; minus.textContent='-';
-            const plus  = document.createElement('button'); plus.type='button'; plus.title='放大'; plus.textContent='+';
-            zoomBox.appendChild(minus); zoomBox.appendChild(plus);
-            q.appendChild(zoomBox);
+          const enableZoom = cjkCount >= 20 || latinCount >= 20;
+          const enableSpeak = shouldEnableSpeakButton(src, targetLang);
+          if (enableZoom || enableSpeak){
+            const ctrlBox = document.createElement('div');
+            ctrlBox.className = 'sx-it-zoom';
+            if (enableSpeak){
+              const inlineSpeakBtn = document.createElement('button');
+              inlineSpeakBtn.type = 'button';
+              inlineSpeakBtn.title = 'Speak original';
+              inlineSpeakBtn.setAttribute('aria-label','Speak original');
+              inlineSpeakBtn.setAttribute('aria-pressed','false');
+              inlineSpeakBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h3l4 4V5L7 9z"></path><path d="M16 9a4 4 0 0 1 0 6"></path><path d="M18.5 7a7 7 0 0 1 0 10"></path></svg>';
+              inlineSpeakBtn.addEventListener('click', async (ev)=>{
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (!await ensureSpeechSupported()) return;
+                if (isSpeaking && activeSpeakButton === inlineSpeakBtn){
+                  stopSpeech();
+                } else {
+                  playSpeech(src, inlineSpeakBtn);
+                }
+              });
+              ctrlBox.appendChild(inlineSpeakBtn);
+            }
+            if (enableZoom){
+              const minus = document.createElement('button'); minus.type='button'; minus.title='缩小'; minus.textContent='-';
+              const plus  = document.createElement('button'); plus.type='button'; plus.title='放大'; plus.textContent='+';
+              ctrlBox.appendChild(minus); ctrlBox.appendChild(plus);
+              q.dataset.sxZoom = '1';
+              const applyZoom = (f)=>{ try{ q.style.fontSize = Math.round(f*100) + '%'; }catch{} };
+              minus.addEventListener('click', (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.max(0.7, Math.round((f-0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
+              plus.addEventListener('click',  (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.min(2.0, Math.round((f+0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
+            }
+            q.appendChild(ctrlBox);
             // Reserve space on the right to avoid text overlapping buttons
             try {
               // Fallback padding before measurement
               q.style.paddingRight = '60px';
               requestAnimationFrame(()=>{
                 try{
-                  const w = zoomBox.getBoundingClientRect().width || 0;
-                  const pad = Math.max(56, Math.ceil(w + 12));
+                  const w = ctrlBox.getBoundingClientRect().width || 0;
+                  const pad = Math.max(44, Math.ceil(w + 12));
                   q.style.paddingRight = pad + 'px';
                 }catch{}
               });
             } catch {}
-            q.dataset.sxZoom = '1';
-            const applyZoom = (f)=>{ try{ q.style.fontSize = Math.round(f*100) + '%'; }catch{} };
-            minus.addEventListener('click', (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.max(0.7, Math.round((f-0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
-            plus.addEventListener('click',  (ev)=>{ ev.stopPropagation(); ev.preventDefault(); let f=parseFloat(q.dataset.sxZoom||'1')||1; f=Math.min(2.0, Math.round((f+0.1)*10)/10); q.dataset.sxZoom=String(f); applyZoom(f); });
           }
         }catch{}
         // 阶梯延时，增强瀑布式显现（每块 24ms，最多 240ms）
@@ -1200,6 +1247,7 @@
 
   async function restoreFullPageInline(){
     try{
+      stopSpeech();
       // 递增运行代号，中断尚未完成的翻译流程
       __sxFullTranslateRunId++;
       // 移除所有我们插入的译文块
