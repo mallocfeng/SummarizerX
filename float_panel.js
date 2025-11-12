@@ -1179,7 +1179,7 @@ async function maybeRestoreHistory(shadow, state){
     host.style.position='fixed';
     host.style.top='0';
     host.style.right='0';
-    host.style.width='420px';
+    host.style.width='480px';
     host.style.height='100vh';
     host.style.zIndex='2147483647';
     host.style.pointerEvents='auto';
@@ -1439,7 +1439,7 @@ async function maybeRestoreHistory(shadow, state){
       .wrap.is-empty #sx-summary,
       .wrap.is-empty #sx-cleaned,
       .wrap.is-empty #sx-pdf{ display:none !important; }
-      .wrap.is-empty .container{ flex:0 0 auto; height:132px; overflow:hidden; padding-top:0; padding-bottom:0; }
+      .wrap.is-empty .container{ flex:0 0 auto; height:200px; overflow:hidden; padding-top:0; padding-bottom:0; }
       .wrap.is-empty .section{ margin:0 !important; }
       /* While expanding, allow the middle to grow smoothly */
       .wrap.is-empty.expanding .container{ height: var(--sx-target, 2000px); }
@@ -3078,7 +3078,7 @@ async function maybeRestoreHistory(shadow, state){
       });
     }
     drag?.addEventListener('dblclick', async ()=>{
-      const cur=parseInt(getComputedStyle(host).width,10)||420;
+      const cur=parseInt(getComputedStyle(host).width,10)||480;
       const target=cur<520? 560: 380;
       let w=clamp(target);
       // 若双击目标会导致“缩小”，且预测距离将小于安全值（左右任一），则保持当前宽度不变
@@ -5258,8 +5258,8 @@ async function maybeRestoreHistory(shadow, state){
       const useEn = currentLangCache === 'en';
       const tag = useEn ? 'Translation Tip' : '翻译提示';
       const main = useEn
-        ? 'Use the context menu to translate the full page or only what you highlight.'
-        : '右键菜单可直接翻译全文，或选中文本后翻译选区。';
+        ? 'Use the context menu to translate the whole page or just the selected text.In any webpage text box, type three spaces in a row to instantly translate Chinese into English'
+        : '右键菜单可翻译整页或选中的文本。在网页输入框中连续输入三个空格，可自动将中文翻译为英文。';
       const sub = useEn
         ? 'Highlight text and right-click to translate instantly.'
         : '选中文本后右键即可快速翻译。';
@@ -5613,7 +5613,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
         // size + pos restore with current bounds
         const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
         const hardMaxW = 1400;
-        const baseW = Math.min(hardMaxW, Math.round(savedGeom?.width || 420));
+        const baseW = Math.min(hardMaxW, Math.round(savedGeom?.width || 480));
         const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
         chatCard.style.minWidth = '0px';
         chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
@@ -5720,7 +5720,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
         if (shouldFloat && ui?.lastGeom){
           const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
           const hardMaxW = 1400;
-          const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+          const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 480));
           const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
           chatCard.style.minWidth = '0px';
           chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
@@ -6799,7 +6799,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
             const getQABottomGapLocal = ()=>{ try{ const qaBar = shadow.getElementById('sx-qa-area'); const qaH = qaBar ? qaBar.getBoundingClientRect().height : 60; return (qaH + 19); }catch{ return 72; } };
             const { innerLeftAbs, innerRightAbs, availW, contRect } = getContainerBounds();
             const hardMaxW = 1400;
-            const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 420));
+            const baseW = Math.min(hardMaxW, Math.round(ui.lastGeom.width || 480));
             const width = Math.max(4, Math.min(baseW, Math.floor(availW)));
             chatCard.style.minWidth = '0px';
             chatCard.style.width = width + 'px'; chatCard.style.setProperty('--qa-w', width + 'px');
