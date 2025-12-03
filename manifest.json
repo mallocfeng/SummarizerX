@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "key_backup": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz9inzNwru78Y7s6GCylrjKWJ81cbhF89x0RV7b2f9RkP2vzCYhT/rpLfUUpjCbA8Dit0uJlsjplPYjkcPnW/88TUlkGy3LqkB3x8da7nEK4X0jTzGhr8coLqY3hdmTu2LRxJtWe4bM8G1+s8iMP06i1ABIKZ5SX8OiMpJjvU5dyZCwy8PJOdyEByk3r3UMDSax1sBK6+GGIXTQ7f0q8Pv9IIgucer5W3BxSNviwiGu22j7hst9F3QAG2i5+ZiqRnKwAjQnrAPJYeo/zrdkpjE03uWYVpdswvbHmsC7csiDmLCZkgZ61u7fTLxX6QUeNGj4AePsZUi+r7LzZNplx4NwIDAQAB",
   "name": "SummarizerX AI Reader",
-  "version": "2.3.11",
-  "version_name": "2.3.11",
+  "version": "2.3.12",
+  "version_name": "2.3.12",
   "description": "Extract and translate on-page selections via a floating panel. 摘要、翻译网页选区并在页面内弹窗显示。",
   "permissions": [
     "activeTab",

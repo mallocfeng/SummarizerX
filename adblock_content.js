@@ -306,7 +306,8 @@ function collapseNYTFamilyUpsell(){
     if (!on) return;
 
     // Text patterns observed on NYT upsell
-    const txtRe = /(family\s+subscriptions?\s+are\s+here|all\s*access\s*family|家庭(订阅|方案)|家庭版)/i;
+    const txtRe = /(family\s+subscriptions?\s+are\s+here|all\s*access\s*family|add\s+three\s+people\s+to\s+your\s+subscription|keep\s+reading\s+with\s+(the\s+)?times\s+subscription|stay\s+informed\s+with\s+(the\s+)?times|subscribe\s+to\s+(the\s+)?times|纽约时报.*订阅|订阅.*纽约时报|家庭(订阅|方案)|家庭版)/i;
+    const ctaRe = /(subscribe|subscription|订阅|keep\s+reading|see\s+options|not\s+now)/i;
 
     const selectorBuckets = [
       '[role="dialog"]',
@@ -315,11 +316,17 @@ function collapseNYTFamilyUpsell(){
       '[style*="position: sticky" i]',
       '[data-testid*="upsell" i]',
       '[data-testid*="family" i]',
+      '[data-testid*="subscription" i]',
+      '[data-testid*="drawer" i]',
+      '[data-testid*="stick" i]',
       '[data-component*="upsell" i]',
       '[class*="upsell" i]',
       '[class*="family" i]',
+      '[class*="subscription" i]',
+      '[class*="drawer" i]',
       '[id*="upsell" i]',
-      '[id*="family" i]'
+      '[id*="family" i]',
+      '[id*="subscription" i]'
     ];
     const nodes = new Set();
     selectorBuckets.forEach(sel => {
@@ -360,6 +367,12 @@ function collapseNYTFamilyUpsell(){
     };
 
     let removedAny = false;
+    const matchesCta = (root) => {
+      try {
+        return Array.from(root.querySelectorAll('button,a')).some(el => ctaRe.test((el.textContent || '').trim()));
+      } catch { return false; }
+    };
+
     const removeTarget = (target) => {
       hardHide(target);
       const p = target.parentElement;
@@ -393,6 +406,10 @@ function collapseNYTFamilyUpsell(){
         const extraMatchers = [
           /switch\s+to\s+all\s+access\s+family/i,
           /add\s+three\s+people\s+to\s+your\s+subscription/i,
+          /keep\s+reading\s+with\s+(the\s+)?times/i,
+          /stay\s+informed\s+with\s+(the\s+)?times/i,
+          /subscribe\s+to\s+(the\s+)?times/i,
+          /订阅纽约时报/,
           txtRe
         ];
         const candidates = document.querySelectorAll('div,section,aside');
@@ -408,6 +425,27 @@ function collapseNYTFamilyUpsell(){
           if (!hasCta) continue;
           const rect = el.getBoundingClientRect?.();
           if (rect && rect.width * rect.height > 1e6) continue;
+          if (!matchesCta(el) && !txtRe.test(text)) continue;
+          removeTarget(el);
+          if (removedAny) break;
+        }
+      } catch {}
+    }
+
+    if (!removedAny) {
+      try {
+        const stickyCandidates = document.querySelectorAll('[data-testid*="drawer" i], [data-testid*="subscription" i], [class*="subscription" i], [class*="drawer" i]');
+        for (const el of stickyCandidates) {
+          if (!el || !el.isConnected) continue;
+          const rect = el.getBoundingClientRect?.();
+          if (!rect) continue;
+          const nearBottom = vh - rect.bottom <= EDGE + 80;
+          const wideEnough = rect.width >= vw * 0.5;
+          if (!nearBottom && !wideEnough) continue;
+          const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!text) continue;
+          if (!txtRe.test(text) && !/subscription|subscribe|订阅|Times/i.test(text)) continue;
+          if (!matchesCta(el)) continue;
           removeTarget(el);
           if (removedAny) break;
         }

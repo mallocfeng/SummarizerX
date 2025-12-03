@@ -13,8 +13,8 @@
 
 ## English
 
-Current stable: v2.3.11 (main branch)
-Current beta: v2.3.11 (dev/next branch)
+Current stable: v2.3.12 (main branch)
+Current beta: v2.3.12 (dev/next branch)
 
 **Summary** is a Chrome extension that helps you quickly extract, summarize, and translate webpage content with AI-powered enhancements. It offers a clean reading experience with customizable settings and a floating panel.
 
@@ -51,7 +51,7 @@ Current beta: v2.3.11 (dev/next branch)
   - 🧰 Element Hiding Picker (beta): In the floating panel footer, click “Hide element”, then click any element to create a per-domain cosmetic rule; Confirm exits the picker; Cancel continues; press Esc to exit. The picker hides all matches on the current page immediately, and saves the rule under Settings → Ad Filtering → Custom hides. Tip: Medium strength is recommended when using custom/user rules.
   - ▶️ Video ads (beta, site packs): NYTimes + CNN/Reuters/Bloomberg/Guardian/Yahoo/CNET — use session-scoped DNR to redirect specific ad modules (e.g., Betamax ads, IMA3) to safe stubs and block FreeWheel/GPT/Amazon/Media.net with initiator scoping to avoid side effects. Rules load only while a tab of the site is open.
   - 🗂 Settings tabs: Top tabs (AI Summary / Ad Filtering) for clearer navigation; polished tab visuals, gradient underline, and unified header/card background.
-  - 🧩 NYTimes: optional toggle to hide the “Family subscriptions / All Access Family” upsell popup (off by default for fresh installs). Adblock main switch and popup blocker are also off by default on first install.
+  - 🧩 NYTimes: optional toggle to hide the “Family subscriptions / All Access Family” upsell popup (off by default for fresh installs), now patched to also suppress the latest sticky bottom subscription banner. Adblock main switch and popup blocker are also off by default on first install.
   - ℹ️ Safety: Avoid collapsing ChatGPT/OpenAI sticky UI when cleaning floating overlays
 
 ### 🖼 Screenshots
@@ -133,8 +133,8 @@ All processing happens locally or via your configured AI API key. No data is sen
 
 ## 中文简介
 
-当前稳定版：v2.3.4 (main分支)
-当前测试版：v2.3.4 (dev/next分支)
+当前稳定版：v2.3.12 (main分支)
+当前测试版：v2.3.12 (dev/next分支)
 
 **Summary** 是一款 Chrome 浏览器扩展，利用 AI 技术快速提取、摘要和翻译网页内容，提供简洁流畅的阅读体验和丰富的个性化设置，支持浮动面板查看摘要。
 
@@ -167,6 +167,7 @@ All processing happens locally or via your configured AI API key. No data is sen
 - 🛡️ 广告过滤（ABP 2.0 元素隐藏）：在设置 → 广告过滤（现位于“系统提示词”下方）开启；可选全球/区域列表（EasyList、EasyPrivacy、Fanboy’s等）和“Cookie 提示隐藏”分类（内置 EasyList Cookie General Hide）。支持单条规则“同步更新”、勾选后自动同步、高/中/低强度；规则本地保存，并按站点应用以隐藏/去除广告元素。
   - 🧰 隐藏元素选择器（测试版）：在浮窗底部点击“隐藏元素”，再点击页面中的元素即可生成“按域名”的外观隐藏规则；“确认添加”会立即退出选择模式并隐藏当前页所有匹配元素；“取消”继续选择；按 Esc 退出。规则保存在 设置 → 广告过滤 → 自定义隐藏。提示：使用自定义/用户规则时，建议将过滤强度设为“中”。
   - ▶️ 视频广告（测试版，站点包）：NYTimes + CNN/路透/彭博/卫报/Yahoo/CNET — 使用“会话规则（DNR）”在仅打开目标站点时重定向特定广告模块（如 Betamax ads、IMA3）到安全空实现，并按站点限定阻断 FreeWheel/GPT/Amazon/Media.net，降低副作用。
+  - 🧩 纽约时报：新增可选开关，默认屏蔽 “Family subscriptions / All Access Family” 弹窗，并已修复最新上线的底部订阅浮层提示。广告过滤总开关与弹窗拦截首次安装保持关闭。
   - 🗂 设置页标签：新增顶部标签（AI 摘要 / 广告过滤）与样式优化；保留渐变下划线并与首张卡片上浮联动；统一标题栏/卡片色调，视觉更自然。
   - ℹ️ 安全：在清理浮动遮罩时，避免误隐藏 ChatGPT/OpenAI 的粘附式界面元素
 

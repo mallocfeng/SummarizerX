@@ -1,5 +1,15 @@
 # Changelog
 
+# v2.3.12 - 2025-12-03
+
+### English
+- Fix: Updated the NYTimes subscription blocker so the optional toggle also hides the newly introduced sticky bottom upsell banner without touching other site UI.
+- Polish: README/Chrome listing copy now clarifies the fix and keeps the stable/beta badges aligned with v2.3.12 for the release.
+
+### 中文
+- 修复：纽约时报订阅屏蔽开关现已覆盖最新上线的底部粘性订阅浮层，同时保持站内其它界面不受影响。
+- 优化：README 与说明同步更新，稳定/测试版本号统一为 v2.3.12，方便追踪最新版本。
+
 ## v2.3.11 - 2025-11-11
 
 ### English
@@ -316,12 +326,16 @@
 - Visual alignment: Eliminated the gap between header and first card; unified header/card background to remove color shift; softened top‑left highlight.
 - Accessibility: Increased tab label size/weight; i18n for tab titles (English/中文); maintained focus and reduced motion compatibility.
 
+- Adblock: NYTimes pre-roll filtering now uses a safer strategy (limit to DoubleClick/Google Ads/gampad; remove IMA override; improved auto-skip); synced related logic.
+
 ### 中文
 - 设置页：新增顶部标签（AI 摘要 / 广告过滤），并支持中英双语；将“基础配置 + 系统提示词 + 快捷键”与“广告过滤”分栏展示，结构更清晰。
 - 标签样式：三面边框（上/左/右）圆角小方框；激活态为浅色微底纹、低对比度描边和轻微发光，低调不刺眼。
 - 渐变下划线：保留“中间最亮，两侧渐隐”的蓝色横线，并与第一张卡片上浮联动，上下同步更自然。
 - 视觉统一：去除标题栏与首卡片的缝隙；统一标题栏/卡片背景，减轻色差；左上高光过渡更柔和。
 - 可读性：提升标签字号与字重；标签标题支持 i18n；保留键盘焦点样式与“减少动态效果”兼容。
+
+- 广告过滤：纽约时报预卷广告采用更安全的方案（仅限 DoubleClick/Google Ads/gampad；取消 IMA 覆写；改进自动跳过）；同步相关逻辑。
 
 ## v2.0.5
 
