@@ -308,36 +308,108 @@ function collapseNYTFamilyUpsell(){
     // Text patterns observed on NYT upsell
     const txtRe = /(family\s+subscriptions?\s+are\s+here|all\s*access\s*family|家庭(订阅|方案)|家庭版)/i;
 
-    // Collect likely overlays: fixed/sticky or role=dialog banners
-    const nodes = [];
-    try { nodes.push(...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')); } catch {}
-    try { nodes.push(...document.querySelectorAll('[style*="position:fixed" i], [style*="position: sticky" i]')); } catch {}
-    try { nodes.push(...document.querySelectorAll('div,section,aside')); } catch {}
+    const selectorBuckets = [
+      '[role="dialog"]',
+      '[aria-modal="true"]',
+      '[style*="position:fixed" i]',
+      '[style*="position: sticky" i]',
+      '[data-testid*="upsell" i]',
+      '[data-testid*="family" i]',
+      '[data-component*="upsell" i]',
+      '[class*="upsell" i]',
+      '[class*="family" i]',
+      '[id*="upsell" i]',
+      '[id*="family" i]'
+    ];
+    const nodes = new Set();
+    selectorBuckets.forEach(sel => {
+      try {
+        document.querySelectorAll(sel).forEach(el => nodes.add(el));
+      } catch {}
+    });
 
-    const seen = new WeakSet();
     const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
     const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
     const EDGE = 140; // banner near edges
+    const MAX_HOPS = 5;
 
-    for (const el of nodes) {
+    const qualifiesOverlay = (el) => {
       try {
-        if (!el || !el.isConnected || seen.has(el)) continue;
-        seen.add(el);
-        const text = (el.textContent || '').trim();
-        if (!text || !txtRe.test(text)) continue; // must match upsell text
-
-        // Only target overlays/banners to avoid accidental content hiding
+        if (!el || !el.isConnected) return null;
         const cs = getComputedStyle(el);
         const pos = (cs.position || '').toLowerCase();
         const rect = el.getBoundingClientRect();
-        const z = parseInt(cs.zIndex || '0', 10);
-        const overlayish = (pos === 'fixed' || pos === 'sticky' || (isNaN(z) ? false : z >= 5));
-        const nearEdge = rect && (vh - rect.bottom <= EDGE || rect.top <= EDGE || vw - rect.right <= EDGE || rect.left <= EDGE);
+        if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+        const z = Number.parseInt(cs.zIndex || '0', 10);
+        const nearEdge =
+          (vh - rect.bottom <= EDGE) ||
+          (rect.top <= EDGE) ||
+          (vw - rect.right <= EDGE) ||
+          (rect.left <= EDGE);
+        const overlayish = pos === 'fixed' || pos === 'sticky';
+        const absoluteEdge = pos === 'absolute' && nearEdge;
+        const highZ = !Number.isNaN(z) && z >= 80;
+        const coversViewport = rect.width >= vw * 0.95 && rect.height >= vh * 0.95;
+        if (coversViewport && !highZ) return null;
+        const shortish = rect.height <= vh * 0.75;
+        if (overlayish && (nearEdge || highZ)) return { rect };
+        if (absoluteEdge && shortish) return { rect };
+        if (highZ && shortish) return { rect };
+        return null;
+      } catch { return null; }
+    };
 
-        if (overlayish || nearEdge) {
-          hardHide(el);
-          const p = el.parentElement;
-          if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+    let removedAny = false;
+    const removeTarget = (target) => {
+      hardHide(target);
+      const p = target.parentElement;
+      if (p && !hasMedia(p) && isTriviallyEmpty(p)) hardHide(p);
+      removedAny = true;
+    };
+
+    for (const el of nodes) {
+      try {
+        if (!el || !el.isConnected) continue;
+        const text = (el.textContent || '').trim();
+        if (!text || !txtRe.test(text)) continue; // must match upsell text
+
+        let target = el;
+        let hops = 0;
+        let match = qualifiesOverlay(target);
+        while (!match && target && hops < MAX_HOPS) {
+          target = target.parentElement;
+          if (!target) break;
+          hops++;
+          match = qualifiesOverlay(target);
+        }
+        if (!match || !target) continue;
+
+        removeTarget(target);
+      } catch {}
+    }
+
+    if (!removedAny) {
+      try {
+        const extraMatchers = [
+          /switch\s+to\s+all\s+access\s+family/i,
+          /add\s+three\s+people\s+to\s+your\s+subscription/i,
+          txtRe
+        ];
+        const candidates = document.querySelectorAll('div,section,aside');
+
+        for (const el of candidates) {
+          if (!el || !el.isConnected) continue;
+          if (el === document.body) continue;
+          const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!text) continue;
+          if (text.length > 600) continue;
+          if (!extraMatchers.some((rx) => rx.test(text))) continue;
+          const hasCta = el.querySelector('a[href],button');
+          if (!hasCta) continue;
+          const rect = el.getBoundingClientRect?.();
+          if (rect && rect.width * rect.height > 1e6) continue;
+          removeTarget(el);
+          if (removedAny) break;
         }
       } catch {}
     }
