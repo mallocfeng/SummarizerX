@@ -39,7 +39,7 @@ Current beta: v2.3.12 (dev/next branch)
 - 🧾 Full Page Translate: Translate the entire visible page; show translations inline as quote blocks under the originals, and toggle via context menu (Translate full page / Show original)
 - 🌍 Bilingual UI (中文/English): Switch in settings; all UI texts update instantly
 - 🔁 Reader Translate (new): In Reader Mode, click “Translate Original” to progressively translate paragraph by paragraph. Choose translation backend from a dropdown: Free service (Cloudflare Worker + Gemini 2.5‑flash) or your Settings provider (ChatGPT/OpenAI, DeepSeek, Trial, Custom). It caches completed blocks and lets you toggle Show Original/Show Translation. An in-button progress bar shows progress and adapts to light/dark.
-- 💬 Page Q&A Chat (beta): Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
+- 💬 Page Q&A Chat: Ask about the current page via a bubble chat UI (user right, AI left) with a typing indicator and tidy Markdown answers; smart scrolling aligns long answers to the top, short answers scroll to bottom
 - 🔍 Inline Translate Zoom (beta): Per-paragraph +/- zoom for long quote blocks, controls pinned at the top-right with hover lift; text never overlaps controls
 - 🔊 Inline Speech Playback: When translating English → Chinese (selection bubble or full-page blocks), tap the speaker icon to hear the original text via browser speech synthesis—no extra permissions required.
 - ⌨️ Triple-Space Typing Translate (beta): Type in any text field, press space three times, and we translate your draft into English using your configured AI backend. A themed spinner badge shows progress and surfaces errors inline.
@@ -100,7 +100,7 @@ Current beta: v2.3.12 (dev/next branch)
 - Use the new **right-click menu** to translate selected text instantly
  - Use **Translate full page** from the right-click menu to insert translations below each paragraph as quote blocks; switch back via **Show original**
 
-#### Q&A Chat (beta)
+#### Q&A Chat
 - In the floating panel, type your question in the bottom bar; press Enter (Shift+Enter for newline) or click Send.
 - The panel expands with a progress bar. Bubbles appear (you on the right, AI on the left). Answers render with tidy Markdown.
 - During chat, the Summary/Readable cards are hidden. Click **Extract & Summarize** to fade the chat away and restore the two cards.
@@ -158,7 +158,7 @@ All processing happens locally or via your configured AI API key. No data is sen
  - 🧾 全文翻译：将整页可见内容按段落翻译，在原文下方以引用块内联展示；可在右键菜单“全文翻译 / 显示原文”间切换  
  - 🌍 双语界面（中文/English）：设置页可切换语言，界面文案即时更新
  - 🔁 阅读模式翻译（新增）：在阅读模式点击“翻译原文”，系统会按段落逐步翻译并即时替换。下拉菜单可选择后端：免费服务（Cloudflare Worker + Gemini 2.5‑flash）或“设置中的服务”（ChatGPT/OpenAI、DeepSeek、试用、自定义）。已完成的段落会缓存，支持“一键切换 显示原文/显示翻译”，按钮自带背景进度条并适配明暗主题。
- - 💬 你问我答（测试版）：在浮窗底部输入并发送，进入基于当前网页的气泡对话（用户在右、AI 在左）；带三点打字指示、整洁的 Markdown 排版；智能滚动（长回答顶部对齐，短回答自动滚到底部）
+ - 💬 你问我答：在浮窗底部输入并发送，进入基于当前网页的气泡对话（用户在右、AI 在左）；带三点打字指示、整洁的 Markdown 排版；智能滚动（长回答顶部对齐，短回答自动滚到底部）
  - 🔍 全文对照放大（测试版）：对较长段落的引用块提供每段 +/- 放缩；控制按钮固定在右上角并带轻微悬停上浮，文本不会与按钮重叠
  - ⚡ Vue.js 集成：现代化响应式界面，提升性能和用户体验
  - 🎯 智能布局对齐：全文翻译智能定位，适配复杂网站布局（CSS Grid、响应式设计）
