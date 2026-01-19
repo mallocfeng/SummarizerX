@@ -1,6 +1,20 @@
 # Changelog
 
-# v2.3.12 - 2025-12-03
+# v2.3.13 - 2026-01-19
+
+### English
+- Share card image: refreshed to a flatter style with tighter corner radius, cleaner header band, and simplified borders for better readability.
+- Summary card: added a title block above key points, with output-language label and auto-translation to match the configured output language.
+- Title translation caching: cached translated titles locally to avoid repeated translation calls and improve load smoothness.
+- Layout polish: fixed history badge overlap with the new title block.
+
+### 中文
+- 分享卡片图片：升级为扁平风格，圆角更小、标题区更清爽、边框更简洁，提升观感与可读性。
+- 摘要卡片：在要点前加入标题块，标签随输出语言切换，并自动翻译标题以匹配输出语言。
+- 标题翻译缓存：本地缓存已翻译标题，避免重复请求，加载更顺滑。
+- 布局细节：修复历史标记与标题块的重叠问题。
+
+## v2.3.12 - 2025-12-03
 
 ### English
 - Fix: Updated the NYTimes subscription blocker so the optional toggle also hides the newly introduced sticky bottom upsell banner without touching other site UI.

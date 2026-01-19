@@ -538,6 +538,27 @@ async function maybeRestoreHistory(shadow, state){
       const h3Font = Math.round(baseFont * 1.12);
       const hdrH = Math.round(baseFont * 2.7); // taller header for better breathing room
 
+      const shareTheme = {
+        bg: isDark ? '#0b1220' : '#f8fafc',
+        cardFill: isDark ? '#111827' : '#ffffff',
+        cardBorder: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)',
+        cardRadius: Math.round(12 * scale),
+        cardShadow: isDark ? 'rgba(2,6,23,0.30)' : 'rgba(15,23,42,0.08)',
+        cardShadowBlur: Math.round(12 * scale),
+        cardShadowOffsetY: Math.round(4 * scale),
+        headerFill: isDark ? '#1f2937' : '#e7eef7',
+        headerLine: isDark ? 'rgba(148,163,184,0.35)' : 'rgba(15,23,42,0.10)',
+        titleText: isDark ? '#e2e8f0' : '#0f172a',
+        badgeFill: isDark ? 'rgba(148,163,184,0.20)' : 'rgba(15,23,42,0.06)',
+        badgeText: isDark ? '#e2e8f0' : '#475569',
+        bodyText: isDark ? '#e5e7eb' : '#111827',
+        headingText: isDark ? '#f8fafc' : '#0f172a',
+        blockquoteBar: isDark ? 'rgba(148,163,184,0.55)' : 'rgba(59,130,246,0.35)',
+        blockquoteText: isDark ? '#cbd5e1' : '#334155',
+        footerText: isDark ? '#94a3b8' : '#64748b',
+        footerDot: isDark ? '#94a3b8' : '#64748b'
+      };
+
       let blocks = parseMdBlocks(md);
       // Targeted fix: if a heading like “结论/结论或建议/关键词(关键字)” exists but其后无内容块，
       // 直接从 DOM 收集该标题之后到下一个标题之间的 runs 作为段落补齐。
@@ -682,21 +703,11 @@ async function maybeRestoreHistory(shadow, state){
       ctx.scale(dpr, dpr);
 
       // Background
-      if (!isDark){
-        // Pure white background to match float panel light theme
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0,0,W,H);
-      } else {
-        // Dark theme keeps subtle gradient
-        const bg = ctx.createLinearGradient(0, 0, W, H);
-        bg.addColorStop(0, '#0f172a');
-        bg.addColorStop(0.5, '#0b1222');
-        bg.addColorStop(1, '#0a1b14');
-        ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
-      }
+      ctx.fillStyle = shareTheme.bg;
+      ctx.fillRect(0,0,W,H);
 
       // Card container
-      const r = Math.max(12, Math.round(24 * scale));
+      const r = Math.max(8, shareTheme.cardRadius);
       const path = new Path2D();
       path.moveTo(cardX+r, cardY);
       path.arcTo(cardX+cardW, cardY, cardX+cardW, cardY+cardH, r);
@@ -704,41 +715,30 @@ async function maybeRestoreHistory(shadow, state){
       path.arcTo(cardX, cardY+cardH, cardX, cardY, r);
       path.arcTo(cardX, cardY, cardX+cardW, cardY, r);
       ctx.save();
-      ctx.shadowColor = isDark? 'rgba(0,0,0,0.38)' : 'rgba(16,24,40,0.18)';
-      ctx.shadowBlur = 28; ctx.shadowOffsetY = 10;
-      // Morandi-inspired soft card surface (light) instead of pure white
-      ctx.fillStyle = isDark? 'rgba(20,30,54,0.90)' : '#F4F3EF';
+      ctx.shadowColor = shareTheme.cardShadow;
+      ctx.shadowBlur = shareTheme.cardShadowBlur;
+      ctx.shadowOffsetY = shareTheme.cardShadowOffsetY;
+      // Flat card surface with subtle border
+      ctx.fillStyle = shareTheme.cardFill;
       ctx.fill(path);
       // crisp border around card
       ctx.shadowColor = 'transparent';
       ctx.lineWidth = Math.max(1, Math.round(1 * scale));
-      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.10)' : '#e6eaf2';
+      ctx.strokeStyle = shareTheme.cardBorder;
       ctx.stroke(path);
       ctx.restore();
-      // Hero header (Morandi blue): gradient + abstract wave + big title + domain badge
+      // Hero header: flat band + title + domain badge
       ctx.save();
       ctx.clip(path);
-      const heroGrad = ctx.createLinearGradient(cardX, cardY, cardX, cardY+hdrH);
-      if (!isDark){ heroGrad.addColorStop(0,'#C9D3E4'); heroGrad.addColorStop(1,'#B6C4DB'); }
-      else { heroGrad.addColorStop(0,'#33435F'); heroGrad.addColorStop(1,'#2A3B59'); }
-      ctx.fillStyle = heroGrad; ctx.fillRect(cardX, cardY, cardW, hdrH);
-      // abstract wave
-      ctx.globalAlpha = isDark ? 0.18 : 0.22;
-      ctx.fillStyle = isDark ? '#8FB0FF' : '#8FA6C8';
-      const waveY = cardY + Math.round(hdrH*0.46);
-      ctx.beginPath();
-      ctx.moveTo(cardX - 40*scale, waveY);
-      ctx.bezierCurveTo(cardX + cardW*0.25, waveY-36*scale, cardX + cardW*0.55, waveY+24*scale, cardX + cardW + 40*scale, waveY-8*scale);
-      ctx.lineTo(cardX + cardW + 40*scale, cardY + hdrH);
-      ctx.lineTo(cardX - 40*scale, cardY + hdrH);
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = shareTheme.headerFill;
+      ctx.fillRect(cardX, cardY, cardW, hdrH);
       // big title: page title (2 lines)
       const heroPadX = cardX + innerP;
       // Use a concise label in the hero header to avoid overflow
       const title = headerTitle;
       const titleSize = Math.round(baseFont*1.35); // smaller hero title
       ctx.font = `800 ${titleSize}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
-      ctx.fillStyle = isDark? '#ECF2FF' : '#0f172a';
+      ctx.fillStyle = shareTheme.titleText;
       drawWrappedText(ctx, title, heroPadX, cardY + Math.round(baseFont*1.8), cardW - innerP*2, Math.round(titleSize*1.2), 2);
       // domain badge
       if (mainDomain){
@@ -754,17 +754,15 @@ async function maybeRestoreHistory(shadow, state){
         badge.arcTo(bx+tw+pad*2, by+badgeH, bx+tw+pad*2-rx, by+badgeH, rx);
         badge.arcTo(bx, by+badgeH, bx, by+badgeH-rx, rx);
         badge.arcTo(bx, by, bx+rx, by, rx);
-        ctx.fillStyle = isDark? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.08)';
+        ctx.fillStyle = shareTheme.badgeFill;
         ctx.fill(badge);
-        ctx.fillStyle = isDark? '#E5EDFF' : '#334155';
+        ctx.fillStyle = shareTheme.badgeText;
         ctx.fillText(mainDomain, bx+pad, by+Math.round(badgeH*0.74));
       }
       // divider under hero
       const lineY = cardY + hdrH;
-      const divGrad = ctx.createLinearGradient(0, lineY, 0, lineY + Math.round(8*scale));
-      if (!isDark){ divGrad.addColorStop(0,'rgba(15,23,42,0.10)'); divGrad.addColorStop(1,'rgba(15,23,42,0)'); }
-      else { divGrad.addColorStop(0,'rgba(0,0,0,0.25)'); divGrad.addColorStop(1,'rgba(0,0,0,0)'); }
-      ctx.fillStyle = divGrad; ctx.fillRect(cardX, lineY, cardW, Math.round(8*scale));
+      ctx.fillStyle = shareTheme.headerLine;
+      ctx.fillRect(cardX, lineY, cardW, Math.max(1, Math.round(1 * scale)));
       ctx.restore();
       // Summary body (styled by block)
       let drawY = cardY + innerP + hdrH + headerSpacer;
@@ -777,20 +775,20 @@ async function maybeRestoreHistory(shadow, state){
           const bx = cardX + innerP + Math.round(8*scale);
           const bw = cw - Math.round(14*scale);
           // bar
-          ctx.fillStyle = isDark? 'rgba(59,130,246,.35)' : 'rgba(59,130,246,.28)';
+          ctx.fillStyle = shareTheme.blockquoteBar;
           ctx.fillRect(bx, drawY + 4, Math.round(4*scale), Math.round( Math.max(lineH, 10*scale) ));
           ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
-          ctx.fillStyle = isDark? '#dbe3ee' : '#334155';
+          ctx.fillStyle = shareTheme.blockquoteText;
           const used = drawWrappedRich(ctx, b.runs, bx + Math.round(12*scale), drawY, bw - Math.round(12*scale), lineH, 0, { draw:true, fontSize: baseFont });
           drawY += used + Math.round(12*scale);
         } else if (b.kind==='h'){
           const size = b.level<=1? h1Font : b.level===2? h2Font : h3Font;
           ctx.font = fontFor({ size, weight: 800, italic:false, code:false });
-          ctx.fillStyle = isDark? '#e6eefc' : '#0f172a';
+          ctx.fillStyle = shareTheme.headingText;
           drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, Math.round(size*1.45), 0, { draw:true, fontSize: size });
         } else {
           ctx.font = fontFor({ size: baseFont, weight: 400, italic:false, code:false });
-          ctx.fillStyle = isDark? '#e5e7eb' : '#111827';
+          ctx.fillStyle = shareTheme.bodyText;
           if (b.kind==='li'){
             drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, lineH, 0, { draw:true, bullet: b.bullet||'•', indent: Math.round(22*scale), fontSize: baseFont });
           } else {
@@ -805,13 +803,11 @@ async function maybeRestoreHistory(shadow, state){
       // Footer brand — refined palette per theme
       const footer = brand;
       ctx.font = `700 ${Math.round(baseFont*0.95)}px \\-apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, sans-serif`;
-      const brandText = isDark ? '#BFD1FF' : '#3F5B94';   // soft indigo (dark) / muted indigo (light)
-      const brandDot  = isDark ? '#8FB0FF' : '#6C8BD9';   // companion tone
-      ctx.fillStyle = brandText;
+      ctx.fillStyle = shareTheme.footerText;
       const textW = ctx.measureText(footer).width;
       ctx.fillText(footer, cardX + cardW - textW - (innerP + extraRight), cardY + cardH - Math.round(12*scale));
       // brand dot
-      ctx.beginPath(); ctx.arc(cardX + cardW - textW - (innerP + extraRight) - Math.round(14*scale), cardY + cardH - Math.round(18*scale), Math.round(5*scale), 0, Math.PI*2); ctx.fillStyle = brandDot; ctx.fill();
+      ctx.beginPath(); ctx.arc(cardX + cardW - textW - (innerP + extraRight) - Math.round(14*scale), cardY + cardH - Math.round(18*scale), Math.round(5*scale), 0, Math.PI*2); ctx.fillStyle = shareTheme.footerDot; ctx.fill();
 
       // Export to clipboard
       const blob = await new Promise(res=> canvas.toBlob(res, 'image/png', 0.95));
@@ -1842,6 +1838,28 @@ async function maybeRestoreHistory(shadow, state){
 
       /* ===== Markdown ===== */
       .md{ font-size:15px; line-height:1.78; color: var(--text); word-break:break-word; overflow-wrap:anywhere; }
+      .summary-title{
+        margin:4px 0 10px;
+        padding:8px 10px;
+        border-radius:10px;
+        border:1px solid var(--border);
+        background: var(--surface-2);
+      }
+      .summary-title-label{
+        font-size:11px;
+        letter-spacing:.3px;
+        color: var(--muted);
+        font-weight:700;
+      }
+      .summary-title-text{
+        margin-top:2px;
+        font-size:14px;
+        line-height:1.5;
+        color: var(--text);
+        font-weight:700;
+      }
+      .card.card-head.has-history.has-title .summary-title{ margin-top:30px; }
+      .card.card-head.has-history.has-title .md{ margin-top:0; }
       .md h1{ margin:16px 0 10px; font-size:20px; font-weight:900; }
       .md h2{ margin:14px 0 8px;  font-size:18px; font-weight:800; }
       .md h3{ margin:12px 0 8px;  font-size:16px; font-weight:700; }
@@ -4501,6 +4519,8 @@ async function maybeRestoreHistory(shadow, state){
         const qaTitle = shadow.querySelector('.quick-ask .title');
         if (qaTitle) qaTitle.textContent = (currentLangCache==='en'?'You might ask:':'猜你想问：');
       }catch{}
+      // Sync summary title block based on output language
+      try{ await refreshSummaryTitleBlock(shadow); }catch{}
       const noteLbl=shadow.getElementById('sx-footer-note-label'); if (noteLbl) noteLbl.textContent = t_note_label;
       const noteTip=shadow.getElementById('sx-footer-note-tooltip'); if (noteTip) noteTip.textContent = t_note;
       const noteWrap=shadow.getElementById('sx-footer-note'); if (noteWrap) noteWrap.setAttribute('aria-label', t_note_label);
@@ -5320,15 +5340,190 @@ async function maybeRestoreHistory(shadow, state){
     }catch{}
   }
 
+  const summaryTitleTranslateCache = new Map();
+  const summaryTitleTranslateInflight = new Map();
+  const summaryTitleTranslateStoreKey = 'sx_summary_title_trans_cache';
+  let summaryTitleTranslateStore = null;
+  let summaryTitleTranslatePersistTimer = null;
+
+  async function loadSummaryTitleTranslateStore(){
+    if (summaryTitleTranslateStore) return summaryTitleTranslateStore;
+    try{
+      const got = await chrome.storage.local.get({ [summaryTitleTranslateStoreKey]: {} });
+      const raw = got?.[summaryTitleTranslateStoreKey];
+      summaryTitleTranslateStore = (raw && typeof raw === 'object') ? raw : {};
+      for (const [k, v] of Object.entries(summaryTitleTranslateStore)){
+        if (v) summaryTitleTranslateCache.set(k, v);
+      }
+    }catch{
+      summaryTitleTranslateStore = {};
+    }
+    return summaryTitleTranslateStore;
+  }
+
+  function scheduleSummaryTitleTranslatePersist(){
+    if (!summaryTitleTranslateStore) return;
+    if (summaryTitleTranslatePersistTimer) clearTimeout(summaryTitleTranslatePersistTimer);
+    summaryTitleTranslatePersistTimer = setTimeout(() => {
+      try{
+        const keys = Object.keys(summaryTitleTranslateStore);
+        if (keys.length > 200){
+          const drop = keys.slice(0, keys.length - 200);
+          drop.forEach(k => { delete summaryTitleTranslateStore[k]; });
+        }
+        chrome.storage.local.set({ [summaryTitleTranslateStoreKey]: summaryTitleTranslateStore });
+      }catch{}
+    }, 240);
+  }
+
+  function normalizeOutputLang(value){
+    const v = String(value || '').trim().toLowerCase();
+    if (['en','en-us','english','英语','英語'].includes(v)) return 'en';
+    if (['zh','zh-cn','chinese','中文'].includes(v)) return 'zh';
+    if (v === 'auto') return 'auto';
+    return '';
+  }
+
+  async function resolveOutputLang(summaryMarkdown){
+    let pref = '';
+    try{
+      const got = await chrome.storage.sync.get({ output_lang: 'zh' });
+      pref = normalizeOutputLang(got?.output_lang);
+    }catch{}
+    if (pref === 'en' || pref === 'zh') return pref;
+    const metaLang = normalizeOutputLang(summaryHistoryActive?.entry?.meta?.output_lang);
+    if (metaLang === 'en' || metaLang === 'zh') return metaLang;
+    const detected = detectTextLang(summaryMarkdown);
+    if (detected) return detected;
+    return currentLangCache === 'en' ? 'en' : 'zh';
+  }
+
+  function detectTextLang(text = ''){
+    const s = String(text || '').trim();
+    if (!s) return '';
+    const latin = (s.match(/[A-Za-z]/g) || []).length;
+    const cjk = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
+    if (cjk >= 2 && cjk >= Math.max(1, Math.round(latin * 0.4))) return 'zh';
+    if (latin >= 3 && cjk === 0) return 'en';
+    return '';
+  }
+
+  function getSummaryTitleText(shadow){
+    try{
+      const fromHistory = summaryHistoryActive?.group?.title;
+      if (fromHistory && fromHistory.trim()) return fromHistory.trim();
+      const pdfTitle = shadow.getElementById('sx-pdf')?.__pdfName;
+      if (pdfTitle && String(pdfTitle).trim()) return String(pdfTitle).trim();
+    }catch{}
+    return String(document.title || '').trim();
+  }
+
+  async function getSummaryTitleLabel(outputLang){
+    try{
+      const i18n = await loadI18n();
+      if (i18n?.tSync) return i18n.tSync('floatPanel.summaryTitleLabel', outputLang);
+    }catch{}
+    return outputLang==='en' ? 'Title' : '标题';
+  }
+
+  async function translateSummaryTitle(titleText, targetLang){
+    if (!titleText) return '';
+    await loadSummaryTitleTranslateStore();
+    const detected = detectTextLang(titleText);
+    if (detected && detected === targetLang) return titleText;
+    if (!detected && targetLang === 'zh') return titleText;
+    const key = `${targetLang}::${titleText}`;
+    if (summaryTitleTranslateCache.has(key)) return summaryTitleTranslateCache.get(key);
+    if (summaryTitleTranslateStore && summaryTitleTranslateStore[key]){
+      const cached = summaryTitleTranslateStore[key];
+      summaryTitleTranslateCache.set(key, cached);
+      return cached;
+    }
+    if (summaryTitleTranslateInflight.has(key)) return await summaryTitleTranslateInflight.get(key);
+    const task = (async () => {
+      try{
+        const resp = await chrome.runtime.sendMessage({
+          type: 'SX_TRANSLATE_REQUEST',
+          text: titleText,
+          targetLang
+        });
+        const result = resp?.ok ? String(resp.result || '').trim() : '';
+        if (result){
+          summaryTitleTranslateCache.set(key, result);
+          if (summaryTitleTranslateStore){
+            summaryTitleTranslateStore[key] = result;
+            scheduleSummaryTitleTranslatePersist();
+          }
+        }
+        return result || titleText;
+      }catch{
+        return titleText;
+      }
+    })();
+    summaryTitleTranslateInflight.set(key, task);
+    const resolved = await task;
+    summaryTitleTranslateInflight.delete(key);
+    return resolved;
+  }
+
+  async function refreshSummaryTitleBlock(shadow){
+    const card = shadow.getElementById('sx-summary');
+    if (!card) return;
+    const titleWrap = card.querySelector('.summary-title');
+    if (!titleWrap) return;
+    const baseTitle = getSummaryTitleText(shadow);
+    if (!baseTitle){
+      titleWrap.remove();
+      card.classList.remove('has-title');
+      return;
+    }
+    const outputLang = await resolveOutputLang(lastSummaryMarkdown);
+    const label = await getSummaryTitleLabel(outputLang);
+    const labelEl = titleWrap.querySelector('.summary-title-label');
+    if (labelEl) labelEl.textContent = label;
+    const textEl = titleWrap.querySelector('.summary-title-text');
+    if (textEl) textEl.textContent = baseTitle;
+    card.classList.toggle('has-title', true);
+    const translated = await translateSummaryTitle(baseTitle, outputLang);
+    if (textEl && translated) textEl.textContent = translated;
+  }
+
 async function renderCards(summaryMarkdown, cleanedMarkdown){
+    lastSummaryMarkdown = summaryMarkdown || '';
+    lastCleanedMarkdown = cleanedMarkdown;
     const sumHTML = summaryMarkdown ? stripInlineColor(renderMarkdown(summaryMarkdown)) : '';
+    let titleHTML = '';
+    let baseTitle = '';
+    let outputLang = '';
+    if (summaryMarkdown){
+      baseTitle = getSummaryTitleText(shadow);
+      if (baseTitle){
+        outputLang = await resolveOutputLang(summaryMarkdown);
+        const label = await getSummaryTitleLabel(outputLang);
+        titleHTML = `<div class="summary-title"><div class="summary-title-label">${escapeHtml(label)}</div><div class="summary-title-text">${escapeHtml(baseTitle)}</div></div>`;
+      }
+    }
+    const finalSummaryHTML = titleHTML + sumHTML;
     if (vmSummary) {
-      vmSummary.html = sumHTML;
+      vmSummary.html = finalSummaryHTML;
     } else {
       const root = shadow.getElementById('sx-summary');
-      root.innerHTML = sumHTML;
+      root.innerHTML = finalSummaryHTML;
       try{ ensureHistoryButton(shadow); }catch{}
       try{ ensureShareButton(shadow); }catch{}
+    }
+    try{
+      const card = shadow.getElementById('sx-summary');
+      if (card) card.classList.toggle('has-title', !!baseTitle);
+    }catch{}
+    if (baseTitle){
+      try{
+        const translated = await translateSummaryTitle(baseTitle, outputLang || (currentLangCache==='en' ? 'en' : 'zh'));
+        if (translated){
+          const el = shadow.getElementById('sx-summary')?.querySelector('.summary-title-text');
+          if (el) el.textContent = translated;
+        }
+      }catch{}
     }
     if (cleanedMarkdown===null){
       if (vmCleaned) vmCleaned.html = `<div class="skl" style="width:96%"></div><div class="skl" style="width:88%"></div><div class="skl" style="width:76%"></div>`;
@@ -5420,6 +5615,8 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
   let lastQASource = null; // 'pdf' | 'page' | null
   // Track last summary source so Q&A can follow summarize source even if PDF panel is hidden
   let lastSummarySource = null; // 'pdf' | 'page' | null
+  let lastSummaryMarkdown = '';
+  let lastCleanedMarkdown = null;
 
   // Persist lightweight QA UI state per-tab via background session storage
   async function saveQAUIState(part){
@@ -7381,6 +7578,9 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
           forceDarkBtn.classList.toggle('active', forceDarkMode);
         }
         applyForceDarkModeSmart(forceDarkMode);
+      }
+      if (changes.output_lang){
+        try{ refreshSummaryTitleBlock(shadow); }catch{}
       }
     });
   }catch{}
