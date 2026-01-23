@@ -1,5 +1,17 @@
 # Changelog
 
+# v2.3.14 - 2026-01-23
+
+### English
+- Feature: Native streaming output for summaries and Q&A, so responses appear token by token instead of all at once.
+- Performance: Much faster first response and perceived load speed during summarization and chat.
+- Reliability: Automatic fallback to non-streaming mode when an API does not support SSE.
+
+### 中文
+- 新功能：摘要与问答支持原生流式输出，逐字呈现而不是一次性输出。
+- 性能：首帧响应明显更快，整体加载体验大幅提升。
+- 稳定性：当接口不支持 SSE 时自动回退到传统非流式方式。
+
 # v2.3.13 - 2026-01-19
 
 ### English
