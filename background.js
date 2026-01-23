@@ -3,6 +3,7 @@
 
 // ✅ 改动 1：统一从 settings.js 读取配置（含 Trial 默认值）
 import { getSettings, persistSettingsSnapshot, SETTINGS_SNAPSHOT_KEYS, buildAzureChatCompletionsURL } from "./settings.js";
+import { createSSEParser, parseOpenAIStreamData, parseAnthropicStreamData, parseGeminiStreamData } from "./ai_stream.js";
 import { FILTER_LISTS } from "./adblock_lists.js";
 
 
@@ -311,7 +312,24 @@ function buildChatMessages(system, prompt) {
   return messages;
 }
 
-async function chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+async function readSSEStream(res, onData) {
+  if (!res?.body || !res.body.getReader) throw new Error("Stream not supported");
+  const contentType = res.headers?.get?.("content-type") || "";
+  if (!/text\/event-stream/i.test(contentType)) {
+    throw new Error("Non-SSE response");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const parser = createSSEParser(onData);
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parser.feed(decoder.decode(value, { stream: true }));
+  }
+  parser.feed(decoder.decode());
+}
+
+async function chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature = 0.1, onDelta }) {
   if (!apiKey) throw new Error("API Key 未设置");
   const url = `${baseURL.replace(/\/$/, "")}/chat/completions`;
   const body = {
@@ -319,6 +337,27 @@ async function chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, te
     temperature,
     messages: buildChatMessages(system, prompt)
   };
+  if (typeof onDelta === "function") {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ ...body, stream: true })
+      });
+      if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+      let out = "";
+      await readSSEStream(res, (data) => {
+        const { delta } = parseOpenAIStreamData(data);
+        if (delta) {
+          out += delta;
+          onDelta(out, delta);
+        }
+      });
+      return out;
+    } catch (e) {
+      // Fallback to non-streaming when stream is unsupported.
+    }
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
@@ -329,7 +368,7 @@ async function chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, te
   return json.choices?.[0]?.message?.content || "";
 }
 
-async function chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+async function chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature = 0.1, onDelta }) {
   if (!apiKey) throw new Error("Anthropic API Key 未设置");
   const url = `${baseURL.replace(/\/$/, "")}/messages`;
   const body = {
@@ -344,6 +383,31 @@ async function chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt,
     ]
   };
   if (system) body.system = system;
+  if (typeof onDelta === "function") {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION
+        },
+        body: JSON.stringify({ ...body, stream: true })
+      });
+      if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+      let out = "";
+      await readSSEStream(res, (data) => {
+        const { delta } = parseAnthropicStreamData(data);
+        if (delta) {
+          out += delta;
+          onDelta(out, delta);
+        }
+      });
+      return out;
+    } catch (e) {
+      // Fallback to non-streaming when stream is unsupported.
+    }
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -361,7 +425,7 @@ async function chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt,
   return parts.join("\n").trim();
 }
 
-async function chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+async function chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature = 0.1, onDelta }) {
   if (!apiKey) throw new Error("Gemini API Key 未设置");
   const root = baseURL.replace(/\/$/, "");
   const endpoint = `${root}/models/${model || "gemini-1.5-flash-latest"}:generateContent`;
@@ -379,6 +443,34 @@ async function chatCompletionGemini({ baseURL, apiKey, model, system, prompt, te
   if (system) {
     body.systemInstruction = { role: "system", parts: [{ text: system }] };
   }
+  if (typeof onDelta === "function") {
+    try {
+      const streamEndpoint = `${root}/models/${model || "gemini-1.5-flash-latest"}:streamGenerateContent`;
+      const streamUrl = new URL(streamEndpoint);
+      if (apiKey) streamUrl.searchParams.set("key", apiKey);
+      streamUrl.searchParams.set("alt", "sse");
+      const res = await fetch(streamUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+      let out = "";
+      await readSSEStream(res, (data) => {
+        const { delta } = parseGeminiStreamData(data);
+        if (delta) {
+          out += delta;
+          onDelta(out, delta);
+        }
+      });
+      return out;
+    } catch (e) {
+      // Fallback to non-streaming when stream is unsupported.
+    }
+  }
   const res = await fetch(urlObj.toString(), {
     method: "POST",
     headers: {
@@ -393,7 +485,7 @@ async function chatCompletionGemini({ baseURL, apiKey, model, system, prompt, te
   return parts.map((part) => part?.text || "").join("").trim();
 }
 
-async function chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+async function chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature = 0.1, onDelta }) {
   if (!apiKey) throw new Error("Azure API Key 未设置");
   const url = buildAzureChatCompletionsURL(baseURL, model || "default");
   if (!url) throw new Error("Azure Base URL 无效");
@@ -402,6 +494,30 @@ async function chatCompletionAzure({ baseURL, apiKey, model, system, prompt, tem
     temperature
   };
   if (model) body.model = model;
+  if (typeof onDelta === "function") {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey
+        },
+        body: JSON.stringify({ ...body, stream: true })
+      });
+      if (!res.ok) throw new Error(`Azure ${res.status}: ${await res.text()}`);
+      let out = "";
+      await readSSEStream(res, (data) => {
+        const { delta } = parseOpenAIStreamData(data);
+        if (delta) {
+          out += delta;
+          onDelta(out, delta);
+        }
+      });
+      return out;
+    } catch (e) {
+      // Fallback to non-streaming when stream is unsupported.
+    }
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -415,17 +531,17 @@ async function chatCompletionAzure({ baseURL, apiKey, model, system, prompt, tem
   return json.choices?.[0]?.message?.content || "";
 }
 
-async function chatCompletion({ provider = "openai", baseURL, apiKey, model, system, prompt, temperature = 0.1 }) {
+async function chatCompletion({ provider = "openai", baseURL, apiKey, model, system, prompt, temperature = 0.1, onDelta }) {
   const trimmedProvider = (provider || "openai").toLowerCase();
   switch (trimmedProvider) {
     case "anthropic":
-      return chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature });
+      return chatCompletionAnthropic({ baseURL, apiKey, model, system, prompt, temperature, onDelta });
     case "gemini":
-      return chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature });
+      return chatCompletionGemini({ baseURL, apiKey, model, system, prompt, temperature, onDelta });
     case "azure":
-      return chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature });
+      return chatCompletionAzure({ baseURL, apiKey, model, system, prompt, temperature, onDelta });
     default:
-      return chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature });
+      return chatCompletionOpenAI({ baseURL, apiKey, model, system, prompt, temperature, onDelta });
   }
 }
 
@@ -480,6 +596,19 @@ async function runForTab(tabId) {
     return rawTextMd;
   })();
   const quickMd = baseMarkdown;
+  const metaBase = {
+    source: 'page',
+    baseURL: cfg.baseURL,
+    model_extract: cfg.model_extract,
+    model_summarize: cfg.model_summarize,
+    output_lang: finalLang,
+    extract_mode: cfg.extract_mode,
+    task_mode: cfg.task_mode,
+    url,
+    title,
+    pageLang
+  };
+
   const sysForSummary = buildSystemPrompt({
     custom: cfg.system_prompt_custom,
     preset: cfg.system_prompt_preset,
@@ -495,18 +624,47 @@ async function runForTab(tabId) {
     `Content:\n${quickMd.slice(0, 18000)}`;
   summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
 
-  const summaryFast = await chatCompletion({
+  let quickQuestions = [];
+  let summaryFast = "";
+  let summaryPartialSet = false;
+  let summaryUpdateTimer = null;
+  const pushSummaryState = async () => {
+    summaryUpdateTimer = null;
+    if (!summaryPartialSet && !summaryFast) return;
+    summaryPartialSet = true;
+    await setState(tabId, {
+      status: "partial",
+      summary: summaryFast,
+      cleaned: "",
+      quickQuestions,
+      meta: metaBase
+    });
+  };
+  const scheduleSummaryState = () => {
+    if (summaryUpdateTimer) return;
+    summaryUpdateTimer = setTimeout(pushSummaryState, 120);
+  };
+
+  summaryFast = await chatCompletion({
     provider: cfg.aiProvider,
     baseURL: cfg.baseURL,
     apiKey:  cfg.apiKey,
     model:   cfg.model_summarize,
     system:  sysForSummary,
     prompt:  summaryPrompt,
-    temperature: 0.1
+    temperature: 0.1,
+    onDelta: (full, delta) => {
+      if (!delta) return;
+      summaryFast = full;
+      if (!summaryPartialSet) {
+        pushSummaryState();
+      } else {
+        scheduleSummaryState();
+      }
+    }
   });
 
   // Generate 3 likely user questions for quick ask (in finalLang), plain text one per line
-  let quickQuestions = [];
   try {
     const qsPrompt = enforceUserLang(
       `From the content below, generate 3 likely questions a reader may ask.\n`+
@@ -536,18 +694,7 @@ async function runForTab(tabId) {
     summary: summaryFast,
     cleaned: "",
     quickQuestions,
-    meta: {
-      source: 'page',
-      baseURL: cfg.baseURL,
-      model_extract: cfg.model_extract,
-      model_summarize: cfg.model_summarize,
-      output_lang: finalLang,
-      extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode,
-      url,
-      title,
-      pageLang
-    }
+    meta: metaBase
   });
 
   // 正文
@@ -592,18 +739,7 @@ async function runForTab(tabId) {
     summary: summaryFast,
     cleaned: cleanedMarkdown,
     quickQuestions,
-    meta: {
-      source: 'page',
-      baseURL: cfg.baseURL,
-      model_extract: cfg.model_extract,
-      model_summarize: cfg.model_summarize,
-      output_lang: finalLang,
-      extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode,
-      url,
-      title,
-      pageLang
-    }
+    meta: metaBase
   });
 
   try {
@@ -662,6 +798,19 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
   })();
 
   const quickMd = baseMarkdown;
+  const metaBase = {
+    baseURL: cfg.baseURL,
+    model_extract: cfg.model_extract,
+    model_summarize: cfg.model_summarize,
+    output_lang: finalLang,
+    extract_mode: cfg.extract_mode,
+    task_mode: cfg.task_mode,
+    source: 'pdf',
+    pagesLabel,
+    url,
+    title,
+    pageLang
+  };
   const sysForSummary = buildSystemPrompt({
     custom: cfg.system_prompt_custom,
     preset: cfg.system_prompt_preset,
@@ -675,17 +824,46 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     `3) 3–6 keywords\n\n` +
     `Content:\n${quickMd.slice(0, 18000)}`;
   summaryPrompt = enforceUserLang(summaryPrompt, finalLang, false);
-  const summaryFast = await chatCompletion({
+  let quickQuestions = [];
+  let summaryFast = "";
+  let summaryPartialSet = false;
+  let summaryUpdateTimer = null;
+  const pushSummaryState = async () => {
+    summaryUpdateTimer = null;
+    if (!summaryPartialSet && !summaryFast) return;
+    summaryPartialSet = true;
+    await setState(tabId, {
+      status: "partial",
+      summary: summaryFast,
+      cleaned: "",
+      quickQuestions,
+      meta: metaBase
+    });
+  };
+  const scheduleSummaryState = () => {
+    if (summaryUpdateTimer) return;
+    summaryUpdateTimer = setTimeout(pushSummaryState, 120);
+  };
+
+  summaryFast = await chatCompletion({
     provider: cfg.aiProvider,
     baseURL: cfg.baseURL,
     apiKey: cfg.apiKey,
     model: cfg.model_summarize,
     system: sysForSummary,
     prompt: summaryPrompt,
-    temperature: 0.1
+    temperature: 0.1,
+    onDelta: (full, delta) => {
+      if (!delta) return;
+      summaryFast = full;
+      if (!summaryPartialSet) {
+        pushSummaryState();
+      } else {
+        scheduleSummaryState();
+      }
+    }
   });
 
-  let quickQuestions = [];
   try {
     const qsPrompt = enforceUserLang(
       `From the content below, generate 3 likely questions a reader may ask.\n`+
@@ -715,19 +893,7 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     summary: summaryFast,
     cleaned: "",
     quickQuestions,
-    meta: {
-      baseURL: cfg.baseURL,
-      model_extract: cfg.model_extract,
-      model_summarize: cfg.model_summarize,
-      output_lang: finalLang,
-      extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode,
-      source: 'pdf',
-      pagesLabel,
-      url,
-      title,
-      pageLang
-    }
+    meta: metaBase
   });
 
   // Cleaned body
@@ -770,19 +936,7 @@ async function runForText(tabId, { title = '', text = '', url = '', pageLang = '
     summary: summaryFast,
     cleaned: cleanedMarkdown,
     quickQuestions,
-    meta: {
-      baseURL: cfg.baseURL,
-      model_extract: cfg.model_extract,
-      model_summarize: cfg.model_summarize,
-      output_lang: finalLang,
-      extract_mode: cfg.extract_mode,
-      task_mode: cfg.task_mode,
-      source: 'pdf',
-      pagesLabel,
-      url,
-      title,
-      pageLang
-    }
+    meta: metaBase
   });
 
   try {
@@ -1892,6 +2046,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Mark QA busy to reflect in-flight state across tab switches
         try { await setQAUI(tabId, { qaBusy: true }); } catch {}
 
+        const qaTxn = Number.isFinite(+msg?.txn) ? +msg.txn : 0;
+        let qaStreamBuf = "";
+        let qaStreamTimer = null;
+        const flushQAStream = (done = false) => {
+          if (typeof tabId !== 'number' || !qaTxn) return;
+          if (!qaStreamBuf && !done) return;
+          const payload = qaStreamBuf;
+          qaStreamBuf = "";
+          chrome.tabs.sendMessage(tabId, {
+            type: 'SX_QA_STREAM',
+            txn: qaTxn,
+            delta: payload,
+            done
+          }).catch(()=>{});
+        };
+        const onQAStreamDelta = (full, delta) => {
+          if (!delta || !qaTxn) return;
+          qaStreamBuf += delta;
+          if (!qaStreamTimer) {
+            qaStreamTimer = setTimeout(() => {
+              qaStreamTimer = null;
+              flushQAStream(false);
+            }, 80);
+          }
+        };
+
         const answer = await chatCompletion({
           provider: cfg.aiProvider,
           baseURL: cfg.baseURL,
@@ -1899,8 +2079,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           model: cfg.model_summarize,
           system: sys,
           prompt,
-          temperature: 0.1
+          temperature: 0.1,
+          onDelta: (full, delta) => onQAStreamDelta(full, delta)
         });
+        if (qaStreamTimer) {
+          clearTimeout(qaStreamTimer);
+          qaStreamTimer = null;
+        }
+        flushQAStream(true);
 
         const txt = String(answer || '').trim();
         // Persist history robustly (session + local-by-URL)

@@ -5611,6 +5611,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
   const chatHistory = [];
   let chatBubblesUI = [];
   let qaTxn = 0; // cancel token for in-flight QA
+  let qaStreamState = { txn: 0, bubble: null, text: "", timer: null };
   // Track last QA source to auto-switch context between PDF and page
   let lastQASource = null; // 'pdf' | 'page' | null
   // Track last summary source so Q&A can follow summarize source even if PDF panel is hidden
@@ -5646,6 +5647,31 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
       if (qaInput) qaInput.disabled = blocked;
       if (qaSend) qaSend.disabled = blocked;
     }catch{}
+  }
+  function startQAStream(txn, bubble){
+    if (qaStreamState?.timer) { try{ clearTimeout(qaStreamState.timer); }catch{} }
+    qaStreamState = { txn, bubble, text: "", timer: null };
+  }
+  function stopQAStream(){
+    if (qaStreamState?.timer) { try{ clearTimeout(qaStreamState.timer); }catch{} }
+    qaStreamState = { txn: 0, bubble: null, text: "", timer: null };
+  }
+  function scheduleQAStreamRender(){
+    if (!qaStreamState?.bubble) return;
+    if (qaStreamState.timer) return;
+    qaStreamState.timer = setTimeout(() => {
+      qaStreamState.timer = null;
+      try{
+        const html = stripInlineColor(renderMarkdown(qaStreamState.text || ""));
+        qaStreamState.bubble.innerHTML = html;
+      }catch{}
+    }, 80);
+  }
+  function applyQAStreamDelta(txn, delta){
+    if (!delta) return;
+    if (!qaStreamState?.bubble || qaStreamState.txn !== txn) return;
+    qaStreamState.text += delta;
+    scheduleQAStreamRender();
   }
   function setSummarizing(shadow, on){ 
     summarizing = !!on; 
@@ -6338,6 +6364,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
       const userBubble = appendBubble('user', userHtml, false);
       // Append AI pending bubble
       const aiBubble = appendBubble('ai', '', true);
+      startQAStream(myTxn, aiBubble);
       // After both bubbles are in, adjust viewport to show user bubble and as much of AI as possible
       try{ adjustChatViewport(userBubble, aiBubble); requestAnimationFrame(()=>adjustChatViewport(userBubble, aiBubble)); }catch{}
       // If triggered from quick-ask, force a second pass scroll anchoring on the freshly created bubble
@@ -6399,7 +6426,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
       try{ setLoading(shadow, true); }catch{}
       try{
         // Decide QA source: follow last summarize source if present; otherwise fall back to current PDF visibility
-        let qaMsg = { type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8) };
+        let qaMsg = { type: 'SX_QA_ASK', question: q, history: chatHistory.slice(-8), txn: myTxn, stream: true };
         try{
           const pdfCard = shadow.getElementById('sx-pdf');
           const pdfOpen = !!pdfCard && pdfCard.style.display !== 'none';
@@ -6497,6 +6524,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
         // If this response is outdated (e.g., user switched away and we invalidated), ignore
         if (myTxn !== qaTxn) return;
         aiBubble.innerHTML = html;
+        stopQAStream();
         try{
           // Fill the last AI bubble in UI snapshot
           for (let i=chatBubblesUI.length-1; i>=0; i--){ if (chatBubblesUI[i]?.role==='ai'){ chatBubblesUI[i].html = html; break; } }
@@ -6510,6 +6538,7 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
         chatHistory.push({ role:'assistant', content: ans });
         try{ const h = chatHistory.slice(0); saveQAUIState({ hist: h, qaBusy:false, qaTxn }); saveHistoryLocal(h); }catch{}
       }catch(e){
+        stopQAStream();
         try{ alert((currentLangCache==='zh'?'提问失败：':'Ask failed: ') + (e?.message || e)); }catch{}
       } finally {
         try{ setLoading(shadow, false); }catch{}
@@ -7152,6 +7181,12 @@ async function renderCards(summaryMarkdown, cleanedMarkdown){
             `<div class="alert"><button class="alert-close" title="关闭" aria-label="关闭">&times;</button><div class="alert-content"><p>发生错误，请重试。</p></div></div>`;
           stopPolling();
         }
+      }catch{}
+    }else if (msg.type==='SX_QA_STREAM'){
+      try{
+        const txn = Number.isFinite(+msg?.txn) ? +msg.txn : 0;
+        if (!txn || txn !== qaTxn) return;
+        applyQAStreamDelta(txn, String(msg?.delta || ''));
       }catch{}
     }else if (msg.type==='SX_CLOSE_FLOAT_PANEL'){
       try{ await chrome.runtime.sendMessage({ type:'QA_UI_SET', ui:{ visible:false } }); }catch{}
