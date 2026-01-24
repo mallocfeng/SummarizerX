@@ -511,7 +511,15 @@ async function maybeRestoreHistory(shadow, state){
       const md = summaryCard.querySelector('.md');
       if (!md) throw new Error('no summary content');
       const brand = currentLangCache==='en' ? 'SummarizerX AI Reader' : '麦乐可 AI 摘要阅读器';
-      const headerTitle = currentLangCache==='en' ? 'Summary' : '摘要';
+      const summaryTextForLang = String(md?.innerText || '').trim();
+      let outputLang = 'zh';
+      try{ outputLang = await resolveOutputLang(summaryTextForLang); }catch{}
+      const headerTitle = (outputLang === 'en') ? 'Summary' : '摘要';
+      let shareTitleText = '';
+      try{
+        const rawTitle = getSummaryTitleText(shadow);
+        shareTitleText = await translateSummaryTitle(rawTitle, outputLang);
+      }catch{}
       const mainDomain = getMainDomain(location.hostname||'');
 
       // Match current card width but make it slightly narrower/taller
@@ -560,6 +568,15 @@ async function maybeRestoreHistory(shadow, state){
       };
 
       let blocks = parseMdBlocks(md);
+      const textFromRunsShare = (runs=[])=> (runs||[]).map(r=>r?.text||'').join('');
+      const blockTextShare = (blk)=> (blk?.text !== undefined ? String(blk.text) : textFromRunsShare(blk?.runs||[])).trim();
+      const firstText = blocks[0] ? blockTextShare(blocks[0]) : '';
+      const titleText = String(shareTitleText || '').trim();
+      if (titleText){
+        if (!firstText || firstText.toLowerCase() !== titleText.toLowerCase()){
+          blocks.unshift({ kind:'h', runs: [{ text: titleText, weight: 800, italic:false, code:false }], level:2, __sxShareTitle:true });
+        }
+      }
       // Targeted fix: if a heading like “结论/结论或建议/关键词(关键字)” exists but其后无内容块，
       // 直接从 DOM 收集该标题之后到下一个标题之间的 runs 作为段落补齐。
       try{
@@ -665,6 +682,7 @@ async function maybeRestoreHistory(shadow, state){
       const textFromRunsLocal = (runs=[])=> (runs||[]).map(r=>r?.text||'').join('');
       const getHeadMetrics = (blk)=>{
         if (blk?.kind!=='h') return { top: blockGap, bottom: blockGap, isTight:false };
+        if (blk.__sxShareTitle) return { top: Math.round(10 * scale), bottom: Math.round(8 * scale), isTight:false };
         const s=(blk.text!==undefined? blk.text : textFromRunsLocal(blk.runs||[])).trim();
         const isTight = /^(结论或建议|结论|建议|关键词|关键字|keywords?)$/i.test(s);
         return { top: headTopGapDefault, bottom: isTight? headBottomGapTight: headBottomGapDefault, isTight };
@@ -679,7 +697,7 @@ async function maybeRestoreHistory(shadow, state){
           const used = drawWrappedRich(ctx, b.runs, 0, 0, cw - Math.round(14*scale), lineH, 0, { draw:false, fontSize: baseFont });
           y += used + Math.round(12*scale);
         } else if (b.kind==='h'){
-          const size = b.level<=1? h1Font : b.level===2? h2Font : h3Font;
+          const size = b.__sxShareTitle ? Math.round(baseFont * 1.18) : (b.level<=1? h1Font : b.level===2? h2Font : h3Font);
           ctx.font = fontFor({ size, weight: 800, italic:false, code:false });
           y += drawWrappedRich(ctx, b.runs, 0, 0, cw, Math.round(size*1.45), 0, { draw:false, fontSize: size });
         } else if (b.kind==='li'){
@@ -782,7 +800,7 @@ async function maybeRestoreHistory(shadow, state){
           const used = drawWrappedRich(ctx, b.runs, bx + Math.round(12*scale), drawY, bw - Math.round(12*scale), lineH, 0, { draw:true, fontSize: baseFont });
           drawY += used + Math.round(12*scale);
         } else if (b.kind==='h'){
-          const size = b.level<=1? h1Font : b.level===2? h2Font : h3Font;
+          const size = b.__sxShareTitle ? Math.round(baseFont * 1.18) : (b.level<=1? h1Font : b.level===2? h2Font : h3Font);
           ctx.font = fontFor({ size, weight: 800, italic:false, code:false });
           ctx.fillStyle = shareTheme.headingText;
           drawY += drawWrappedRich(ctx, b.runs, cardX+innerP, drawY, cw, Math.round(size*1.45), 0, { draw:true, fontSize: size });
