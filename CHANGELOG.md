@@ -1,5 +1,13 @@
 # Changelog
 
+# v2.3.15 - 2026-01-25
+
+### English
+- Maintenance: Version bump for release packaging (no functional changes).
+
+### 中文
+- 维护更新：发布打包的小版本号升级（无功能变更）。
+
 # v2.3.14 - 2026-01-23
 
 ### English
